@@ -132,6 +132,8 @@ things do need them, all part of the M4 exit:
   run by letting each file's own metadata pick the level.
 - pdf.js drops the spaces at line ends when asked for the text of a tagged element; poppler
   (`pdfinfo -struct-text`) shows them.
+- CI's gzip measures about 1 kB more than this machine's (145.1 against 144.1 kB for the root entry). Set
+  size budgets from the CI figure with a few kB to spare, and look at CI before the next push.
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 
 ## Resume checklist
