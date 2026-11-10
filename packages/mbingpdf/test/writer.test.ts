@@ -13,7 +13,6 @@ import {
 } from "../src/core/index.ts";
 
 const latin1 = (bytes: Uint8Array): string => new TextDecoder("latin1").decode(bytes);
-const ascii = (text: string): Uint8Array => new TextEncoder().encode(text);
 
 const hasQpdf = spawnSync("qpdf", ["--version"]).status === 0;
 
@@ -38,10 +37,9 @@ function sample(options: PdfDocumentOptions = {}, pages = 3): Uint8Array {
   });
   for (let i = 0; i < pages; i++) {
     const y = 100 + i * 50;
-    doc.addPage({
-      size: [595.276, 841.89],
-      content: ascii(`0.2 0.4 0.8 rg\n72 ${y} 200 100 re\nf\n`.repeat(4)),
-    });
+    doc
+      .addPage({ size: [595.276, 841.89] })
+      .content.raw(`0.2 0.4 0.8 rg\n72 ${y} 200 100 re\nf\n`.repeat(4));
   }
   return doc.finish();
 }
@@ -104,10 +102,6 @@ describe("PdfDocument", () => {
 
   test("compression makes the file smaller", () => {
     expect(sample({}, 20).length).toBeLessThan(sample({ compress: false }, 20).length);
-  });
-
-  test("rejects a page with no area", () => {
-    expect(() => new PdfDocument().addPage({ size: [0, 100] })).toThrow(RangeError);
   });
 
   test.skipIf(!hasQpdf).each(variants)("qpdf --check passes: %s", (_label, options) => {

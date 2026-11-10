@@ -1,4 +1,5 @@
-import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
+import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
+import { PdfPage, type PdfPageOptions } from "./page.ts";
 import { PdfWriter, type PdfWriterOptions } from "./writer.ts";
 
 /** Document information shown in a viewer's properties dialog. */
@@ -24,14 +25,6 @@ export interface PdfDocumentOptions extends PdfWriterOptions {
   deterministic?: boolean;
 }
 
-export interface PdfPageOptions {
-  /** Page width and height in points. */
-  size: readonly [width: number, height: number];
-  /** A finished content stream. */
-  content?: Uint8Array;
-  resources?: PdfDict;
-}
-
 /**
  * The document skeleton: catalog, page tree and information dictionary on top of a
  * {@link PdfWriter}. Pages are written as they are added.
@@ -41,7 +34,8 @@ export class PdfDocument {
   readonly #info: PdfInfo;
   readonly #deterministic: boolean;
   readonly #pagesRef: PdfRef;
-  readonly #pages: PdfRef[] = [];
+  readonly #pages: PdfPage[] = [];
+  readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
 
   constructor(options: PdfDocumentOptions = {}) {
     this.writer = new PdfWriter(options);
@@ -54,18 +48,15 @@ export class PdfDocument {
     return this.#pages.length;
   }
 
-  addPage(options: PdfPageOptions): PdfRef {
-    const [width, height] = options.size;
-    if (!(width > 0 && height > 0)) throw new RangeError("Page width and height must be positive");
-    const contents = options.content ? this.writer.add(new PdfStream(options.content)) : undefined;
-    const page = this.writer.add(
-      new PdfDict({
-        Type: new PdfName("Page"),
-        Parent: this.#pagesRef,
-        MediaBox: [0, 0, width, height],
-        Resources: options.resources ?? new PdfDict(),
-        Contents: contents,
-      }),
+  /** Starts a new page. Draw on it through `page.content`. */
+  addPage(options: PdfPageOptions): PdfPage {
+    const page = new PdfPage(
+      {
+        writer: this.writer,
+        pagesRef: this.#pagesRef,
+        opacityState: (fill, stroke) => this.#opacityState(fill, stroke),
+      },
+      options,
     );
     this.#pages.push(page);
     return page;
@@ -75,13 +66,35 @@ export class PdfDocument {
   finish(): Uint8Array {
     const writer = this.writer;
     if (this.#pages.length === 0) throw new Error("A PDF needs at least one page");
+    for (const page of this.#pages) page.end();
     writer.set(
       this.#pagesRef,
-      new PdfDict({ Type: new PdfName("Pages"), Kids: this.#pages, Count: this.#pages.length }),
+      new PdfDict({
+        Type: new PdfName("Pages"),
+        Kids: this.#pages.map((page) => page.ref),
+        Count: this.#pages.length,
+      }),
     );
     const root = writer.add(new PdfDict({ Type: new PdfName("Catalog"), Pages: this.#pagesRef }));
     const info = writer.add(this.#infoDict());
     return writer.finish({ root, info });
+  }
+
+  /** One ExtGState object per distinct opacity pair, shared by every page that uses it. */
+  #opacityState(
+    fill: number | undefined,
+    stroke: number | undefined,
+  ): { name: string; ref: PdfRef } {
+    const key = `${fill ?? ""}/${stroke ?? ""}`;
+    let state = this.#opacityStates.get(key);
+    if (!state) {
+      const ref = this.writer.add(
+        new PdfDict({ Type: new PdfName("ExtGState"), ca: fill, CA: stroke }),
+      );
+      state = { name: `GS${this.#opacityStates.size + 1}`, ref };
+      this.#opacityStates.set(key, state);
+    }
+    return state;
   }
 
   #infoDict(): PdfDict {
