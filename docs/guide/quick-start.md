@@ -175,6 +175,16 @@ import { renderSvg } from "mbingpdf/svg";
 const pages = renderSvg(document);       // string[]
 ```
 
+In a React or Vue app, the `PdfPreview` component does this for you: pages sized to their container, drawn as they scroll into view, with working links.
+
+```tsx
+import { PdfPreview, usePdf } from "@mbingpdf/react";   // or "@mbingpdf/vue"
+
+<PdfPreview document={document} />
+```
+
+`usePdf(document)` makes the file itself and gives `{ bytes, url, loading, error, download }`. See the README of [`@mbingpdf/react`](../../packages/react/README.md) or [`@mbingpdf/vue`](../../packages/vue/README.md).
+
 ## For a print shop
 
 ```ts

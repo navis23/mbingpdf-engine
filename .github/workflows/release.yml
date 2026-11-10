@@ -30,9 +30,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - name: Pack
-        run: pnpm --filter mbingpdf pack --pack-destination "$RUNNER_TEMP"
+        run: pnpm --filter "./packages/*" exec pnpm pack --pack-destination "$RUNNER_TEMP"
       - name: Publish to npm
         if: ${{ !inputs.dry-run }}
-        run: pnpm --filter mbingpdf publish --no-git-checks
+        run: pnpm --filter "./packages/*" publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

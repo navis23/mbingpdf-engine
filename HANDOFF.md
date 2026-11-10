@@ -55,13 +55,17 @@ M1 has just started; see `docs/05-roadmap.md`.
     `types` conditions and provenance, `.changeset/first-release.md`, `.github/workflows/release.yml`
     (manual, dry run by default). To release: `pnpm changeset version`, commit, then run the workflow with
     dry-run off. Nothing has been published.
-16. M4 remaining: `@mbingpdf/react` and `@mbingpdf/vue` preview components; preview server; shared
-    graphics; benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
+16. Also done in M4: `@mbingpdf/react` and `@mbingpdf/vue` (`packages/react`, `packages/vue`): `PdfPreview`,
+    `usePdf`, `downloadPdf`, built on `previewPages()` in `mbingpdf/svg`. Tested with happy-dom; the Vue one
+    was also checked by hand in Chromium.
+17. M4 remaining: preview server; shared graphics; benchmarks against PDFKit, pdfmake and
+    @react-pdf/renderer.
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
 things do need them, all part of the M4 exit:
-- publishing `0.1.0` to npm: add the `NPM_TOKEN` secret, run `pnpm changeset version`, commit, then start
+- publishing `0.1.0` to npm: create the `@mbingpdf` organisation on npm (for the scoped packages), add the
+  `NPM_TOKEN` secret, run `pnpm changeset version`, commit, then start
   the Release workflow with dry-run off (their account and their decision);
 - switching one document type in each of the two private apps to mbingpdf;
 - the manual checks: Acrobat PDF/X-4 preflight of the certificate, copying text out of Acrobat, and comparing
@@ -78,7 +82,7 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 429 tests, build, size). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 445 tests, build, size). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 

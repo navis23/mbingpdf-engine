@@ -69,6 +69,15 @@ function imageUri(image: PdfImage): string {
   return uri;
 }
 
+/**
+ * A link's address if it is safe to put in a page that a browser shows, otherwise undefined.
+ * Only web, mail and phone addresses pass: an SVG placed in a web page runs `javascript:`
+ * links when they are clicked, and a document's links may come from user data.
+ */
+export function safeUrl(url: string): string | undefined {
+  return /^(https?:|mailto:|tel:)/i.test(url.trim()) ? url.trim() : undefined;
+}
+
 /** A font that can give the shapes of its glyphs. */
 interface OutlineFont {
   glyphOutline(glyph: number): readonly OutlineCommand[];
@@ -168,9 +177,12 @@ class PageWriter {
           out += `<image x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" preserveAspectRatio="none" href="${imageUri(item.image)}"${clip}/>`;
           break;
         }
-        case "link":
-          out += `<a href="${escapeXml(item.url ?? `#${item.target}`)}"><rect x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" fill="none" pointer-events="all"/></a>`;
+        case "link": {
+          const href = item.url !== undefined ? safeUrl(item.url) : `#${item.target}`;
+          if (href === undefined) break;
+          out += `<a href="${escapeXml(href)}"><rect x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" fill="none" pointer-events="all"/></a>`;
           break;
+        }
         case "anchor":
           // An empty, invisible target for links within the document.
           out += `<g id="${escapeXml(item.id)}" transform="translate(${n(item.x)} ${n(item.y)})"/>`;
@@ -213,4 +225,115 @@ export function pageToSvg(page: DisplayPage): string {
 export function renderSvg(document: LayoutNode | DocumentLayout): string[] {
   const layout = "pages" in document ? document : layoutDocument(document);
   return layout.pages.map(pageToSvg);
+}
+
+/** A clickable area of a preview page. Positions are in points from the page's top-left corner. */
+export interface PreviewLink {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  /** A web, mail or phone address, or… */
+  readonly url?: string;
+  /** …the id of an anchor somewhere in the document. */
+  readonly target?: string;
+}
+
+/** A place in the document that links point to. */
+export interface PreviewAnchor {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+/** One page of a document, prepared for showing on screen. */
+export interface PreviewPage {
+  /** The page's size in points. */
+  readonly width: number;
+  readonly height: number;
+  /** The page as an SVG image. Made on first use and kept, so unseen pages cost nothing. */
+  svg(): string;
+  readonly links: readonly PreviewLink[];
+  readonly anchors: readonly PreviewAnchor[];
+}
+
+type Point = readonly [number, number];
+type Transform = (point: Point) => Point;
+
+function collectAreas(
+  items: readonly DisplayItem[],
+  transform: Transform,
+  links: PreviewLink[],
+  anchors: PreviewAnchor[],
+): void {
+  for (const item of items) {
+    if (item.type === "link") {
+      const url = item.url !== undefined ? safeUrl(item.url) : undefined;
+      if (url === undefined && item.target === undefined) continue;
+      // Inside a rotated group the area is no longer upright; its bounding box stands in.
+      const corners = [
+        transform([item.x, item.y]),
+        transform([item.x + item.width, item.y]),
+        transform([item.x, item.y + item.height]),
+        transform([item.x + item.width, item.y + item.height]),
+      ];
+      const xs = corners.map((corner) => corner[0]);
+      const ys = corners.map((corner) => corner[1]);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      links.push({
+        x,
+        y,
+        width: Math.max(...xs) - x,
+        height: Math.max(...ys) - y,
+        ...(url !== undefined ? { url } : { target: item.target as string }),
+      });
+    } else if (item.type === "anchor") {
+      const [x, y] = transform([item.x, item.y]);
+      anchors.push({ id: item.id, x, y });
+    } else if (item.type === "group") {
+      let inner = transform;
+      if (item.rotate) {
+        const { degrees, cx, cy } = item.rotate;
+        const cos = Math.cos((degrees * Math.PI) / 180);
+        const sin = Math.sin((degrees * Math.PI) / 180);
+        inner = ([px, py]) =>
+          transform([
+            cx + (px - cx) * cos - (py - cy) * sin,
+            cy + (px - cx) * sin + (py - cy) * cos,
+          ]);
+      }
+      collectAreas(item.items, inner, links, anchors);
+    }
+  }
+}
+
+/**
+ * Lays out a document and prepares its pages for an on-screen preview: each page's SVG image
+ * (made when first asked for), and its links and anchors as plain rectangles and points, so a
+ * viewer can show the image safely as a picture and put real links on top of it.
+ *
+ * This is what the `@mbingpdf/react` and `@mbingpdf/vue` preview components are built on.
+ */
+export function previewPages(
+  document: LayoutNode | DocumentLayout,
+  options: { debug?: boolean } = {},
+): PreviewPage[] {
+  const layout = "pages" in document ? document : layoutDocument(document, options);
+  return layout.pages.map((page) => {
+    const links: PreviewLink[] = [];
+    const anchors: PreviewAnchor[] = [];
+    collectAreas(page.items, (point) => point, links, anchors);
+    let svg: string | undefined;
+    return {
+      width: page.width,
+      height: page.height,
+      svg: () => {
+        svg ??= pageToSvg(page);
+        return svg;
+      },
+      links,
+      anchors,
+    };
+  });
 }

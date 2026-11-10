@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "mbingpdf": ["../mbingpdf/src/index.ts"],
+      "mbingpdf/svg": ["../mbingpdf/src/svg/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

@@ -59,6 +59,9 @@
 | 56 | Bundle budget | `pnpm size` measures the gzip size of each entry point with everything it imports, untree-shaken, and fails CI when one exceeds `size-budget.json` (current size plus 10%). The whole document API is about 130 kB gzip; `mbingpdf/core` alone 31 kB | 2026-11-10 |
 | 57 | Examples | Starter templates live in `examples/` as a private workspace package that imports `mbingpdf` by name; each exports a function from data to a document, plus sample data | 2026-11-10 |
 | 58 | Release | Publishing is a manual step: the `Release` workflow is started by hand, defaults to a dry run, and needs the `NPM_TOKEN` secret. Packages are published with npm provenance. No source maps are shipped. Subpath imports need `moduleResolution` `node16` or `bundler` | 2026-11-10 |
+| 59 | Preview components | `@mbingpdf/react` and `@mbingpdf/vue` each give `PdfPreview`, `usePdf` and `downloadPdf`, written without JSX or single-file components so they build with the same toolchain. Each page is shown as an `<img>` of its SVG (no script can run, no id clashes between pages), drawn when it nears the screen; links are real `<a>` elements laid on top. Both are built on `previewPages()` in `mbingpdf/svg` | 2026-11-10 |
+| 60 | Link safety on screen | The SVG backend and the previews keep only `http`, `https`, `mailto` and `tel` links; anything else (such as `javascript:`) is dropped, because link addresses may come from user data. The PDF keeps every link as written | 2026-11-10 |
+| 61 | Framework versions | React 18 or later; Vue 3.5 or later (for `useId`). `mbingpdf` is a peer dependency of both | 2026-11-10 |
 
 Decisions 8–10 and 16–58 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 

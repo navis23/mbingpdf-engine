@@ -1,5 +1,7 @@
 ---
 "mbingpdf": minor
+"@mbingpdf/react": minor
+"@mbingpdf/vue": minor
 ---
 
 First release.
@@ -10,5 +12,6 @@ First release.
 - Text: Unicode line breaking, hyphenation for English and Indonesian, justification, fit-to-width.
 - Themes with `defineTheme`; JSX through `mbingpdf/jsx-runtime`.
 - Print: CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
-- SVG preview with `renderSvg` from `mbingpdf/svg`.
+- SVG preview with `renderSvg` and `previewPages` from `mbingpdf/svg`.
+- `@mbingpdf/react` and `@mbingpdf/vue`: a `PdfPreview` component and `usePdf` for each framework.
 - Lower layers on their own: `mbingpdf/core`, `mbingpdf/font`, `mbingpdf/text`, `mbingpdf/image`, `mbingpdf/qr`.

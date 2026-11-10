@@ -23,7 +23,7 @@ import {
   Stack,
   Text,
 } from "../src/index.ts";
-import { renderSvg } from "../src/svg/index.ts";
+import { previewPages, renderSvg, safeUrl } from "../src/svg/index.ts";
 import { encodePng } from "../src/svg/png.ts";
 import { env } from "./harness/env.ts";
 import { type RenderedPage, renderPdf } from "./harness/render.ts";
@@ -162,6 +162,52 @@ describe("SVG backend", () => {
     expect(svg).toContain('clip-path="url(#c1)"');
     expect(svg).toMatch(/<g opacity="0\.2" transform="rotate\(-20 [\d.]+ [\d.]+\)">/);
     expect(svg).toContain('stroke-dasharray="4 2"');
+  });
+
+  test("links that a browser would run as script are left out", () => {
+    expect(safeUrl("https://example.com/x")).toBe("https://example.com/x");
+    expect(safeUrl(" MAILTO:someone@example.com ")).toBe("MAILTO:someone@example.com");
+    expect(safeUrl("tel:+62123")).toBe("tel:+62123");
+    expect(safeUrl("javascript:alert(1)")).toBeUndefined();
+    expect(safeUrl("data:text/html,<script>1</script>")).toBeUndefined();
+    const [svg] = renderSvg(
+      Document(Page(Text(Link({ href: "javascript:alert(1)" }, "bad"), " and plain text"))),
+    );
+    expect(svg).not.toContain("javascript:");
+    expect(svg).not.toContain("<a ");
+  });
+
+  test("previewPages gives each page's picture, links and anchors", () => {
+    const pages = previewPages(
+      Document(
+        { font: inter },
+        Page(
+          { size: "A6", margin: 20 },
+          Text(Link({ href: "https://example.com" }, "web"), " ", Link({ to: "last" }, "jump")),
+          Text(Link({ href: "javascript:alert(1)" }, "bad")),
+          Absolute({ top: 200, left: 100, rotate: 90 }, Text(Link({ href: "tel:123" }, "turned"))),
+        ),
+        Page({ size: "A6", margin: 20 }, Text({ id: "last" }, "The last page")),
+      ),
+    );
+    expect(pages).toHaveLength(2);
+    const [first, second] = pages;
+    if (!first || !second) return;
+    expect(first.width).toBeCloseTo(mm(105), 3);
+    expect(first.svg()).toMatch(/^<svg /);
+    expect(first.svg()).toBe(first.svg());
+    expect(first.links.map((link) => link.url ?? `#${link.target}`)).toEqual([
+      "https://example.com",
+      "#last",
+      "tel:123",
+    ]);
+    const [web, , turned] = first.links;
+    expect(web?.x).toBeCloseTo(20, 3);
+    expect(web?.width).toBeGreaterThan(web?.height ?? 0);
+    // A quarter turn swaps the area's width and height.
+    expect(turned?.height).toBeGreaterThan(turned?.width ?? 0);
+    expect(second.anchors).toEqual([{ id: "last", x: expect.any(Number), y: expect.any(Number) }]);
+    expect(second.anchors[0]?.y).toBeCloseTo(20, 3);
   });
 
   test("looks like the PDF of the same document", async () => {
