@@ -1,5 +1,6 @@
 import type { AnyFont, FontBinding } from "./content.ts";
 import { EmbeddedFont } from "./embedded-font.ts";
+import { writeGlyphRun } from "./glyph-run.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
 import { PdfPage, type PdfPageOptions } from "./page.ts";
 import { writeObject } from "./serialize.ts";
@@ -127,6 +128,21 @@ export class PdfDocument {
           writeObject(out, new PdfString(font.encode(text)));
           out.ascii(" Tj\n");
         },
+        showGlyphs: (out, glyphs, text, size, rise) =>
+          writeGlyphRun(
+            out,
+            {
+              unitsPerEm: 1000,
+              bytesPerGlyph: 1,
+              // Code 0 stands for a character the font lacks: leave its space empty.
+              code: (glyph) => (glyph === 0 ? undefined : glyph),
+              width: (glyph) => font.advanceOfCode(glyph),
+            },
+            glyphs,
+            text,
+            size,
+            rise,
+          ),
       };
     } else {
       // The subset is only known once every page is drawn, so the object is written in finish().
@@ -137,6 +153,8 @@ export class PdfDocument {
         name,
         ref,
         show: (out, text, size, rise) => embedded.show(out, text, size, rise),
+        showGlyphs: (out, glyphs, text, size, rise) =>
+          embedded.showGlyphs(out, glyphs, text, size, rise),
       };
     }
     this.#fonts.set(font, resource);

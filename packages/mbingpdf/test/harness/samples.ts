@@ -8,6 +8,7 @@
  */
 import type * as Core from "../../src/core/index.ts";
 import type * as Font from "../../src/font/index.ts";
+import type * as Text from "../../src/text/index.ts";
 
 export type CoreModule = typeof Core;
 
@@ -26,6 +27,7 @@ export type FontFile = (typeof FONT_FILES)[number];
 export interface SampleEnv {
   readonly core: CoreModule;
   readonly font: typeof Font;
+  readonly text: typeof Text;
   /** The bytes of each test font. */
   readonly fonts: Readonly<Record<FontFile, Uint8Array>>;
 }
@@ -345,4 +347,133 @@ const fonts: Sample = {
   },
 };
 
-export const samples: Readonly<Record<string, Sample>> = { shapes, text, report, fonts };
+const INDONESIAN =
+  "Dengan ini menerangkan bahwa pembayaran untuk keberangkatan rombongan telah diterima " +
+  "sepenuhnya. Sertifikat penghargaan akan dikirimkan paling lambat empat belas hari setelah " +
+  "kegiatan berakhir, bersama kuitansi resmi dan rincian biaya perjalanan.";
+const ENGLISH =
+  "Typography is the craft of arranging type so that written language is legible, readable " +
+  "and appealing. Hyphenation and justification together decide how evenly a paragraph fills " +
+  "its column.";
+
+/** Paragraph layout: wrapping, alignment, justification, hyphenation, spacing, fallback. */
+const paragraphs: Sample = {
+  // The letter-spaced heading is left out: viewers report wide letter spacing as spaces.
+  text: [
+    [
+      "Bartholomew Maximilian Wolfeschlegelstein",
+      "rombongan telah diterima sepenuhnya.",
+      "Typography is the craft of arranging type",
+      "Rata kanan",
+      "Total: Rp 1.250.000",
+    ],
+  ],
+  build(env) {
+    const { PdfDocument, PageSizes, StandardFonts, rgb, gray } = env.core;
+    const { layoutParagraph, drawParagraph, fitText, hyphenateIndonesian, hyphenateEnglish } =
+      env.text;
+    const doc = new PdfDocument({ deterministic: true, info: { title: "Paragraphs" } });
+    const page = doc.addPage({ size: PageSizes.A5 });
+    const c = page.content;
+    const inter = new env.font.TrueTypeFont(env.fonts["Inter-Variable"]);
+    const jakarta = new env.font.TrueTypeFont(env.fonts["PlusJakartaSans-Variable"]);
+    const barlowBold = new env.font.TrueTypeFont(env.fonts["BarlowCondensed-Bold"]);
+    const left = 36;
+    const width = page.width - 2 * left;
+    let top = page.height - 36;
+
+    /** Draws a paragraph inside a hairline box that shows the column it was laid out in. */
+    const block = (layout: Text.ParagraphLayout, x = left, boxWidth = width): void => {
+      c.strokeColor(gray(0.75))
+        .lineWidth(0.3)
+        .rect(x, top - layout.height, boxWidth, layout.height)
+        .stroke();
+      c.fillColor(gray(0.1));
+      drawParagraph(c, layout, x, top);
+      top -= layout.height + 12;
+    };
+
+    c.fillColor(rgb(0.1, 0.2, 0.5));
+    const heading = layoutParagraph("Sertifikat", {
+      font: barlowBold,
+      size: 26,
+      width,
+      align: "center",
+      transform: "uppercase",
+      letterSpacing: 6,
+    });
+    drawParagraph(c, heading, left, top);
+    top -= heading.height + 6;
+
+    // A long name shrunk to fit the column exactly.
+    const name = "Bartholomew Maximilian Wolfeschlegelstein";
+    const fit = fitText(name, { font: jakarta.instance("Bold"), width, maxSize: 30, minSize: 8 });
+    block(
+      layoutParagraph(name, {
+        font: jakarta.instance("Bold"),
+        size: fit.size,
+        width,
+        align: "center",
+      }),
+    );
+
+    block(layoutParagraph(INDONESIAN, { font: inter, size: 10, width, lineHeight: 1.45 }));
+    block(
+      layoutParagraph(INDONESIAN, {
+        font: inter,
+        size: 10,
+        width,
+        lineHeight: 1.45,
+        align: "justify",
+        hyphenate: hyphenateIndonesian,
+      }),
+    );
+
+    // Two narrow columns side by side: justified with and without hyphenation.
+    const column = (width - 14) / 2;
+    const columnTop = top;
+    const plain = layoutParagraph(ENGLISH, {
+      font: StandardFonts.TimesRoman,
+      size: 10,
+      width: column,
+      align: "justify",
+    });
+    block(plain, left, column);
+    top = columnTop;
+    const hyphenated = layoutParagraph(ENGLISH, {
+      font: StandardFonts.TimesRoman,
+      size: 10,
+      width: column,
+      align: "justify",
+      hyphenate: hyphenateEnglish,
+    });
+    block(hyphenated, left + column + 14, column);
+    top = columnTop - Math.max(plain.height, hyphenated.height) - 12;
+
+    block(
+      layoutParagraph("Rata kanan\nTotal: Rp 1.250.000\nPPN 11%: Rp 137.500", {
+        font: inter.instance("Medium"),
+        size: 10,
+        width,
+        align: "right",
+        features: { tnum: true },
+      }),
+    );
+    block(
+      layoutParagraph("Lunas ✔ — ŵ é ✈ campuran fon", {
+        font: [StandardFonts.Helvetica, StandardFonts.ZapfDingbats, inter],
+        size: 12,
+        width,
+      }),
+    );
+    return doc.finish();
+  },
+};
+
+export const samples: Readonly<Record<string, Sample>> = {
+  shapes,
+  text,
+  report,
+  fonts,
+  paragraphs,
+};

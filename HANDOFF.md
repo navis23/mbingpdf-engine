@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 10:20 WIB · Session 2 · Milestone: M0 done, M1 (Fonts and text) starting · Branch: main_
+_Updated: 2026-11-10 12:10 WIB · Session 2 · Milestone: M0 done, M1 (Fonts and text) mostly done · Branch: main_
 
 ## Where we are
 M0 is finished and green in CI. `mbingpdf/core` writes valid multi-page PDFs with vector graphics, RGB/CMYK
@@ -28,7 +28,12 @@ M1 has just started; see `docs/05-roadmap.md`.
 5. ~~Variable-font instancing~~ done (`font.instance({ wght: 700 })` or `font.instance("Bold")`;
    `src/font/variations.ts`, `gvar.ts`, `glyf.ts`). Instances are written unhinted (no `cvar` support).
 6. WOFF2 decoding (needs a Brotli decoder; decide how before starting).
-7. Line breaking (UAX #14), justification, fit-to-width, hyphenation for English and Indonesian, fallback.
+7. ~~Line breaking, justification, fit-to-width, hyphenation, fallback~~ done (`src/text/`, exported as
+   `mbingpdf/text`): `layoutParagraph`, `drawParagraph`, `fitText`, `lineBreaks`, `graphemes`,
+   `hyphenateEnglish`, `hyphenateIndonesian`.
+8. M1 exit test: compare subset size with `hb-subset` (wasm is in `harfbuzzjs`); the Acrobat copy check is
+   manual.
+9. Then M2 (layout and pagination): document tree, box model, flex, fragmentation across pages.
 
 ## Waiting on the owner
 None. The owner asked for autonomous work: decide, commit and push without asking, and report afterwards.
@@ -39,10 +44,12 @@ None. The owner asked for autonomous work: decide, commit and push without askin
   layer that paints the display list.
 - Text a standard font cannot encode throws instead of being replaced.
 - Standard-font kerning pairs are not bundled (size); real kerning arrives with embedded fonts in M1.
+- Rows 16–23 in `docs/07-open-decisions.md` (shaping oracle, own UAX #14/#29, hyphenation licensing, greedy
+  line filling).
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 82 tests, build). CI green on all jobs.
+- Checks: `pnpm check` green (lint, typecheck, 192 tests, build). Runtime digests match on Node, Deno, Chromium.
 - Published: not published.
 
 ## Gotchas / don't redo
@@ -55,6 +62,9 @@ None. The owner asked for autonomous work: decide, commit and push without askin
   fonts with `readFont()` from `test/harness/env.ts`.
 - An object is serialised when it is set on the writer and cannot change afterwards; allocate a ref first for
   anything that must be completed later.
+- Regenerating data: `scripts/generate-*.mjs` (standard fonts, Unicode tables, en-US hyphenation); inputs are
+  not in the repo, the scripts' headers say where to get them.
+- pdf.js reports wide letter spacing as spaces between letters when extracting text.
 - After an intended output change: review `test/.artifacts/`, then `pnpm test:update`.
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 

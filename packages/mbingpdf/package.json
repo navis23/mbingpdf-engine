@@ -40,6 +40,10 @@
       "import": "./dist/font/index.js",
       "require": "./dist/font/index.cjs"
     },
+    "./text": {
+      "import": "./dist/text/index.js",
+      "require": "./dist/text/index.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

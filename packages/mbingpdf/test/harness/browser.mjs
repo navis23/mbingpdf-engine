@@ -60,6 +60,7 @@ try {
   const actual = await page.evaluate(async () => {
     const core = await import("/dist/core/index.js");
     const font = await import("/dist/font/index.js");
+    const text = await import("/dist/text/index.js");
     const { digestSamples } = await import("/test/harness/digest.ts");
     const { FONT_FILES } = await import("/test/harness/samples.ts");
     const fonts = {};
@@ -68,7 +69,7 @@ try {
       if (!response.ok) throw new Error(`Could not load ${file}: ${response.status}`);
       fonts[file] = new Uint8Array(await response.arrayBuffer());
     }
-    return digestSamples({ core, font, fonts });
+    return digestSamples({ core, font, text, fonts });
   });
   if (errors.length > 0) throw new Error(`Page errors: ${errors.join("; ")}`);
   const different = compareDigests(actual, golden);

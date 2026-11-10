@@ -1,3 +1,4 @@
+import type { PositionedGlyph } from "./glyph-run.ts";
 import type { StandardEncodingData, StandardFontData } from "./standard-font-data.ts";
 import { symbolEncoding, win1252Encoding, zapfdingbatsEncoding } from "./standard-font-data.ts";
 
@@ -47,6 +48,13 @@ export class StandardFont {
   readonly underlineThickness: number;
   /** True for Symbol and ZapfDingbats, which use their built-in encoding. */
   readonly symbolic: boolean;
+  /** Metrics of the standard fonts are always in thousandths of the font size. */
+  readonly unitsPerEm = 1000;
+  /**
+   * Extra space between lines. The standard fonts do not define one, so this is chosen to give
+   * a line spacing of 1.15 times the font size, the usual default for these typefaces.
+   */
+  readonly lineGap: number;
   readonly #data: StandardFontData;
   #widths: Float64Array | undefined;
 
@@ -62,6 +70,7 @@ export class StandardFont {
     this.underlinePosition = data.underlinePosition;
     this.underlineThickness = data.underlineThickness;
     this.symbolic = data.encoding !== "win1252";
+    this.lineGap = Math.max(0, 1150 - (data.ascender - data.descender));
   }
 
   /** Whether the font has a glyph for every character of `text`. */
@@ -71,6 +80,42 @@ export class StandardFont {
       if (!map.has(char.codePointAt(0) as number)) return false;
     }
     return true;
+  }
+
+  /** Same as {@link canEncode}; the name embedded fonts use. */
+  hasGlyphsFor(text: string): boolean {
+    return this.canEncode(text);
+  }
+
+  /**
+   * One glyph per character at its plain width; the standard fonts have no kerning data
+   * bundled. The glyph ID is the character code, or 0 for a character the font lacks.
+   * Invisible formatting characters such as the soft hyphen produce no glyph.
+   */
+  shape(text: string): PositionedGlyph[] {
+    const map = encodingMap(ENCODINGS[this.#data.encoding]);
+    const widths = this.#widthTable();
+    const glyphs: PositionedGlyph[] = [];
+    for (let i = 0; i < text.length; ) {
+      const codePoint = text.codePointAt(i) as number;
+      const cluster = i;
+      i += codePoint > 0xffff ? 2 : 1;
+      if (
+        codePoint === 0x00ad ||
+        (codePoint >= 0x200b && codePoint <= 0x200f) ||
+        codePoint === 0x2060
+      ) {
+        continue;
+      }
+      const id = map.get(codePoint) ?? 0;
+      glyphs.push({ id, cluster, xAdvance: widths[id] as number, xOffset: 0, yOffset: 0 });
+    }
+    return glyphs;
+  }
+
+  /** The advance of a character code, in thousandths of the font size. */
+  advanceOfCode(code: number): number {
+    return this.#widthTable()[code] ?? 0;
   }
 
   /** Converts text to the font's one-byte character codes. Throws on a character it lacks. */

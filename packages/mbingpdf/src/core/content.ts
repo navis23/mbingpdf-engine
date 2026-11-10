@@ -1,6 +1,7 @@
 import { ByteWriter } from "./bytes.ts";
 import type { Color } from "./color.ts";
 import type { FontProgram } from "./embedded-font.ts";
+import type { PositionedGlyph } from "./glyph-run.ts";
 import { PdfName } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 import type { StandardFont } from "./standard-font.ts";
@@ -47,6 +48,14 @@ export interface FontBinding {
    * size and text rise, which a font needs when it moves glyphs off the baseline.
    */
   show(out: ByteWriter, text: string, size: number, rise: number): void;
+  /** Writes the operators that show glyphs which are already shaped and positioned. */
+  showGlyphs(
+    out: ByteWriter,
+    glyphs: readonly PositionedGlyph[],
+    text: string,
+    size: number,
+    rise: number,
+  ): void;
 }
 
 interface TextState {
@@ -344,6 +353,20 @@ export class ContentStream {
     const state = this.#state;
     if (!state.font) throw new Error("Select a font with font() before showing text");
     state.font.show(this.#out, text, state.size, state.rise);
+    return this;
+  }
+
+  /**
+   * Shows glyphs that a shaper or the text layout has already chosen and positioned, in the
+   * current font. `text` is what the glyphs stand for (used for copy and search); each glyph's
+   * `cluster` is an offset into it. Unlike {@link showText}, a missing glyph (ID 0) is drawn
+   * as the font's "missing" box instead of raising an error.
+   */
+  showGlyphs(glyphs: readonly PositionedGlyph[], text: string): this {
+    this.#needText("showGlyphs()");
+    const state = this.#state;
+    if (!state.font) throw new Error("Select a font with font() before showing text");
+    state.font.showGlyphs(this.#out, glyphs, text, state.size, state.rise);
     return this;
   }
 

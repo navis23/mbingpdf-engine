@@ -31,6 +31,11 @@ export class ByteWriter {
     this.#length += data.length;
   }
 
+  /** Discards everything written after the first `length` bytes. */
+  truncate(length: number): void {
+    if (length < this.#length) this.#length = Math.max(0, length);
+  }
+
   /** Returns a copy of what has been written. */
   toBytes(): Uint8Array {
     return this.#buffer.slice(0, this.#length);
