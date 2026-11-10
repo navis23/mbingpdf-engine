@@ -35,6 +35,7 @@ export {
   Text,
 } from "./elements.ts";
 export { LayoutError } from "./engine.ts";
+export { type FacturXOptions, type FacturXProfile, facturX } from "./factur-x.ts";
 export {
   type DocumentLayout,
   type InspectedBox,

@@ -13,12 +13,16 @@ export {
   gray,
   hex,
   inch,
+  type MetadataSchema,
   mm,
   type OutputIntent,
   PageSizes,
+  type PdfAttachment,
   type PdfImage,
+  type PdfMetadata,
   rgb,
   StandardFonts,
+  type StructureRole,
   spot,
 } from "./core/index.ts";
 export { Font, loadFont } from "./font/index.ts";

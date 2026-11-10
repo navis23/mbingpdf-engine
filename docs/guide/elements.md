@@ -67,7 +67,7 @@ Set on any element; inherited by everything inside it.
 
 | Element | Notes |
 | --- | --- |
-| `Document(props, ...pages)` | `title`, `author`, `subject`, `keywords`, `creator`, `lang`, `theme`, and text properties as defaults. Children that are not pages are put on a default A4 page |
+| `Document(props, ...pages)` | `title`, `author`, `subject`, `keywords`, `creator`, `lang`, `theme`, `attachments` (files carried inside the PDF: `{ name, data, mimeType, description, relationship }`), `metadata`, and text properties as defaults. Children that are not pages are put on a default A4 page |
 | `Page(props, ...children)` | `size` (`"A4"`, `"A5"`, `"Letter"`, … or `[width, height]`), `orientation`, `margin` (default 20 mm), `gap`, `header`, `footer`, `background`, `fill`, `bleed`, `marks`, `fontSize` |
 | `PageBreak()` | Ends the page |
 

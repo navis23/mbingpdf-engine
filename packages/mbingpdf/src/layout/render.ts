@@ -143,7 +143,12 @@ function layoutPass(
   const theme = (document.props as DocumentProps).theme;
   useTheme(theme);
   const themed: TextContext = { ...DEFAULT_TEXT, theme };
-  const { theme: _theme, ...documentText } = document.props as DocumentProps;
+  const {
+    theme: _theme,
+    attachments: _attachments,
+    metadata: _metadata,
+    ...documentText
+  } = document.props as DocumentProps;
   const base = inherit(
     theme?.text?.body ? inherit(themed, { style: "body" }) : themed,
     documentText,
@@ -563,7 +568,9 @@ function renderSync(document: LayoutNode, options: RenderOptions = {}): Uint8Arr
       ...(options.conformance ? { conformance: options.conformance } : {}),
       ...(options.outputIntent ? { outputIntent: options.outputIntent } : {}),
       ...(tagged ? { tagged: true } : {}),
+      ...(props.metadata ? { metadata: props.metadata } : {}),
     });
+    for (const file of props.attachments ?? []) pdf.attach(file);
     const result = layoutPass(document, layoutOptions, toc, (page) =>
       writeDisplayPage(pdf, page, { boxes: options.conformance !== undefined }),
     );

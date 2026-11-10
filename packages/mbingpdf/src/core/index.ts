@@ -17,10 +17,13 @@ export {
 } from "./content.ts";
 export {
   type Conformance,
+  type MetadataSchema,
   type OutputIntent,
+  type PdfAttachment,
   PdfDocument,
   type PdfDocumentOptions,
   type PdfInfo,
+  type PdfMetadata,
 } from "./document.ts";
 export { EmbeddedFont, type FontProgram } from "./embedded-font.ts";
 export type { PositionedGlyph } from "./glyph-run.ts";

@@ -234,6 +234,26 @@ Stack({ role: "Sect" }, Heading({ level: 2 }, "Ketentuan"), Text("…"));
 
 A picture with neither `alt` nor `decorative` is treated as decoration, with a warning. Page headers and footers, backgrounds and borders are marked as decoration automatically.
 
+## Files inside the file
+
+A PDF can carry other files, which a reader lists and can save: the spreadsheet behind a report, the XML of an invoice.
+
+```ts
+Document(
+  { attachments: [{ name: "data.csv", data: csvText, mimeType: "text/csv", relationship: "Data" }] },
+  ...
+);
+```
+
+For an e-invoice in the Factur-X (ZUGFeRD 2) form, `facturX()` gives the attachment and the metadata that go with it. The XML itself is yours to produce.
+
+```ts
+import { facturX } from "mbingpdf";
+
+const document = Document({ title: "Invoice 42", font: inter, ...facturX({ xml, profile: "EN 16931" }) }, ...);
+await render(document, { conformance: "PDF/A-3b" });   // PDF/A-3 is the archival level that allows attachments
+```
+
 ## JSX
 
 The same documents can be written as JSX; no React is involved. Set `"jsx": "react-jsx"` and `"jsxImportSource": "mbingpdf"` in `tsconfig.json`.

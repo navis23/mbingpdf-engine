@@ -2,7 +2,7 @@
  * The document tree: plain data that describes a document. Element functions build it; the
  * layout engine reads it. Nothing here does any work.
  */
-import type { Color, PdfImage, StructureRole } from "../core/index.ts";
+import type { Color, PdfAttachment, PdfImage, PdfMetadata, StructureRole } from "../core/index.ts";
 import type { Hyphenator, TextAlign, TextFont, TextTransform } from "../text/index.ts";
 import type { CanvasContext } from "./canvas.ts";
 import type { Theme, ThemeColorName, ThemeFontName, ThemeTextStyleName } from "./theme.ts";
@@ -442,6 +442,13 @@ export interface DocumentProps extends TextProps {
   creator?: string;
   /** Language of the text, as a BCP 47 tag such as `"id"` or `"en-GB"`. */
   lang?: string;
+  /**
+   * Files carried inside the PDF, which a reader can save: the data behind a report, the XML
+   * of an e-invoice. Of the archival standards only PDF/A-3 allows them.
+   */
+  attachments?: readonly PdfAttachment[];
+  /** Extra metadata properties, with their descriptions; see `facturX()` for a use. */
+  metadata?: readonly PdfMetadata[];
 }
 
 interface PropsByType {

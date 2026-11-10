@@ -8,6 +8,7 @@ import {
   cmyk,
   Document,
   Font,
+  facturX,
   Heading,
   Image,
   Link,
@@ -115,6 +116,77 @@ describe("PDF/A", () => {
   });
 });
 
+const INVOICE_XML =
+  '<?xml version="1.0" encoding="UTF-8"?>\n<rsm:CrossIndustryInvoice ' +
+  'xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"/>\n';
+
+describe("attached files", () => {
+  test("a file rides inside the PDF and is listed by name", async () => {
+    const document = Document(
+      {
+        font: inter,
+        attachments: [
+          { name: "data.csv", data: "a,b\n1,2\n", mimeType: "text/csv", relationship: "Data" },
+          { name: "catatan.txt", data: new Uint8Array([104, 105]), description: "Catatan" },
+        ],
+      },
+      Page(Text("Lihat lampiran.")),
+    );
+    const pdf = latin1(await render(document, { compress: false, deterministic: true }));
+    expect(pdf).toContain("/Type/EmbeddedFile/Subtype/text#2Fcsv/Params<</Size 8>>");
+    expect(pdf).toContain("a,b\n1,2\n");
+    expect(pdf).toContain("/F(data.csv)/UF(data.csv)/AFRelationship/Data");
+    expect(pdf).toContain("/Desc(Catatan)/AFRelationship/Unspecified");
+    // Sorted by name, as a name tree must be.
+    expect(pdf).toMatch(
+      /\/EmbeddedFiles<<\/Names\[\(catatan\.txt\)\d+ 0 R\(data\.csv\)\d+ 0 R\]>>/,
+    );
+    expect(pdf).toMatch(/\/AF\[\d+ 0 R \d+ 0 R\]/);
+    const dated = latin1(await render(document, { compress: false }));
+    expect(dated).toMatch(/\/Params<<\/Size 8\/ModDate\(D:\d{14}Z\)>>/);
+  });
+
+  test("only PDF/A-3 may carry them; names must differ", async () => {
+    const file = { name: "a.txt", data: "a" };
+    const document = Document({ font: inter, attachments: [file] }, Page(Text("x")));
+    await expect(render(document, { conformance: "PDF/A-2b" })).rejects.toThrow(
+      "PDF/A-2 cannot carry attached files; use PDF/A-3",
+    );
+    await expect(render(document, { conformance: "PDF/A-3b" })).resolves.toBeInstanceOf(Uint8Array);
+    await expect(
+      render(Document({ font: inter, attachments: [file, file] }, Page(Text("x")))),
+    ).rejects.toThrow('Two attached files are named "a.txt"');
+  });
+
+  test("facturX() gives the attachment and the metadata of an e-invoice", async () => {
+    const parts = facturX({ xml: INVOICE_XML, profile: "EN 16931" });
+    expect(parts.attachments[0]).toMatchObject({
+      name: "factur-x.xml",
+      mimeType: "text/xml",
+      relationship: "Alternative",
+    });
+    expect(facturX({ xml: INVOICE_XML, profile: "MINIMUM" }).attachments[0]?.relationship).toBe(
+      "Data",
+    );
+    const pdf = latin1(
+      await render(
+        Document({ font: inter, title: "Invoice 42", ...parts }, Page(Text("Invoice 42"))),
+        {
+          conformance: "PDF/A-3b",
+          compress: false,
+        },
+      ),
+    );
+    expect(pdf).toContain(
+      '<rdf:Description rdf:about="" xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">',
+    );
+    expect(pdf).toContain("<fx:ConformanceLevel>EN 16931</fx:ConformanceLevel>");
+    expect(pdf).toContain("<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>");
+    expect(pdf).toContain("<pdfaSchema:prefix>fx</pdfaSchema:prefix>");
+    expect(pdf).toContain("<pdfaProperty:category>external</pdfaProperty:category>");
+  });
+});
+
 describe.skipIf(!veraPdf).concurrent("veraPDF", () => {
   const sample = (name: string) => samples[name] as (typeof samples)[string];
   const press = { ...env, icc: pressProfile() };
@@ -134,6 +206,28 @@ describe.skipIf(!veraPdf).concurrent("veraPDF", () => {
       });
       expected[`certificate-${level}`] = `${level}: ok`;
     }
+    // An e-invoice: the XML attached, and described in the metadata.
+    files.facturx = await render(
+      Document(
+        {
+          font: inter,
+          title: "Invoice 42",
+          ...facturX({ xml: INVOICE_XML, profile: "EN 16931", modified: new Date(0) }),
+        },
+        Page(Text("Invoice 42")),
+      ),
+      { conformance: "PDF/A-3b" },
+    );
+    expected.facturx = "3b: ok";
+    // And the same without a date on the file, as in a deterministic build.
+    files.undated = await render(
+      Document(
+        { font: inter, attachments: [{ name: "a.csv", data: "1,2", mimeType: "text/csv" }] },
+        Page(Text("x")),
+      ),
+      { conformance: "PDF/A-3a", deterministic: true },
+    );
+    expected.undated = "3a: ok";
     const { plain, ...verdicts } = await validate(files, "auto");
     expect(verdicts).toEqual(expected);
     expect(plain).not.toMatch(/ok$/);

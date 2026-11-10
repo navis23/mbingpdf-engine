@@ -61,8 +61,54 @@ export type Conformance =
   | "PDF/A-3a"
   | "PDF/UA-1";
 
+/** A file carried inside the PDF, which a reader can save or open. */
+export interface PdfAttachment {
+  /** The file's name as the reader sees it, such as `"invoice.xml"`. */
+  name: string;
+  /** The file's bytes, or text to store as UTF-8. */
+  data: Uint8Array | string;
+  /** The file's type, such as `"text/xml"`. Default `"application/octet-stream"`. */
+  mimeType?: string;
+  description?: string;
+  /**
+   * What the file is to the document: `"Source"` (the document was made from it), `"Data"`
+   * (the numbers behind it), `"Alternative"` (the same content in another form),
+   * `"Supplement"`, or `"Unspecified"` (default).
+   */
+  relationship?: "Source" | "Data" | "Alternative" | "Supplement" | "Unspecified";
+  /** When the file was last changed. */
+  modified?: Date;
+}
+
+/** A group of metadata properties from outside the standard sets, with their descriptions. */
+export interface MetadataSchema {
+  /** A readable name for the group. */
+  readonly name: string;
+  /** The XML namespace of the properties. */
+  readonly uri: string;
+  /** The prefix the properties are written with. */
+  readonly prefix: string;
+  readonly properties: readonly {
+    readonly name: string;
+    /** The XMP value type, such as `"Text"` or `"Integer"`. */
+    readonly type: string;
+    readonly description: string;
+    /** Whether a person (`"external"`) or the software (`"internal"`, default) sets it. */
+    readonly category?: "internal" | "external";
+  }[];
+}
+
+/** Extra properties for the file's metadata (XMP), with the schema that describes them. */
+export interface PdfMetadata {
+  readonly schema: MetadataSchema;
+  /** The value of each property, by its name without the prefix. */
+  readonly values: Readonly<Record<string, string>>;
+}
+
 export interface PdfDocumentOptions extends PdfWriterOptions {
   info?: PdfInfo;
+  /** Extra metadata properties, such as those an e-invoice standard asks for. */
+  metadata?: readonly PdfMetadata[];
   /**
    * The standard the file must meet, or several: `["PDF/X-4", "PDF/A-2b"]`. The file is
    * checked against them as it is written, and what cannot be met is an error.
@@ -106,6 +152,9 @@ export class PdfDocument {
   readonly #structRoot: PdfRef | undefined;
   /** The parent tree: for each key, the elements of a page's content or of an annotation. */
   readonly #parents: PdfObject[] = [];
+  readonly #metadata: readonly PdfMetadata[];
+  /** Attached files by name, each with its file specification. */
+  readonly #attachments: Map<string, PdfRef> = new Map();
   readonly #outputIntent: OutputIntent | undefined;
   #intentProfile: PdfRef | undefined;
   #srgb: { name: string; ref: PdfRef } | undefined;
@@ -125,6 +174,7 @@ export class PdfDocument {
   constructor(options: PdfDocumentOptions = {}) {
     this.writer = new PdfWriter(options);
     this.#info = options.info ?? {};
+    this.#metadata = options.metadata ?? [];
     this.#deterministic = options.deterministic ?? false;
     this.#lang = options.lang;
     const standards =
@@ -239,6 +289,52 @@ export class PdfDocument {
     const form = new PdfForm(this.#host(), `Fm${this.#forms.length + 1}`, bbox);
     this.#forms.push(form);
     return form;
+  }
+
+  /**
+   * Puts a file inside the PDF: the spreadsheet a report was made from, the XML of an
+   * e-invoice. Readers list attachments in a panel of their own. Of the archival standards
+   * only PDF/A-3 allows them.
+   */
+  attach(file: PdfAttachment): void {
+    if (this.#archive && this.#archive.part !== 3) {
+      throw new Error("PDF/A-2 cannot carry attached files; use PDF/A-3");
+    }
+    if (file.name === "") throw new Error("An attached file needs a name");
+    if (this.#attachments.has(file.name)) {
+      throw new Error(`Two attached files are named "${file.name}"`);
+    }
+    const writer = this.writer;
+    const data = typeof file.data === "string" ? new TextEncoder().encode(file.data) : file.data;
+    const { modified } = this.#dates();
+    const changed = file.modified ?? modified;
+    const stream = writer.add(
+      new PdfStream(
+        data,
+        new PdfDict({
+          Type: new PdfName("EmbeddedFile"),
+          Subtype: new PdfName(file.mimeType ?? "application/octet-stream"),
+          Params: new PdfDict({
+            Size: data.length,
+            ModDate: changed && PdfString.date(changed),
+          }),
+        }),
+      ),
+    );
+    const name = PdfString.text(file.name);
+    this.#attachments.set(
+      file.name,
+      writer.add(
+        new PdfDict({
+          Type: new PdfName("Filespec"),
+          F: name,
+          UF: name,
+          Desc: file.description === undefined ? undefined : PdfString.text(file.description),
+          AFRelationship: new PdfName(file.relationship ?? "Unspecified"),
+          EF: new PdfDict({ F: stream, UF: stream }),
+        }),
+      ),
+    );
   }
 
   /**
@@ -399,6 +495,8 @@ export class PdfDocument {
         }),
       );
     }
+    // The name tree wants its keys in order.
+    const attached = [...this.#attachments].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
     const root = writer.add(
       new PdfDict({
         Type: new PdfName("Catalog"),
@@ -417,6 +515,16 @@ export class PdfDocument {
         Outlines: outline,
         // Open the bookmarks panel when the document has bookmarks.
         PageMode: outline ? new PdfName("UseOutlines") : undefined,
+        Names:
+          attached.length > 0
+            ? new PdfDict({
+                EmbeddedFiles: new PdfDict({
+                  Names: attached.flatMap(([name, ref]) => [PdfString.text(name), ref]),
+                }),
+              })
+            : undefined,
+        // The files that belong to the document as a whole.
+        AF: attached.length > 0 ? attached.map(([, ref]) => ref) : undefined,
         MarkInfo: structTree ? new PdfDict({ Marked: true }) : undefined,
         StructTreeRoot: structTree,
         // A reader announces the title rather than the file name.
@@ -614,6 +722,7 @@ export class PdfDocument {
       const described = extensionSchemas([
         ...(this.#print ? [PDFX_SCHEMA, TRAPPED_SCHEMA] : []),
         ...(this.#accessible ? [PDFUA_SCHEMA] : []),
+        ...this.#metadata.map((extra) => extra.schema),
       ]);
       if (described) lines.push(described);
     }
@@ -628,7 +737,21 @@ export class PdfDocument {
       'xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/" ' +
       'xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/">\n' +
       `${lines.join("\n")}\n` +
-      "</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n" +
+      "</rdf:Description>\n" +
+      this.#metadata
+        .map(
+          ({ schema, values }) =>
+            `<rdf:Description rdf:about="" xmlns:${schema.prefix}="${xmlText(schema.uri).replace(/"/g, "&quot;")}">\n` +
+            Object.entries(values)
+              .map(
+                ([name, value]) =>
+                  `<${schema.prefix}:${name}>${xmlText(value)}</${schema.prefix}:${name}>\n`,
+              )
+              .join("") +
+            "</rdf:Description>\n",
+        )
+        .join("") +
+      "</rdf:RDF>\n</x:xmpmeta>\n" +
       '<?xpacket end="w"?>';
     return new TextEncoder().encode(xml);
   }
@@ -658,18 +781,6 @@ export class PdfDocument {
 function iccComponents(profile: Uint8Array): number {
   const space = String.fromCharCode(...profile.subarray(16, 20));
   return space === "CMYK" ? 4 : space === "GRAY" ? 1 : 3;
-}
-
-/** A group of metadata properties that PDF/A does not know and must be told about. */
-interface MetadataSchema {
-  readonly name: string;
-  readonly uri: string;
-  readonly prefix: string;
-  readonly properties: readonly {
-    readonly name: string;
-    readonly type: string;
-    readonly description: string;
-  }[];
 }
 
 const PDFX_SCHEMA: MetadataSchema = {
@@ -705,7 +816,7 @@ function extensionSchemas(schemas: readonly MetadataSchema[]): string | undefine
           '<rdf:li rdf:parseType="Resource">' +
           `<pdfaProperty:name>${property.name}</pdfaProperty:name>` +
           `<pdfaProperty:valueType>${property.type}</pdfaProperty:valueType>` +
-          "<pdfaProperty:category>internal</pdfaProperty:category>" +
+          `<pdfaProperty:category>${property.category ?? "internal"}</pdfaProperty:category>` +
           `<pdfaProperty:description>${property.description}</pdfaProperty:description>` +
           "</rdf:li>",
       )

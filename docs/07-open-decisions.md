@@ -73,6 +73,7 @@
 | 70 | Pictures without a description | In a tagged file an `Image`, `Svg` or `Canvas` without `alt` becomes an artifact and raises the `missing-alt-text` warning (an error under `strict`). A `QrCode` defaults to `QR code: <value>`. Not an error, because a file with an undescribed decoration is still valid, and a wrong guess at a description is worse than none | 2026-11-11 |
 | 71 | Line-break spaces | In a tagged file the space a line was broken at is written (invisibly, past the line's end), so text read from the structure keeps its word boundaries. A hyphen added by hyphenation stays an ordinary hyphen for now | 2026-11-11 |
 | 72 | Validation | veraPDF is the judge for PDF/A and PDF/UA. The tests run it from a local `verapdf` or the `verapdf/cli` Docker image and skip when neither exists; CI sets `VERAPDF=required` on one job. Links now always carry the print flag, which PDF/A asks for and costs nothing | 2026-11-11 |
+| 73 | Attachments and e-invoices | `Document({ attachments })` embeds files (`PdfDocument.attach` underneath); PDF/A-2 refuses them and PDF/A-3 takes them. `Document({ metadata })` adds described XMP properties. `facturX({ xml, profile })` returns both for a Factur-X / ZUGFeRD 2 invoice; the library neither writes nor checks the XML. XRechnung is left out until someone needs it | 2026-11-11 |
 
 Decisions 8–10 and 16–58 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
