@@ -72,7 +72,8 @@
     "test:runtime:node": "node test/harness/runtime.mjs",
     "test:runtime:deno": "deno run --allow-read test/harness/runtime.mjs",
     "test:runtime:bun": "bun test/harness/runtime.mjs",
-    "test:runtime:browser": "node test/harness/browser.mjs"
+    "test:runtime:browser": "node test/harness/browser.mjs",
+    "size": "node scripts/size.mjs"
   },
   "devDependencies": {
     "@hyzyla/pdfium": "^3.0.0",

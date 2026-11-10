@@ -1,0 +1,11 @@
+{
+  "mbingpdf": 145920,
+  "mbingpdf/core": 35840,
+  "mbingpdf/font": 33792,
+  "mbingpdf/image": 10752,
+  "mbingpdf/qr": 4096,
+  "mbingpdf/svg": 114176,
+  "mbingpdf/text": 35328,
+  "mbingpdf/jsx-runtime": 512,
+  "mbingpdf/jsx-dev-runtime": 512
+}

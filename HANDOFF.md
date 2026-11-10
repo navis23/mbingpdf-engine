@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 18:00 WIB · Session 2 · Milestone: M0–M3 done; M4 in progress · Branch: main_
+_Updated: 2026-11-10 18:50 WIB · Session 2 · Milestone: M0–M3 done; M4 in progress · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -48,10 +48,12 @@ M1 has just started; see `docs/05-roadmap.md`.
     M3 is closed; deferred to M4:
     shared graphics (Form XObjects; less urgent now that batches are fast and small).
 13. M4 done so far: JSX runtime (`src/jsx-runtime.ts`), `inspect()`, warning paths, `strict`, `debug`.
-14. The third acceptance document is the `agreement` sample. M4 remaining, in this order: starter templates under `examples/`; quick-start guide; bundle-size budget in CI;
-    release preparation (package metadata, changeset, release workflow — do not publish); `@mbingpdf/react`
-    and `@mbingpdf/vue` preview components; preview server; shared graphics; benchmarks against PDFKit,
-    pdfmake and @react-pdf/renderer.
+14. Also done in M4: the `agreement` sample (third acceptance document); starter templates in `examples/`
+    with a test; `docs/guide/quick-start.md` and `docs/guide/elements.md`; `pnpm size` with
+    `size-budget.json`, run in CI.
+15. M4 remaining, in this order: release preparation (package README and licence, changeset, release
+    workflow with provenance — do not publish); `@mbingpdf/react` and `@mbingpdf/vue` preview components;
+    preview server; shared graphics; benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
@@ -72,7 +74,7 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 414 tests, build). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 429 tests, build, size). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 

@@ -55,8 +55,11 @@
 | 52 | Shared graphics | Deferred from M3 to M4: no Form XObjects yet. Fonts and images are embedded once already | 2026-11-10 |
 | 53 | JSX | `jsxImportSource: "mbingpdf"`. Element functions accept `children` as a property, so every tag is a plain function call; fragments and your own function components work; there are no lower-case intrinsic tags. `render()` and `inspect()` take any element and check at run time that it is a `Document` | 2026-11-10 |
 | 54 | Diagnostics | `inspect(document)` returns each page's boxes as JSON-safe data rounded to 0.001 pt. Warnings carry the element path where the problem was first met. `strict: true` throws on the first warning. `debug: true` outlines every box | 2026-11-10 |
+| 55 | Undefined properties | Any element property may be passed as `undefined` and is dropped when the element is built, so conditional properties need no spreading and an undefined value never overrides a default | 2026-11-10 |
+| 56 | Bundle budget | `pnpm size` measures the gzip size of each entry point with everything it imports, untree-shaken, and fails CI when one exceeds `size-budget.json` (current size plus 10%). The whole document API is about 130 kB gzip; `mbingpdf/core` alone 31 kB | 2026-11-10 |
+| 57 | Examples | Starter templates live in `examples/` as a private workspace package that imports `mbingpdf` by name; each exports a function from data to a document, plus sample data | 2026-11-10 |
 
-Decisions 8–10 and 16–54 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–57 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "isolatedDeclarations": false,
+    "declaration": false,
+    "exactOptionalPropertyTypes": false,
+    "paths": {
+      "mbingpdf": ["../packages/mbingpdf/src/index.ts"],
+      "mbingpdf/*": ["../packages/mbingpdf/src/*/index.ts"]
+    }
+  },
+  "include": ["*.ts"]
+}

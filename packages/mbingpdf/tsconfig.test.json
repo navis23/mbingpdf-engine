@@ -6,6 +6,9 @@
     "declaration": false,
     "resolveJsonModule": true,
     "jsx": "react-jsx",
+    "paths": {
+      "mbingpdf": ["./src/index.ts"]
+    },
     "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src", "test", "tsdown.config.ts"]

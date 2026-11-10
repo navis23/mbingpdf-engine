@@ -1,0 +1,126 @@
+# Element reference
+
+Every element is called as `Element(properties?, ...children)`. Properties are optional unless marked **required**. Sizes are in points; `mm()`, `cm()` and `inch()` convert.
+
+## Properties shared by most elements
+
+### Box
+
+| Property | Value | Meaning |
+| --- | --- | --- |
+| `margin`, `padding` | number, `[vertical, horizontal]`, `[top, right, bottom, left]`, or `{ top, right, bottom, left }` | Space outside and inside the border |
+| `border` | `{ width, color }`, or `{ top, right, bottom, left }` of those | Lines around the box |
+| `background` | colour | Fill behind the content |
+| `radius` | number | Rounded corners |
+| `width`, `height`, `minWidth`, `maxWidth`, `minHeight` | number or `"50%"` | Size; by default an element is as wide as its container and as tall as its content |
+| `opacity` | 0–1 | Transparency of the element and everything in it |
+| `id` | string | A name that `Link({ to })` can point to |
+
+### In a `Row`
+
+| Property | Meaning |
+| --- | --- |
+| `grow` | Share of the spare width this element takes |
+| `shrink` | How readily it gives up width when space is short (default 1; 0 never shrinks) |
+| `basis` | The width to start from before growing or shrinking |
+| `alignSelf` | Overrides the row's `align` for this element |
+
+### Page breaks
+
+| Property | Meaning |
+| --- | --- |
+| `break` | `"before"`, `"after"` or `"avoid"` |
+| `keepTogether` | Move the element to the next page rather than split it |
+| `keepWithNext` | Keep it on the same page as the start of the next element |
+
+### Text
+
+Set on any element; inherited by everything inside it.
+
+| Property | Value |
+| --- | --- |
+| `font` | a font, a list of fonts to fall back through, or a theme font name |
+| `weight`, `italic` | with a theme font family: 100–900, and true for italic |
+| `size` | font size |
+| `color` | `"#RRGGBB"`, `rgb()`, `cmyk()`, `gray()`, `spot()`, or a theme colour name |
+| `lineHeight` | distance between baselines as a multiple of the size |
+| `letterSpacing`, `wordSpacing` | extra space in points |
+| `textAlign` | `"left"`, `"center"`, `"right"`, `"justify"` |
+| `transform` | `"uppercase"`, `"lowercase"`, `"capitalize"` |
+| `features` | OpenType features: `{ tnum: true, liga: false }` |
+| `hyphenate` | `hyphenateEnglish`, `hyphenateIndonesian`, or a function of your own |
+| `underline`, `strikethrough` | true or false |
+| `orphans`, `widows` | fewest lines left at the bottom or carried to the top of a page (default 2) |
+| `style` | a text style from the theme |
+
+## Structure
+
+| Element | Notes |
+| --- | --- |
+| `Document(props, ...pages)` | `title`, `author`, `subject`, `keywords`, `creator`, `lang`, `theme`, and text properties as defaults. Children that are not pages are put on a default A4 page |
+| `Page(props, ...children)` | `size` (`"A4"`, `"A5"`, `"Letter"`, … or `[width, height]`), `orientation`, `margin` (default 20 mm), `gap`, `header`, `footer`, `background`, `fill`, `bleed`, `marks`, `fontSize` |
+| `PageBreak()` | Ends the page |
+
+`header`, `footer` and `background` take content, or a function of `{ page, pages }`. The background is laid out across the whole sheet, behind everything.
+
+## Layout
+
+| Element | Notes |
+| --- | --- |
+| `Stack(props, ...children)` | One below another. `gap`; `align`: `"stretch"` (default), `"start"`, `"center"`, `"end"` |
+| `Box(props, ...children)` | The same as `Stack`, for when the point is the padding, border or background |
+| `Row(props, ...children)` | Side by side. `gap`; `align` across the height; `justify`: `"start"`, `"center"`, `"end"`, `"space-between"`, `"space-around"` |
+| `Spacer(size?)` | A fixed gap, or in a row all the spare width |
+| `Columns(props, ...children)` | Newspaper columns. `count` (default 2), `gap`, `rowGap`, `rule`, `balance` |
+| `Grid(props, ...children)` | Cells of a fixed size. `columns` **required**, `cell: { width?, height }` **required**, `gap`, `rows` |
+| `Absolute(props, ...children)` | Out of the flow. `top`, `right`, `bottom`, `left`, `rotate` (degrees), `anchor`: `"parent"` or `"page"` |
+
+## Text
+
+| Element | Notes |
+| --- | --- |
+| `Text(props, ...content)` | A paragraph of strings, `Span`s and `Link`s. `align`; `fit`: true or `{ min, max }` keeps it on one line and sizes it to the width |
+| `Span(props, ...content)` | A stretch of text with its own style |
+| `Link({ href }, ...)` / `Link({ to }, ...)` | A link to a web address, or to the element with that `id` |
+| `Heading({ level }, ...)` | Levels 1–6. Sized by level (or by the theme's `h1`–`h6`), kept with what follows, bookmarked. `bookmark: false` to leave it out, or a string for a shorter title |
+| `List(props, ...items)` | `marker`: `"disc"`, `"dash"`, `"decimal"`, `"lower-alpha"`, `"upper-alpha"`, `"lower-roman"`, `"upper-roman"`, any string, or a function of the number. `start`, `gap`, `splitItems` |
+| `TableOfContents(props?)` | `levels` (default `[1, 3]`), `indent`, `gap`, `leaders` |
+
+## Tables
+
+`Table(props)`:
+
+| Property | Meaning |
+| --- | --- |
+| `columns` **required** | A count, or a list of `{ width, align, ...text }`. Width: points, `"30%"`, `"1fr"` (default), or `"auto"` |
+| `rows` **required** | A list of rows; a row is a list of cells |
+| `header`, `footer` | One row or several |
+| `repeatHeader` | Repeat the header on every page (default true) |
+| `repeatFooter` | Repeat the footer on every page (default false) |
+| `cellPadding` | Default `[4, 6]` |
+| `borders` | `"rows"` (default), `"grid"`, `"none"`, or `{ outer, horizontal, vertical, header, footer }` |
+| `zebra` | Background of every second row |
+| `headerStyle`, `footerStyle` | Text properties and `background` |
+
+A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is for cells that need properties, `TableRow({ background, height, keepWithNext, ...text }, ...cells)` for rows that do.
+
+## Media
+
+| Element | Notes |
+| --- | --- |
+| `Image({ src })` | JPEG or PNG bytes. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
+| `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks |
+| `QrCode({ value })` | `size` (default 72), `level`: `"L"`, `"M"`, `"Q"`, `"H"`; `quiet` (default 4 modules); `color` |
+| `Canvas({ width, height, draw })` | `draw(g, { width, height })` with `g.rect`, `roundedRect`, `circle`, `ellipse`, `line`, `moveTo`, `lineTo`, `curveTo`, `closePath`, then `fill(color)`, `stroke({ color, width, dash, cap, join })` or `fillAndStroke(color, stroke)` |
+
+## Rendering
+
+| Function | Returns |
+| --- | --- |
+| `render(document, options?)` | `Promise<Uint8Array>` |
+| `render.sync(document, options?)` | `Uint8Array` |
+| `render.stream(document, options?)` | `ReadableStream<Uint8Array>` |
+| `renderSvg(document)` from `mbingpdf/svg` | `string[]`, one SVG per page |
+| `inspect(document)` | every box on every page, as plain data |
+
+Options: `deterministic`, `compress`, `onWarning`, `strict`, `debug`, `minImageDpi`, `conformance: "PDF/X-4"`, `outputIntent: { profile, identifier }`.

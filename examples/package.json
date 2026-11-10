@@ -1,0 +1,13 @@
+{
+  "name": "mbingpdf-examples",
+  "private": true,
+  "type": "module",
+  "description": "Starter templates for mbingpdf. Each file builds one kind of document.",
+  "scripts": {
+    "build": "node build.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "mbingpdf": "workspace:*"
+  }
+}

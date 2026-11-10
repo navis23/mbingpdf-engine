@@ -30,15 +30,23 @@ What works today:
 - **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
 - **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
 
-Documentation, starter templates, a preview server and the first npm release come next. The design is in [`docs/`](./docs/README.md).
+A preview server, framework components and the first npm release come next.
+
+## Documentation
+
+- [Quick start](./docs/guide/quick-start.md) — from a first document to themes, tables and print.
+- [Element reference](./docs/guide/elements.md) — every element and its properties.
+- [`examples/`](./examples) — starter templates: invoice, report, letter, certificate, label sheet. Build them with `pnpm build && pnpm --filter mbingpdf-examples build`.
+- [`docs/`](./docs/README.md) — the design and the roadmap.
 
 ## Development
 
 ```sh
 pnpm install
-pnpm check          # lint, typecheck, test, build
+pnpm check          # lint, typecheck, test, build, size
 pnpm test:update    # approve changed output (golden images and digests) after reviewing it
 pnpm test:runtime   # built package gives byte-identical output on Node, Deno and Chromium
+pnpm size           # gzip size of each entry point against its budget
 ```
 
 The tests use `qpdf` for structural checks when it is installed, and render every sample with pdf.js and PDFium to compare against approved images in `packages/mbingpdf/test/golden/`.

@@ -45,7 +45,12 @@ function element<T extends NodeType>(type: T, args: readonly unknown[]): LayoutN
   if (!isProps(first))
     return { type, props: {} as LayoutNode<T>["props"], children: args as Child[] };
   // Children may also arrive as a property, which is how JSX passes them.
-  const { children, ...props } = first as { children?: Child };
+  const { children, ...given } = first as { children?: Child } & Record<string, unknown>;
+  // A property given as `undefined` is the same as one not given at all.
+  const props: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(given)) {
+    if (value !== undefined) props[key] = value;
+  }
   return {
     type,
     props: props as LayoutNode<T>["props"],
@@ -53,7 +58,13 @@ function element<T extends NodeType>(type: T, args: readonly unknown[]): LayoutN
   };
 }
 
-type Args<P> = [props: P & { children?: Child }, ...children: Child[]] | Child[];
+/**
+ * Properties as callers may write them: any of them may be `undefined`, which is convenient
+ * for `{ break: first ? undefined : "before" }` and is ignored.
+ */
+type Loose<P> = { [K in keyof P]: P[K] | undefined };
+
+type Args<P> = [props: Loose<P> & { children?: Child }, ...children: Child[]] | Child[];
 
 /** The whole document. Text properties set here are the defaults for everything inside. */
 export function Document(...args: Args<DocumentProps>): LayoutNode<"Document"> {
@@ -98,7 +109,7 @@ export function Span(...args: Args<SpanProps>): LayoutNode<"Span"> {
  * (`to`, the element's `id`).
  */
 export function Link(
-  props: SpanProps & ({ href: string } | { to: string }) & { children?: Child },
+  props: Loose<SpanProps> & ({ href: string } | { to: string }) & { children?: Child },
   ...children: Child[]
 ): LayoutNode<"Span"> {
   return element("Span", [props, ...children]);
@@ -113,7 +124,9 @@ export function Heading(...args: Args<HeadingProps>): LayoutNode<"Heading"> {
 }
 
 /** A list of the document's headings with their page numbers, each a link to its heading. */
-export function TableOfContents(props: TableOfContentsProps = {}): LayoutNode<"TableOfContents"> {
+export function TableOfContents(
+  props: Loose<TableOfContentsProps> = {},
+): LayoutNode<"TableOfContents"> {
   return element("TableOfContents", [props]);
 }
 
@@ -123,27 +136,30 @@ export function Columns(...args: Args<ColumnsProps>): LayoutNode<"Columns"> {
 }
 
 /** A picture. Give a width or a height and the other follows from its proportions. */
-export function Image(props: ImageProps): LayoutNode<"Image"> {
+export function Image(props: Loose<ImageProps>): LayoutNode<"Image"> {
   return element("Image", [props]);
 }
 
 /** Empty space: a fixed gap, or in a `Row` whatever width is left over. */
-export function Spacer(props: SpacerProps | number = {}): LayoutNode<"Spacer"> {
+export function Spacer(props: Loose<SpacerProps> | number = {}): LayoutNode<"Spacer"> {
   return element("Spacer", [typeof props === "number" ? { size: props } : props]);
 }
 
 /** Cells of a fixed size, filled row by row and continued on new pages: labels, bibs, cards. */
-export function Grid(props: GridProps, ...children: Child[]): LayoutNode<"Grid"> {
+export function Grid(props: Loose<GridProps>, ...children: Child[]): LayoutNode<"Grid"> {
   return element("Grid", [props, ...children]);
 }
 
 /** Content placed at fixed distances from the edges of its container or the page. */
-export function Absolute(props: AbsoluteProps, ...children: Child[]): LayoutNode<"Absolute"> {
+export function Absolute(
+  props: Loose<AbsoluteProps>,
+  ...children: Child[]
+): LayoutNode<"Absolute"> {
   return element("Absolute", [props, ...children]);
 }
 
 /** A region you draw in yourself: charts, diagrams, decorations. */
-export function Canvas(props: CanvasProps): LayoutNode<"Canvas"> {
+export function Canvas(props: Loose<CanvasProps>): LayoutNode<"Canvas"> {
   return element("Canvas", [props]);
 }
 
@@ -156,7 +172,7 @@ export function PageBreak(): LayoutNode<"PageBreak"> {
  * Rows and columns of data. A table runs over as many pages as it needs, never splits a row,
  * and repeats its header on each page.
  */
-export function Table(props: TableProps): LayoutNode<"Table"> {
+export function Table(props: Loose<TableProps>): LayoutNode<"Table"> {
   return element("Table", [props]);
 }
 
@@ -179,7 +195,7 @@ export function List(...args: Args<ListProps>): LayoutNode<"List"> {
 }
 
 /** A QR code, drawn as vector shapes so that it prints sharply at any size. */
-export function QrCode(props: QrCodeProps): LayoutNode<"QrCode"> {
+export function QrCode(props: Loose<QrCodeProps>): LayoutNode<"QrCode"> {
   return element("QrCode", [props]);
 }
 
@@ -187,6 +203,6 @@ export function QrCode(props: QrCodeProps): LayoutNode<"QrCode"> {
  * Vector artwork from an SVG file, drawn as shapes so that it stays sharp in print. It is
  * sized like an image: give a width or a height and the other follows.
  */
-export function Svg(props: SvgProps): LayoutNode<"Svg"> {
+export function Svg(props: Loose<SvgProps>): LayoutNode<"Svg"> {
   return element("Svg", [props]);
 }

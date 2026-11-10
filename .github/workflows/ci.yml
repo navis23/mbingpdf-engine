@@ -42,6 +42,8 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
       - run: pnpm build
+      - name: Bundle size is within budget
+        run: pnpm size
 
   runtimes:
     name: Bun, Deno and Chromium

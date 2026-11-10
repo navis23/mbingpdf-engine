@@ -68,6 +68,14 @@ describe("elements", () => {
     expect(Link({ href: "https://example.com" }, "x").props.href).toBe("https://example.com");
   });
 
+  test("a property given as undefined is as if it was not given", () => {
+    const first = true;
+    const node = Text({ size: 12, break: first ? undefined : "before", color: undefined }, "a");
+    expect(node.props).toEqual({ size: 12 });
+    // An undefined value must not wipe out a default, such as a table cell's padding.
+    expect(Stack({ padding: undefined, gap: 4 }).props).toEqual({ gap: 4 });
+  });
+
   test("empty values and nested lists of children are fine", () => {
     const items = ["satu", "dua"];
     const [first] = pagesOf(
