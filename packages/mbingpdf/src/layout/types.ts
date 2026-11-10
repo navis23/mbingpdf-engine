@@ -185,6 +185,81 @@ export interface CanvasProps extends BoxProps {
   draw: (g: CanvasContext, size: { width: number; height: number }) => void;
 }
 
+/** A column of a table. */
+export interface TableColumn extends TextProps {
+  /**
+   * A fixed width in points, a percentage of the table, a share of the leftover width
+   * (`"1fr"`, `"2fr"`), or `"auto"` for as wide as its content. Default `"1fr"`.
+   */
+  width?: number | `${number}%` | `${number}fr` | "auto";
+  /** Alignment of text in this column's cells. */
+  align?: TextAlign | "start" | "end";
+}
+
+export interface CellProps extends BoxProps {
+  /** Number of columns the cell covers. Default 1. */
+  colSpan?: number;
+  /** Alignment of text in the cell; overrides the column's. */
+  align?: TextAlign | "start" | "end";
+  /** Where the content sits when the row is taller than it. Default `"top"`. */
+  verticalAlign?: "top" | "middle" | "bottom";
+}
+
+export interface TableRowProps extends TextProps {
+  background?: ColorInput;
+  /** The least height of the row. */
+  height?: number;
+  /** Keeps this row on the same page as the next one (a group title with its first line). */
+  keepWithNext?: boolean;
+}
+
+/** A row of a table: a list of cells, or a `TableRow` when the row needs properties. */
+export type TableRowInput = readonly Child[] | LayoutNode<"TableRow">;
+
+/** The lines of a table. */
+export interface TableBorders {
+  /** Around the table. */
+  outer?: BorderSide;
+  /** Between rows. */
+  horizontal?: BorderSide;
+  /** Between columns. */
+  vertical?: BorderSide;
+  /** Under the header; default: the same as `horizontal`. */
+  header?: BorderSide;
+  /** Above the footer; default: the same as `horizontal`. */
+  footer?: BorderSide;
+}
+
+/** Style of the header or footer rows of a table. */
+export interface TableSectionStyle extends TextProps {
+  background?: ColorInput;
+}
+
+export interface TableProps extends BoxProps {
+  /** The columns, or just how many there are. */
+  columns: number | readonly (TableColumn | number | `${number}%` | `${number}fr` | "auto")[];
+  /** One header row or several. */
+  header?: TableRowInput | readonly TableRowInput[];
+  rows: readonly TableRowInput[];
+  /** One footer row or several, shown after the last row. */
+  footer?: TableRowInput | readonly TableRowInput[];
+  /** Repeat the header at the top of every page the table runs onto. Default true. */
+  repeatHeader?: boolean;
+  /** Repeat the footer at the bottom of every page, not only after the last row. */
+  repeatFooter?: boolean;
+  /** Space inside every cell. Default 4 points above and below, 6 at the sides. */
+  cellPadding?: Edges;
+  /**
+   * The lines to draw: `"rows"` (default) between rows, `"grid"` around every cell, `"none"`,
+   * or each kind of line separately.
+   */
+  borders?: "rows" | "grid" | "none" | TableBorders;
+  /** Background of every second body row. */
+  zebra?: ColorInput;
+  headerStyle?: TableSectionStyle;
+  footerStyle?: TableSectionStyle;
+}
+
 /** What page furniture is told about the page it is on. */
 export interface PageInfo {
   /** Page number, counting from 1 across the whole document. */
@@ -250,6 +325,9 @@ interface PropsByType {
   Grid: GridProps;
   Absolute: AbsoluteProps;
   Canvas: CanvasProps;
+  Table: TableProps;
+  TableRow: TableRowProps;
+  Cell: CellProps;
   PageBreak: Record<string, never>;
 }
 

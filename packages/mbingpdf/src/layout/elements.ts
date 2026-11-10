@@ -6,6 +6,7 @@
 import type {
   AbsoluteProps,
   CanvasProps,
+  CellProps,
   Child,
   DocumentProps,
   GridProps,
@@ -17,6 +18,8 @@ import type {
   SpacerProps,
   SpanProps,
   StackProps,
+  TableProps,
+  TableRowProps,
   TextElementProps,
 } from "./types.ts";
 
@@ -117,4 +120,22 @@ export function Canvas(props: CanvasProps): LayoutNode<"Canvas"> {
 /** Ends the page; what follows starts on the next one. */
 export function PageBreak(): LayoutNode<"PageBreak"> {
   return { type: "PageBreak", props: {}, children: [] };
+}
+
+/**
+ * Rows and columns of data. A table runs over as many pages as it needs, never splits a row,
+ * and repeats its header on each page.
+ */
+export function Table(props: TableProps): LayoutNode<"Table"> {
+  return element("Table", [props]);
+}
+
+/** A table row with properties of its own: a background, text style, or `keepWithNext`. */
+export function TableRow(...args: Args<TableRowProps>): LayoutNode<"TableRow"> {
+  return element("TableRow", args);
+}
+
+/** A table cell with properties of its own: a column span, padding, background, alignment. */
+export function Cell(...args: Args<CellProps>): LayoutNode<"Cell"> {
+  return element("Cell", args);
 }

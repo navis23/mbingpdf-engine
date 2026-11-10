@@ -26,6 +26,7 @@ import {
   toPoints,
   toSides,
 } from "./style.ts";
+import { layoutTable, measureTable } from "./table.ts";
 import type {
   AbsoluteProps,
   Align,
@@ -105,7 +106,7 @@ export interface LayoutSink {
 }
 
 /** Marks "not started; try again on the next page". */
-const RETRY: unique symbol = Symbol("retry");
+export const RETRY: unique symbol = Symbol("retry");
 
 /** Raised when content can never be placed, however many pages are added. */
 export class LayoutError extends Error {
@@ -287,6 +288,10 @@ export function measure(node: LayoutNode, context: TextContext): { min: number; 
       const height = typeof props.height === "number" ? props.height : undefined;
       max = height !== undefined ? (height * natural.width) / natural.height : natural.width * PX;
       break;
+    }
+    case "Table": {
+      const size = measureTable(node as LayoutNode<"Table">, context);
+      return size;
     }
     case "Grid": {
       const grid = (node as LayoutNode<"Grid">).props;
@@ -946,6 +951,11 @@ export function layout(
       );
     case "Canvas":
       return layoutCanvas(node as LayoutNode<"Canvas">, context, area);
+    case "Table":
+      return layoutTable(node as LayoutNode<"Table">, context, area, resume as never, sink);
+    case "TableRow":
+    case "Cell":
+      throw new LayoutError(`${node.type} belongs inside a Table`);
     case "Spacer": {
       const size = (node as LayoutNode<"Spacer">).props.size ?? 0;
       if (size > area.height + 1e-6 && !area.fresh) return { state: RETRY };

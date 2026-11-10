@@ -617,7 +617,7 @@ const tour: Sample = {
   },
 };
 
-/** The invoice from the API design, without the table (tables come in M3). */
+/** The invoice from the API design. */
 const invoice: Sample = {
   text: [["Invoice", "INV-0042", "Sewa bus pariwisata", "Total Rp 4.850.000", "Page 1 of 1"]],
   build(env) {
@@ -666,22 +666,18 @@ const invoice: Sample = {
             d.Text("10 November 2026"),
           ),
         ),
-        d.Stack(
-          d.Row(
-            { background: "#F3F4F6", padding: [6, 8], font: semiBold, size: 9 },
-            d.Text({ grow: 1 }, "Description"),
-            d.Text({ width: 50, align: "right" }, "Qty"),
-            d.Text({ width: 90, align: "right" }, "Amount"),
-          ),
-          items.map(([name, quantity, price]) =>
-            d.Row(
-              { padding: [6, 8], border: { bottom: { width: 0.5, color: "#E5E7EB" } }, ...numbers },
-              d.Text({ grow: 1 }, name),
-              d.Text({ width: 50, align: "right" }, String(quantity)),
-              d.Text({ width: 90, align: "right" }, money(quantity * price)),
-            ),
-          ),
-        ),
+        d.Table({
+          columns: [
+            { width: "1fr" },
+            { width: 50, align: "end" },
+            { width: 90, align: "end", ...numbers },
+          ],
+          header: ["Description", "Qty", "Amount"],
+          rows: items.map(([name, quantity, price]) => [name, quantity, money(quantity * price)]),
+          headerStyle: { font: semiBold, size: 9, background: "#F3F4F6" },
+          cellPadding: [6, 8],
+          borders: { horizontal: { width: 0.5, color: "#E5E7EB" } },
+        }),
         d.Stack(
           { keepTogether: true, align: "end" },
           d.Text({ font: semiBold, size: 14, ...numbers }, `Total ${money(total)}`),

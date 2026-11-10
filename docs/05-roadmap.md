@@ -48,7 +48,7 @@ _Status: done 2026-11-10. The exit test passes: a 53-page report with headings, 
 
 ## M3 — Tables, vector art and print
 
-_Status: next_
+_Status: in progress — done: tables (fixed, percentage, fractional and auto columns; column spans; lines and zebra rows; headers and footers repeated across pages; rows that stay whole; `keepWithNext` for group titles). The 1,000-row exit test passes in well under the budget. Row spans are not supported. Still to do: lists, multi-column sections, outlines and links within the document, a table of contents, SVG input, QR codes, themes, and print output (bleed, marks, spot colours, output intent, PDF/X-4, DPI warnings, shared graphics)_
 
 - Tables: column sizing, spans, borders, zebra rows, repeated headers and footers, split and non-split rows, group subtotals.
 - Lists, multi-column sections, per-section page size and orientation.

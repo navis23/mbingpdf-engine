@@ -7,6 +7,7 @@ export {
   Absolute,
   Box,
   Canvas,
+  Cell,
   Document,
   Grid,
   Image,
@@ -17,6 +18,8 @@ export {
   Spacer,
   Span,
   Stack,
+  Table,
+  TableRow,
   Text,
 } from "./elements.ts";
 export { LayoutError } from "./engine.ts";
@@ -35,6 +38,7 @@ export type {
   BorderSide,
   BoxProps,
   CanvasProps,
+  CellProps,
   Child,
   ColorInput,
   DocumentProps,
@@ -51,6 +55,12 @@ export type {
   SpacerProps,
   SpanProps,
   StackProps,
+  TableBorders,
+  TableColumn,
+  TableProps,
+  TableRowInput,
+  TableRowProps,
+  TableSectionStyle,
   TextElementProps,
   TextProps,
 } from "./types.ts";
