@@ -1,6 +1,7 @@
 import { ByteWriter } from "./bytes.ts";
 import { Hash128 } from "./hash.ts";
 import { PdfDict, PdfName, type PdfRef, PdfStream, PdfString } from "./objects.ts";
+import { formatNumber } from "./serialize.ts";
 import type { PdfWriter } from "./writer.ts";
 
 /**
@@ -23,11 +24,27 @@ export interface FontProgram {
   glyphForCodePoint(codePoint: number): number;
   /** Advance width of a glyph in font units. */
   advanceWidth(glyph: number): number;
+  /**
+   * Shapes text into positioned glyphs (ligatures, kerning, accents), in font units. When a
+   * font does not provide this, each character is drawn with its own glyph at its plain width.
+   */
+  shape?(text: string): readonly PositionedGlyph[];
   /** A font file with only these glyphs, renumbered in order; see `TrueTypeFont.subset`. */
   subset(glyphs: readonly number[]): {
     readonly data: Uint8Array;
     readonly glyphs: readonly number[];
   };
+}
+
+/** A glyph as a shaper returns it. Distances are in font units. */
+export interface PositionedGlyph {
+  /** Glyph ID in the font; 0 when the font has no glyph for the character. */
+  readonly id: number;
+  /** UTF-16 offset in the text of the first character the glyph stands for. */
+  readonly cluster: number;
+  readonly xAdvance: number;
+  readonly xOffset: number;
+  readonly yOffset: number;
 }
 
 function hex4(value: number): string {
@@ -75,23 +92,95 @@ export class EmbeddedFont {
     return id;
   }
 
-  /** Converts text to glyph IDs, one per character. Throws on a character the font lacks. */
-  encode(text: string): PdfString {
-    const out = new Uint8Array(text.length * 2);
-    let length = 0;
-    for (const char of text) {
-      const codePoint = char.codePointAt(0) as number;
-      const glyph = this.font.glyphForCodePoint(codePoint);
-      if (glyph === 0) {
+  /** One glyph per character at its plain advance, for fonts without a shaper. */
+  #unshaped(text: string): PositionedGlyph[] {
+    const glyphs: PositionedGlyph[] = [];
+    for (let i = 0; i < text.length; ) {
+      const codePoint = text.codePointAt(i) as number;
+      const id = this.font.glyphForCodePoint(codePoint);
+      glyphs.push({ id, cluster: i, xAdvance: this.font.advanceWidth(id), xOffset: 0, yOffset: 0 });
+      i += codePoint > 0xffff ? 2 : 1;
+    }
+    return glyphs;
+  }
+
+  /**
+   * Writes the operators that show `text`: a `Tj`, or a `TJ` array when kerning or accent
+   * placement moves glyphs away from their plain advance. Throws on a character the font lacks.
+   */
+  show(out: ByteWriter, text: string, size: number, rise: number): void {
+    const font = this.font;
+    const glyphs = font.shape ? font.shape(text) : this.#unshaped(text);
+    const scale = 1000 / font.unitsPerEm;
+    const number = (value: number): string => formatNumber(value, 3);
+
+    // A TJ array alternates strings of glyph IDs with shifts in thousandths of the font size.
+    const items: string[] = [];
+    let run = "";
+    /** Distance the pen still has to move right before the next glyph, in thousandths. */
+    let shift = 0;
+    let currentRise = rise;
+    const flush = (): void => {
+      if (run !== "") items.push(`<${run}>`);
+      run = "";
+      if (items.length === 1 && items[0]?.startsWith("<")) out.ascii(`${items[0]} Tj\n`);
+      else if (items.length > 0) out.ascii(`[${items.join("")}] TJ\n`);
+      items.length = 0;
+    };
+    const applyShift = (): void => {
+      if (Math.abs(shift) < 0.0005) return;
+      if (run !== "") items.push(`<${run}>`);
+      run = "";
+      // TJ numbers move the pen left, so the sign flips.
+      items.push(number(-shift));
+      shift = 0;
+    };
+
+    glyphs.forEach((glyph, i) => {
+      if (glyph.id === 0) {
+        const codePoint = text.codePointAt(glyph.cluster) as number;
         throw new RangeError(
-          `${this.font.postScriptName} has no glyph for "${char}" (U+${hex4(codePoint)})`,
+          `${font.postScriptName} has no glyph for "${String.fromCodePoint(codePoint)}" (U+${hex4(codePoint)})`,
         );
       }
-      const id = this.use(glyph, char);
-      out[length++] = id >> 8;
-      out[length++] = id & 0xff;
-    }
-    return new PdfString(out.subarray(0, length), true);
+      // The first glyph of a cluster carries the cluster's text for copy and search.
+      let clusterText: string | undefined;
+      if (i === 0 || glyphs[i - 1]?.cluster !== glyph.cluster) {
+        let end = text.length;
+        for (let j = i + 1; j < glyphs.length; j++) {
+          const next = (glyphs[j] as PositionedGlyph).cluster;
+          if (next !== glyph.cluster) {
+            end = next;
+            break;
+          }
+        }
+        clusterText = text.slice(glyph.cluster, end);
+      }
+      const id = this.use(glyph.id, clusterText);
+
+      const glyphRise = rise + (glyph.yOffset * size) / font.unitsPerEm;
+      if (Math.abs(glyphRise - currentRise) >= 0.0005) {
+        applyShift();
+        flush();
+        out.ascii(`${number(glyphRise)} Ts\n`);
+        currentRise = glyphRise;
+      }
+      shift += glyph.xOffset * scale;
+      applyShift();
+      run += hex4(id);
+      // What the viewer will advance by is the width in the font's W array.
+      shift += (glyph.xAdvance - glyph.xOffset) * scale - this.#pdfWidth(glyph.id);
+    });
+    applyShift();
+    flush();
+    if (Math.abs(currentRise - rise) >= 0.0005) out.ascii(`${number(rise)} Ts\n`);
+  }
+
+  /** A glyph's advance as written to the PDF: thousandths of the font size, 3 decimals. */
+  #pdfWidth(glyph: number): number {
+    return (
+      Math.round(((this.font.advanceWidth(glyph) * 1000) / this.font.unitsPerEm) * 1000) / 1000
+    );
   }
 
   /** Writes the font objects. `ref` is the reference pages already point at. */
@@ -132,9 +221,7 @@ export class EmbeddedFont {
       }),
     );
 
-    const widths = subset.glyphs.map(
-      (glyph) => Math.round(font.advanceWidth(glyph) * scale * 1000) / 1000,
-    );
+    const widths = subset.glyphs.map((glyph) => this.#pdfWidth(glyph));
     const descendant = writer.add(
       new PdfDict({
         Type: new PdfName("Font"),

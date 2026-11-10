@@ -2,6 +2,7 @@ import type { AnyFont, FontBinding } from "./content.ts";
 import { EmbeddedFont } from "./embedded-font.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
 import { PdfPage, type PdfPageOptions } from "./page.ts";
+import { writeObject } from "./serialize.ts";
 import { StandardFont } from "./standard-font.ts";
 import { PdfWriter, type PdfWriterOptions } from "./writer.ts";
 
@@ -119,13 +120,24 @@ export class PdfDocument {
           Encoding: font.symbolic ? undefined : new PdfName("WinAnsiEncoding"),
         }),
       );
-      resource = { name, ref, encode: (text) => new PdfString(font.encode(text)) };
+      resource = {
+        name,
+        ref,
+        show: (out, text) => {
+          writeObject(out, new PdfString(font.encode(text)));
+          out.ascii(" Tj\n");
+        },
+      };
     } else {
       // The subset is only known once every page is drawn, so the object is written in finish().
       const embedded = new EmbeddedFont(font);
       const ref = this.writer.allocate();
       this.#embedded.push({ font: embedded, ref });
-      resource = { name, ref, encode: (text) => embedded.encode(text) };
+      resource = {
+        name,
+        ref,
+        show: (out, text, size, rise) => embedded.show(out, text, size, rise),
+      };
     }
     this.#fonts.set(font, resource);
     return resource;

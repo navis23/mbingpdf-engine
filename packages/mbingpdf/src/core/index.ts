@@ -16,7 +16,7 @@ export {
   type TextRenderingMode,
 } from "./content.ts";
 export { PdfDocument, type PdfDocumentOptions, type PdfInfo } from "./document.ts";
-export { EmbeddedFont, type FontProgram } from "./embedded-font.ts";
+export { EmbeddedFont, type FontProgram, type PositionedGlyph } from "./embedded-font.ts";
 export {
   dict,
   name,

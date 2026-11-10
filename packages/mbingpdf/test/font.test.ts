@@ -198,9 +198,10 @@ describe("embedding", () => {
     expect(out.match(/\/Subtype\/Type0/g)?.length).toBe(1);
     // Glyphs are numbered in order of first use, after glyph 0:
     // H=1 a=2 l=3 o=4 ,=5 space=6 d=7 u=8 n=9 i=10 —=11 é=12.
+    // The font kerns "o," by -7 units, so the text is a TJ array with one adjustment.
     const ids = (...values: number[]): string =>
       values.map((value) => value.toString(16).toUpperCase().padStart(4, "0")).join("");
-    expect(out).toContain(`<${ids(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 2, 6, 11, 6, 12)}> Tj`);
+    expect(out).toContain(`[<${ids(1, 2, 3, 4)}>7<${ids(5, 6, 7, 8, 9, 10, 2, 6, 11, 6, 12)}>] TJ`);
     expect(out).toContain(`<${ids(7, 8, 2)}> Tj`);
     const h = font.advanceWidth(font.glyphForCodePoint(0x48));
     expect(out).toContain(`/W[0[${font.advanceWidth(0)} ${h} `);
@@ -208,6 +209,64 @@ describe("embedding", () => {
     expect(out).toContain("<000B> <2014>\n");
 
     expect(await extractText(pdf)).toEqual([["Halo, dunia — é"], ["dua"]]);
+  });
+
+  test("ligatures and composed accents map back to the text they stand for", async () => {
+    const font = load("BarlowCondensed-Regular");
+    const doc = new PdfDocument(plain);
+    doc
+      .addPage({ size: [300, 100] })
+      .content.font(font, 20)
+      .text("fi e\u0301 office", 10, 40);
+    const pdf = doc.finish();
+    const out = latin1(pdf);
+    // One glyph for "fi", mapped to both letters; e + combining acute drawn with the é glyph.
+    expect(out).toContain("<0001> <00660069>\n");
+    expect(out).toContain("<0003> <00650301>\n");
+    expect((await extractText(pdf))[0]?.join("").normalize("NFC")).toBe("fi é office");
+  });
+
+  test("kerning can be measured and matches what is drawn", () => {
+    const font = load("BarlowCondensed-Regular");
+    const doc = new PdfDocument(plain);
+    doc
+      .addPage({ size: [300, 100] })
+      .content.font(font, 10)
+      .text("AV", 0, 0);
+    const out = latin1(doc.finish());
+    const a = font.advanceWidth(font.glyphForCodePoint(0x41));
+    const v = font.advanceWidth(font.glyphForCodePoint(0x56));
+    const kern = Number(/\[<0001>(-?[\d.]+)<0002>\] TJ/.exec(out)?.[1]);
+    expect(kern).toBeGreaterThan(0);
+    expect(font.widthOfText("AV", 1000)).toBe(a + v - kern);
+  });
+
+  test("glyph offsets become pen shifts and text rise", () => {
+    const base = load("BarlowCondensed-Regular");
+    const doc = new PdfDocument(plain);
+    // A base glyph of width 500 followed by a mark placed 100 left and 250 up, with no advance.
+    const fake = {
+      ...metricsOf(base),
+      unitsPerEm: 1000,
+      advanceWidth: (glyph: number) => (glyph === 6 ? 0 : 500),
+      shape: () => [
+        { id: 5, cluster: 0, xAdvance: 500, xOffset: 0, yOffset: 0 },
+        { id: 6, cluster: 0, xAdvance: 0, xOffset: -100, yOffset: 250 },
+        { id: 5, cluster: 2, xAdvance: 480, xOffset: 0, yOffset: 0 },
+      ],
+    };
+    doc
+      .addPage({ size: [100, 100] })
+      .content.font(fake, 20)
+      .textRise(3)
+      .text("a\u0301b", 0, 0);
+    const out = latin1(doc.finish());
+    expect(out).toContain(
+      "3 Ts\nBT\n0 0 Td\n<0001> Tj\n8 Ts\n[100<0002>-100] TJ\n3 Ts\n[<0001>20] TJ\nET\n",
+    );
+    // Only the first glyph of a cluster carries its text.
+    expect(out).toContain("<0001> <00610301>\n");
+    expect(out).not.toContain("<0002> <");
   });
 
   test("maps characters outside the Basic Multilingual Plane back to text", () => {

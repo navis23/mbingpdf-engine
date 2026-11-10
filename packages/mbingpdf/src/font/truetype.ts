@@ -1,5 +1,6 @@
 import { BinaryReader, BinaryWriter } from "./reader.ts";
 import { buildSfnt, parseSfnt } from "./sfnt.ts";
+import { openTypeShaper, type ShapedGlyph, type ShapeOptions, type Shaper } from "./shaper.ts";
 
 /** The result of {@link TrueTypeFont.subset}. */
 export interface FontSubset {
@@ -160,6 +161,11 @@ export class TrueTypeFont {
   readonly weightClass: number;
   /** False when the font's licence flags forbid embedding it in documents. */
   readonly embeddable: boolean;
+  /**
+   * Turns text into positioned glyphs. Replace it to use another shaping engine, for scripts
+   * the built-in one does not cover.
+   */
+  shaper: Shaper = openTypeShaper;
 
   readonly #tables: ReadonlyMap<string, Uint8Array>;
   readonly #cmap: Map<number, number>;
@@ -243,6 +249,11 @@ export class TrueTypeFont {
     this.postScriptName = (names.get(6) ?? fallback).replace(/[^\x21-\x7e]|[()<>[\]{}/%]/g, "");
   }
 
+  /** The raw bytes of a font table, such as `GSUB` or `kern`. */
+  table(tag: string): Uint8Array | undefined {
+    return this.#tables.get(tag);
+  }
+
   /** The glyph for a Unicode code point, or 0 (the "missing glyph") when the font has none. */
   glyphForCodePoint(codePoint: number): number {
     return this.#cmap.get(codePoint) ?? 0;
@@ -263,14 +274,17 @@ export class TrueTypeFont {
   }
 
   /**
-   * The width of `text` at `size` in points, from advance widths alone (no kerning or
-   * ligatures). Characters the font lacks count as the missing glyph.
+   * Shapes text: maps characters to glyphs and applies the font's ligatures, kerning and
+   * accent positioning. A glyph ID of 0 marks a character the font cannot show.
    */
-  widthOfText(text: string, size: number): number {
+  shape(text: string, options?: ShapeOptions): ShapedGlyph[] {
+    return this.shaper.shape(this, text, options);
+  }
+
+  /** The width of `text` at `size` in points, after shaping. */
+  widthOfText(text: string, size: number, options?: ShapeOptions): number {
     let total = 0;
-    for (const char of text) {
-      total += this.advanceWidth(this.glyphForCodePoint(char.codePointAt(0) as number));
-    }
+    for (const glyph of this.shape(text, options)) total += glyph.xAdvance;
     return (total * size) / this.unitsPerEm;
   }
 

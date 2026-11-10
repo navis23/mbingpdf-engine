@@ -19,7 +19,7 @@ Repository, toolchain and a valid PDF.
 
 ## M1 — Fonts and text
 
-_Status: in progress — TrueType parsing, glyph subsetting, CID embedding and `ToUnicode` are done and checked against HarfBuzz. Still to do: shaping (kerning, ligatures), variable-font instancing, CFF, WOFF2, line breaking, justification, fit-to-width, hyphenation, fallback_
+_Status: in progress — done and checked against HarfBuzz: TrueType parsing, glyph subsetting, CID embedding with `ToUnicode`, and shaping for simple scripts (GSUB ligatures and alternates, GPOS kerning and mark attachment, feature toggles, the `Shaper` interface). Still to do: variable-font instancing, CFF, WOFF2, line breaking, justification, fit-to-width, hyphenation, fallback_
 
 - TrueType and OpenType/CFF parsing, WOFF2 decoding, variable-font instancing.
 - Glyph subsetting, CID font embedding, `ToUnicode` maps.

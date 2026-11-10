@@ -1,7 +1,7 @@
 import { ByteWriter } from "./bytes.ts";
 import type { Color } from "./color.ts";
 import type { FontProgram } from "./embedded-font.ts";
-import { PdfName, type PdfString } from "./objects.ts";
+import { PdfName } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 import type { StandardFont } from "./standard-font.ts";
 
@@ -42,8 +42,17 @@ export type AnyFont = StandardFont | FontProgram;
 export interface FontBinding {
   /** The resource name, such as `F1`. */
   readonly name: string;
-  /** Converts text to the string operand that shows it in this font. */
-  encode(text: string): PdfString;
+  /**
+   * Writes the operators that show `text` in this font. `size` and `rise` are the current font
+   * size and text rise, which a font needs when it moves glyphs off the baseline.
+   */
+  show(out: ByteWriter, text: string, size: number, rise: number): void;
+}
+
+interface TextState {
+  font: FontBinding | undefined;
+  size: number;
+  rise: number;
 }
 
 const TEXT_RENDERING_MODES: Record<TextRenderingMode, number> = {
@@ -76,8 +85,8 @@ const factor = (value: number): string => formatNumber(value, 6);
 export class ContentStream {
   readonly #out: ByteWriter = new ByteWriter();
   readonly #resources: ContentResources | undefined;
-  /** The font in effect at each save() level; the last entry is the current one. */
-  readonly #fonts: (FontBinding | undefined)[] = [undefined];
+  /** The text state at each save() level; the last entry is the current one. */
+  readonly #text: TextState[] = [{ font: undefined, size: 0, rise: 0 }];
   #inText = false;
 
   constructor(resources?: ContentResources) {
@@ -89,15 +98,15 @@ export class ContentStream {
   /** Saves the graphics state (`q`). Every save needs a matching {@link restore}. */
   save(): this {
     this.#noText("save()");
-    this.#fonts.push(this.#fonts.at(-1));
+    this.#text.push({ ...this.#state });
     return this.#op("q");
   }
 
   /** Restores the most recently saved graphics state (`Q`). */
   restore(): this {
     this.#noText("restore()");
-    if (this.#fonts.length === 1) throw new Error("restore() without a matching save()");
-    this.#fonts.pop();
+    if (this.#text.length === 1) throw new Error("restore() without a matching save()");
+    this.#text.pop();
     return this.#op("Q");
   }
 
@@ -299,7 +308,8 @@ export class ContentStream {
     if (!(size > 0)) throw new RangeError("Font size must be positive");
     if (!this.#resources) throw new Error("font() needs a content stream that belongs to a page");
     const binding = this.#resources.font(font);
-    this.#fonts[this.#fonts.length - 1] = binding;
+    this.#state.font = binding;
+    this.#state.size = size;
     return this.#op("Tf", this.#name(binding.name), n(size));
   }
 
@@ -331,10 +341,9 @@ export class ContentStream {
   /** Shows text at the current position in the current font (`Tj`). */
   showText(text: string): this {
     this.#needText("showText()");
-    const font = this.#fonts.at(-1);
-    if (!font) throw new Error("Select a font with font() before showing text");
-    writeObject(this.#out, font.encode(text));
-    this.#out.ascii(" Tj\n");
+    const state = this.#state;
+    if (!state.font) throw new Error("Select a font with font() before showing text");
+    state.font.show(this.#out, text, state.size, state.rise);
     return this;
   }
 
@@ -355,6 +364,7 @@ export class ContentStream {
 
   /** Raises (or, when negative, lowers) the baseline, for superscripts and subscripts (`Ts`). */
   textRise(rise: number): this {
+    this.#state.rise = rise;
     return this.#op("Ts", n(rise));
   }
 
@@ -374,8 +384,8 @@ export class ContentStream {
   /** The finished stream. Throws if a save() was never restored. */
   toBytes(): Uint8Array {
     if (this.#inText) throw new Error("beginText() without a matching endText()");
-    if (this.#fonts.length !== 1) {
-      throw new Error(`${this.#fonts.length - 1} save() call(s) without a matching restore()`);
+    if (this.#text.length !== 1) {
+      throw new Error(`${this.#text.length - 1} save() call(s) without a matching restore()`);
     }
     return this.#out.toBytes();
   }
@@ -389,6 +399,10 @@ export class ContentStream {
       case "cmyk":
         return this.#op(stroking ? "K" : "k", n(color.c), n(color.m), n(color.y), n(color.k));
     }
+  }
+
+  get #state(): TextState {
+    return this.#text.at(-1) as TextState;
   }
 
   #noText(what: string): void {
