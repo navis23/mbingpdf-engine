@@ -22,6 +22,9 @@ const pdf = await render(
 What works today:
 
 - **Documents** (`mbingpdf`) — rows and stacks with flexbox-style sizing, tables with repeated headers, lists, multi-column sections, grids, text with mixed styles and links, images, SVG artwork and QR codes as vectors, absolute positioning and free drawing. Content flows over pages with forced breaks, keep-together, keep-with-next and widow/orphan control; headers and footers know the page number and total; headings become bookmarks and a table of contents.
+- **Barcodes and charts** — Code 128, EAN-13, EAN-8, UPC-A, Code 39 and ITF as vectors; bar, line and pie charts; text on a `Canvas`.
+- **Standards** — PDF/A-2 and PDF/A-3 for archiving, and tagged PDF with PDF/UA-1 for accessibility, checked with veraPDF.
+- **Protection** — password encryption with AES-256 and permissions; files attached inside the PDF, including Factur-X e-invoices.
 - **Themes** — fonts with weights, colours and text styles defined once with `defineTheme` and used by name.
 - **Print** — CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
 - **Text** (`mbingpdf/text`) — Unicode line breaking, hyphenation for English and Indonesian, justification, font fallback and fit-to-width.
@@ -30,7 +33,7 @@ What works today:
 - **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
 - **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
 
-[`@mbingpdf/dev`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/dev) adds a preview server that redraws a document on every save. The first npm release comes next.
+[`@mbingpdf/dev`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/dev) adds a preview server that redraws a document on every save.
 
 ## Install
 
@@ -58,6 +61,7 @@ Node 22 or later, current browsers, Bun, Deno and edge runtimes. There are no ru
 | `mbingpdf/text` | Line breaking, hyphenation, paragraph layout |
 | `mbingpdf/image` | JPEG and PNG decoding |
 | `mbingpdf/qr` | QR code generation |
+| `mbingpdf/barcode` | One-dimensional barcode patterns |
 
 ## Licence
 
