@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 15:40 WIB · Session 2 · Milestone: M0–M2 done; M3 in progress (tables, lists, QR, print done) · Branch: main_
+_Updated: 2026-11-10 16:10 WIB · Session 2 · Milestone: M0–M2 done; M3 mostly done · Branch: main_
 
 ## Where we are
 M0, M1 and M2 are finished. The root `mbingpdf` entry now has
@@ -43,9 +43,9 @@ M1 has just started; see `docs/05-roadmap.md`.
 11. M3 done so far: tables (`src/layout/table.ts`), lists, `fit` on Text, QR codes (`src/qr/`), print
     (bleed, marks, spot colours, output intent, PDF/X-4, XMP, DPI warnings). Samples `invoice` and
     `certificate` are the two M3 acceptance documents.
-12. M3 remaining, in this order: themes (`defineTheme`), outlines and internal links, table of contents,
-    SVG input (`Svg` element), multi-column sections, shared graphics (Form XObjects), the 5,000-bib
-    benchmark.
+12. Also done in M3: `Heading` with bookmarks, `id` + `Link({ to })`, `TableOfContents`, `Columns`.
+    M3 remaining, in this order: themes (`defineTheme`), SVG input (`Svg` element), shared graphics (Form
+    XObjects), the 5,000-bib benchmark.
 13. Then M4 (developer experience and first release): see the roadmap.
 
 ## Waiting on the owner
@@ -62,7 +62,7 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 356 tests, build). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 371 tests, build). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 

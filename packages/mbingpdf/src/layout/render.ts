@@ -1,7 +1,14 @@
 /** From a document tree to pages, and from pages to a PDF file. */
 import { type OutputIntent, orientedSize, PdfDocument } from "../core/index.ts";
 import type { DisplayItem, DisplayPage } from "./display.ts";
-import { type Box, LayoutError, type LayoutSink, layout, normalize } from "./engine.ts";
+import {
+  type Box,
+  LayoutError,
+  type LayoutSink,
+  layout,
+  normalize,
+  type TocEntry,
+} from "./engine.ts";
 import { paintBox } from "./paint.ts";
 import { writeDisplayPage } from "./pdf.ts";
 import { DEFAULT_TEXT, inherit, type TextContext, toColor, toPageSize, toSides } from "./style.ts";
@@ -66,9 +73,40 @@ export function layoutDocument(
   document: LayoutNode<"Document">,
   options: { minImageDpi?: number } = {},
 ): DocumentLayout {
-  const lowResolution: string[] = [];
   if (document?.type !== "Document") throw new LayoutError("render() needs a Document element");
-  const sink: LayoutSink = { missingCharacters: new Set(), page: { width: 0, height: 0 } };
+  // A table of contents shows page numbers that are only known once the document is laid out,
+  // and its own length can move those pages. So: lay out, read off the headings, and repeat
+  // until the page numbers stop changing (twice is the usual case).
+  let toc: TocEntry[] = [];
+  let result = layoutPass(document, options, toc);
+  for (let pass = 0; pass < 5 && result.usesToc; pass++) {
+    const same =
+      toc.length === result.headings.length &&
+      toc.every(
+        (entry, i) =>
+          entry.id === result.headings[i]?.id && entry.page === result.headings[i]?.page,
+      );
+    if (same) break;
+    toc = result.headings;
+    result = layoutPass(document, options, toc);
+  }
+  return { pages: result.pages, warnings: result.warnings };
+}
+
+/** One run of layout, given the headings found by the run before. */
+function layoutPass(
+  document: LayoutNode<"Document">,
+  options: { minImageDpi?: number },
+  toc: readonly TocEntry[],
+): DocumentLayout & { usesToc: boolean; headings: TocEntry[] } {
+  const lowResolution: string[] = [];
+  const sink: LayoutSink = {
+    missingCharacters: new Set(),
+    page: { width: 0, height: 0 },
+    toc,
+    headingCount: 0,
+    usesToc: false,
+  };
   const base = inherit(DEFAULT_TEXT, document.props);
 
   // Anything that is not a Page is put on a default page, so small documents need no ceremony.
@@ -258,7 +296,20 @@ export function layoutDocument(
     });
   }
   for (const message of lowResolution) warnings.push({ code: "low-resolution-image", message });
-  return { pages, warnings };
+
+  const headings: TocEntry[] = [];
+  const collect = (list: readonly DisplayItem[], pageNumber: number): void => {
+    for (const item of list) {
+      if (item.type === "group") collect(item.items, pageNumber);
+      else if (item.type === "heading") {
+        headings.push({ title: item.title, level: item.level, id: item.id, page: pageNumber });
+      }
+    }
+  };
+  pages.forEach((page, i) => {
+    collect(page.items, i + 1);
+  });
+  return { pages, warnings, usesToc: sink.usesToc, headings };
 }
 
 /** Moves display items by an offset. */

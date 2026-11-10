@@ -60,7 +60,27 @@ export type DisplayItem =
       readonly y: number;
       readonly width: number;
       readonly height: number;
-      readonly url: string;
+      /** A web address, or… */
+      readonly url?: string;
+      /** …the name of an anchor in this document. */
+      readonly target?: string;
+    }
+  | {
+      /** A named place that links within the document point to. */
+      readonly type: "anchor";
+      readonly id: string;
+      readonly x: number;
+      readonly y: number;
+    }
+  | {
+      /** A heading, for the document's bookmarks. */
+      readonly type: "heading";
+      readonly level: number;
+      readonly title: string;
+      /** The anchor that marks the heading's place. */
+      readonly id: string;
+      readonly x: number;
+      readonly y: number;
     }
   | {
       /** Items drawn together with an opacity, a rotation, or both. */

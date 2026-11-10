@@ -42,8 +42,12 @@
 | 39 | Bleed | `Page({ size, bleed })`: `size` is the finished size and coordinates start at its corner. The page `fill` and `background` extend across the bleed; content is clipped at the bleed edge. Marks add 10 mm around the bleed | 2026-11-10 |
 | 40 | Metadata | XMP is always written, uncompressed, alongside the information dictionary | 2026-11-10 |
 | 41 | PDF/X-4 | Checked when the file is written: an output intent, a trim box on every page and embedded fonts are required, and the standard fonts are refused. No profile is bundled; the test profile is CC0 | 2026-11-10 |
+| 42 | Headings | `Heading({ level })` sizes itself from the surrounding text (2, 1.5, 1.25, 1.1, 1, 0.9 times), stays with the next element, and becomes a bookmark and a table-of-contents entry unless `bookmark: false` | 2026-11-10 |
+| 43 | Table of contents | Laid out in repeated passes until the page numbers stop changing (at most five); documents without one are laid out once | 2026-11-10 |
+| 44 | Links within the document | Any element takes an `id`; `Link({ to })` points at it. Written as named destinations, so forward references work | 2026-11-10 |
+| 45 | Columns | Filled one after another and balanced where the content ends; no spanning elements | 2026-11-10 |
 
-Decisions 8–10 and 16–41 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–45 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

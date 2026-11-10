@@ -8,8 +8,10 @@ import type {
   CanvasProps,
   CellProps,
   Child,
+  ColumnsProps,
   DocumentProps,
   GridProps,
+  HeadingProps,
   ImageProps,
   LayoutNode,
   ListProps,
@@ -20,6 +22,7 @@ import type {
   SpacerProps,
   SpanProps,
   StackProps,
+  TableOfContentsProps,
   TableProps,
   TableRowProps,
   TextElementProps,
@@ -86,12 +89,33 @@ export function Span(...args: Args<SpanProps>): LayoutNode<"Span"> {
   return element("Span", args);
 }
 
-/** A stretch of text that links to a web address. */
+/**
+ * A stretch of text that links to a web address (`href`) or to an element of this document
+ * (`to`, the element's `id`).
+ */
 export function Link(
-  props: SpanProps & { href: string },
+  props: SpanProps & ({ href: string } | { to: string }),
   ...children: Child[]
 ): LayoutNode<"Span"> {
   return element("Span", [props, ...children]);
+}
+
+/**
+ * A heading. It is larger than body text, stays with the paragraph after it, and appears in
+ * the PDF's bookmarks and in a `TableOfContents`.
+ */
+export function Heading(...args: Args<HeadingProps>): LayoutNode<"Heading"> {
+  return element("Heading", args);
+}
+
+/** A list of the document's headings with their page numbers, each a link to its heading. */
+export function TableOfContents(props: TableOfContentsProps = {}): LayoutNode<"TableOfContents"> {
+  return element("TableOfContents", [props]);
+}
+
+/** Children flowing down one column and continuing at the top of the next, as in a newspaper. */
+export function Columns(...args: Args<ColumnsProps>): LayoutNode<"Columns"> {
+  return element("Columns", args);
 }
 
 /** A picture. Give a width or a height and the other follows from its proportions. */

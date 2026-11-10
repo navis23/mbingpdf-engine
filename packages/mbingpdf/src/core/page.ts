@@ -139,6 +139,23 @@ export class PdfPage {
   }
 
   /**
+   * Makes a rectangle of the page a link to a place in this document, named with
+   * `PdfDocument.addDestination`. The destination may be added later, on a later page.
+   */
+  addInternalLink(x: number, y: number, width: number, height: number, destination: string): void {
+    if (this.#ended) throw new Error("This page is already written");
+    this.#annotations.push(
+      new PdfDict({
+        Type: new PdfName("Annot"),
+        Subtype: new PdfName("Link"),
+        Rect: [x, y, x + width, y + height],
+        Border: [0, 0, 0],
+        Dest: new PdfName(destination),
+      }),
+    );
+  }
+
+  /**
    * Writes the page to the file and releases its content. Called automatically when the
    * document finishes; call it earlier to free memory in long documents.
    */

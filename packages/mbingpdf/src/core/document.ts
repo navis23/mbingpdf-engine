@@ -64,6 +64,8 @@ export class PdfDocument {
   readonly #conformance: "PDF/X-4" | undefined;
   readonly #outputIntent: OutputIntent | undefined;
   readonly #spots: Map<string, { name: string; ref: PdfRef }> = new Map();
+  readonly #destinations: Map<string, PdfObject> = new Map();
+  readonly #bookmarks: { title: string; level: number; dest: PdfObject }[] = [];
   #usesStandardFonts = false;
   #now: Date | undefined;
   readonly #pagesRef: PdfRef;
@@ -113,6 +115,99 @@ export class PdfDocument {
     return page;
   }
 
+  /**
+   * Names a place in the document that links and bookmarks can point to.
+   *
+   * @param top distance of the place from the bottom of the page, in the page's coordinates;
+   *   a viewer scrolls so that it is at the top of the window
+   */
+  addDestination(name: string, page: PdfPage, left: number, top: number): void {
+    if (!this.#destinations.has(name))
+      this.#destinations.set(name, [page.ref, new PdfName("XYZ"), left, top, null]);
+  }
+
+  /**
+   * Adds a bookmark to the document's outline (the navigation panel of a viewer). Bookmarks
+   * nest by `level`: a level-2 bookmark goes under the level-1 bookmark before it.
+   */
+  addBookmark(title: string, level: number, page: PdfPage, top: number): void {
+    this.#bookmarks.push({
+      title,
+      level: Math.max(1, Math.floor(level)),
+      dest: [page.ref, new PdfName("XYZ"), null, top, null],
+    });
+  }
+
+  /** Writes the outline tree and returns its root, or undefined when there are no bookmarks. */
+  #outline(): PdfRef | undefined {
+    if (this.#bookmarks.length === 0) return undefined;
+    const writer = this.writer;
+    interface Node {
+      ref: PdfRef;
+      title: string;
+      dest: PdfObject;
+      level: number;
+      parent: Node | undefined;
+      children: Node[];
+    }
+    const root: Node = {
+      ref: writer.allocate(),
+      title: "",
+      dest: null,
+      level: 0,
+      parent: undefined,
+      children: [],
+    };
+    let last = root;
+    for (const bookmark of this.#bookmarks) {
+      // Climb to the nearest ancestor of a lower level; a skipped level nests one step only.
+      let parent = last;
+      while (parent.level >= bookmark.level && parent.parent) parent = parent.parent;
+      const node: Node = {
+        ref: writer.allocate(),
+        title: bookmark.title,
+        dest: bookmark.dest,
+        level: bookmark.level,
+        parent,
+        children: [],
+      };
+      parent.children.push(node);
+      last = node;
+    }
+    /** Number of bookmarks under a node, all of them shown open. */
+    const count = (node: Node): number =>
+      node.children.reduce((sum, child) => sum + 1 + count(child), 0);
+    const write = (node: Node): void => {
+      node.children.forEach((child, i) => {
+        write(child);
+        writer.set(
+          child.ref,
+          new PdfDict({
+            Title: PdfString.text(child.title),
+            Parent: node.ref,
+            Prev: node.children[i - 1]?.ref,
+            Next: node.children[i + 1]?.ref,
+            First: child.children[0]?.ref,
+            Last: child.children.at(-1)?.ref,
+            Count: child.children.length > 0 ? count(child) : undefined,
+            Dest: child.dest,
+          }),
+        );
+      });
+    };
+    write(root);
+    writer.set(
+      root.ref,
+      new PdfDict({
+        Type: new PdfName("Outlines"),
+        First: root.children[0]?.ref,
+        Last: root.children.at(-1)?.ref,
+        Count: count(root),
+      }),
+    );
+    return root.ref;
+  }
+
   /** Completes the file and returns its bytes. The document cannot be used afterwards. */
   finish(): Uint8Array {
     const writer = this.writer;
@@ -153,6 +248,9 @@ export class PdfDocument {
         ]
       : undefined;
     const infoDict = this.#infoDict();
+    const outline = this.#outline();
+    const destinations =
+      this.#destinations.size > 0 ? new PdfDict(Object.fromEntries(this.#destinations)) : undefined;
     const root = writer.add(
       new PdfDict({
         Type: new PdfName("Catalog"),
@@ -167,6 +265,10 @@ export class PdfDocument {
           ),
         ),
         OutputIntents: outputIntents,
+        Dests: destinations,
+        Outlines: outline,
+        // Open the bookmarks panel when the document has bookmarks.
+        PageMode: outline ? new PdfName("UseOutlines") : undefined,
       }),
     );
     const info = writer.add(infoDict);

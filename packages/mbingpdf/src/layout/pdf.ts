@@ -15,8 +15,11 @@ function tracePath(content: ContentStream, commands: readonly PathCommand[]): vo
 function drawItems(
   content: ContentStream,
   items: readonly DisplayItem[],
-  pageHeight: number,
-  addLink: (x: number, y: number, width: number, height: number, url: string) => void,
+  hooks: {
+    link(item: Extract<DisplayItem, { type: "link" }>): void;
+    anchor(item: Extract<DisplayItem, { type: "anchor" }>): void;
+    heading(item: Extract<DisplayItem, { type: "heading" }>): void;
+  },
 ): void {
   for (const item of items) {
     switch (item.type) {
@@ -56,13 +59,19 @@ function drawItems(
         if (item.clip) content.restore();
         break;
       case "link":
-        addLink(item.x, pageHeight - item.y - item.height, item.width, item.height, item.url);
+        hooks.link(item);
+        break;
+      case "anchor":
+        hooks.anchor(item);
+        break;
+      case "heading":
+        hooks.heading(item);
         break;
       case "group":
         content.save();
         if (item.rotate) content.rotate(item.rotate.degrees, item.rotate.cx, item.rotate.cy);
         if (item.opacity !== undefined) content.opacity(item.opacity);
-        drawItems(content, item.items, pageHeight, addLink);
+        drawItems(content, item.items, hooks);
         content.restore();
         break;
     }
@@ -77,7 +86,7 @@ const MARKS_MARGIN = 10 * MM;
 export function writeDisplayPage(
   document: PdfDocument,
   page: DisplayPage,
-  options: { boxes?: boolean } = {},
+  options: { boxes?: boolean; bookmarks?: boolean } = {},
 ): void {
   const bleed = page.bleed ?? 0;
   const margin = page.marks ? MARKS_MARGIN : 0;
@@ -107,9 +116,25 @@ export function writeDisplayPage(
       .rect(-bleed, -bleed, page.width + bleed * 2, page.height + bleed * 2)
       .clip();
   }
-  drawItems(content, page.items, page.height, (x, y, width, height, url) =>
-    pdfPage.addLink(x + offset, y + offset, width, height, url),
-  );
+  // Display coordinates measure down from the top of the finished page; these turn them into
+  // the sheet's own, which measure up from its bottom-left corner.
+  const sheetX = (x: number): number => x + offset;
+  const sheetY = (y: number): number => offset + page.height - y;
+  drawItems(content, page.items, {
+    link: (item) => {
+      const bottom = sheetY(item.y + item.height);
+      if (item.url !== undefined)
+        pdfPage.addLink(sheetX(item.x), bottom, item.width, item.height, item.url);
+      else if (item.target !== undefined) {
+        pdfPage.addInternalLink(sheetX(item.x), bottom, item.width, item.height, item.target);
+      }
+    },
+    anchor: (item) => document.addDestination(item.id, pdfPage, sheetX(item.x), sheetY(item.y)),
+    heading: (item) => {
+      if (options.bookmarks !== false)
+        document.addBookmark(item.title, item.level, pdfPage, sheetY(item.y));
+    },
+  });
   if (printed) content.restore();
 
   if (page.marks) {

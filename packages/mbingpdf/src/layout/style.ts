@@ -168,7 +168,7 @@ export function inherit(parent: TextContext, props: TextProps): TextContext {
 }
 
 /** The style of a span of text, as the paragraph layout wants it. */
-export function inlineStyle(context: TextContext, link?: string): InlineStyle {
+export function inlineStyle(context: TextContext, link?: string, linkTo?: string): InlineStyle {
   return {
     font: context.font,
     size: context.size,
@@ -181,5 +181,6 @@ export function inlineStyle(context: TextContext, link?: string): InlineStyle {
     ...(context.features ? { features: context.features } : {}),
     ...(context.lineHeight !== undefined ? { lineHeight: context.lineHeight } : {}),
     ...(link !== undefined ? { link } : {}),
+    ...(linkTo !== undefined ? { linkTo } : {}),
   };
 }

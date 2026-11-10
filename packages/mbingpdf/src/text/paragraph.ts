@@ -45,6 +45,8 @@ export interface InlineStyle extends TextStyle {
   color?: unknown;
   /** A web address that the text links to. */
   link?: string;
+  /** The name of a place in the same document that the text links to. */
+  linkTo?: string;
   underline?: boolean;
   strikethrough?: boolean;
   /**

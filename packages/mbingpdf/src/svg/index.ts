@@ -163,7 +163,13 @@ class PageWriter {
           break;
         }
         case "link":
-          out += `<a href="${escapeXml(item.url)}"><rect x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" fill="none" pointer-events="all"/></a>`;
+          out += `<a href="${escapeXml(item.url ?? `#${item.target}`)}"><rect x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" fill="none" pointer-events="all"/></a>`;
+          break;
+        case "anchor":
+          // An empty, invisible target for links within the document.
+          out += `<g id="${escapeXml(item.id)}" transform="translate(${n(item.x)} ${n(item.y)})"/>`;
+          break;
+        case "heading":
           break;
         case "group": {
           const opacity = item.opacity !== undefined ? ` opacity="${n(item.opacity)}"` : "";

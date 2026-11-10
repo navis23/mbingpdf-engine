@@ -14,6 +14,7 @@ import {
   type ParagraphLayout,
   type TextLine,
 } from "../text/index.ts";
+import type { CanvasContext } from "./canvas.ts";
 import {
   borderWidths,
   inherit,
@@ -34,7 +35,9 @@ import type {
   BoxProps,
   CanvasProps,
   Child,
+  ColumnsProps,
   GridProps,
+  HeadingProps,
   ImageProps,
   LayoutNode,
   ListProps,
@@ -42,6 +45,7 @@ import type {
   RowProps,
   SpacerProps,
   StackProps,
+  TableOfContentsProps,
   TextElementProps,
 } from "./types.ts";
 
@@ -78,6 +82,10 @@ export interface Box {
     width: number;
     height: number;
   };
+  /** The name links use to point at this box. */
+  id?: string;
+  /** Set on the first box of a heading: its level and its title for bookmarks. */
+  heading?: { level: number; title: string };
 }
 
 /** The space an element is laid out in. */
@@ -102,8 +110,24 @@ export interface LayoutResult {
 }
 
 /** Collected while laying out, for the caller to report. */
+/** A heading as a table of contents lists it. */
+export interface TocEntry {
+  title: string;
+  level: number;
+  /** The anchor that links to the heading. */
+  id: string;
+  /** The page the heading is on. */
+  page: number;
+}
+
 export interface LayoutSink {
   missingCharacters: Set<string>;
+  /** Headings found by the previous layout pass, for tables of contents to list. */
+  toc: readonly TocEntry[];
+  /** Counts headings in this pass, to give each a stable anchor name. */
+  headingCount: number;
+  /** Set when a table of contents is laid out, so the caller knows another pass is needed. */
+  usesToc: boolean;
   /** Size of the page being laid out, for elements positioned against it. */
   page: { width: number; height: number };
 }
@@ -174,6 +198,7 @@ function decorate(
   const props = boxProps(node);
   if (props.background !== undefined) box.background = toColor(props.background);
   if (props.radius) box.radius = props.radius;
+  if (props.id !== undefined && !open.top) box.id = props.id;
   if (props.opacity !== undefined && props.opacity < 1) box.opacity = Math.max(0, props.opacity);
   const border = { ...decoration.border };
   // A box split across pages is cut open where it was split.
@@ -202,11 +227,12 @@ function collectSpans(
   context: TextContext,
   link: string | undefined,
   out: InlineSpan[],
+  linkTo?: string,
 ): void {
   const visit = (child: Child): void => {
     if (child === null || child === undefined || child === false) return;
     if (typeof child === "string" || typeof child === "number") {
-      out.push({ text: String(child), style: inlineStyle(context, link) });
+      out.push({ text: String(child), style: inlineStyle(context, link, linkTo) });
     } else if (Array.isArray(child)) {
       for (const item of child as readonly Child[]) visit(item);
     } else {
@@ -217,7 +243,7 @@ function collectSpans(
         );
       }
       const props = (element as LayoutNode<"Span">).props;
-      collectSpans(element, inherit(context, props), props.href ?? link, out);
+      collectSpans(element, inherit(context, props), props.href ?? link, out, props.to ?? linkTo);
     }
   };
   for (const child of node.children) visit(child);
@@ -346,6 +372,8 @@ export function measure(node: LayoutNode, context: TextContext): { min: number; 
     case "QrCode":
       max = min = (node as LayoutNode<"QrCode">).props.size ?? 72;
       break;
+    case "Heading":
+      return measure(headingText(node as LayoutNode<"Heading">, context), context);
     case "Grid": {
       const grid = (node as LayoutNode<"Grid">).props;
       const gap = Array.isArray(grid.gap)
@@ -384,6 +412,10 @@ function widthIn(node: LayoutNode, context: TextContext, area: Area): number {
   if (floor !== undefined) width = Math.max(width, floor);
   return Math.max(0, width);
 }
+
+/** Headings stay with what follows them unless told otherwise. */
+const keepsWithNext = (node: LayoutNode): boolean =>
+  boxProps(node).keepWithNext ?? node.type === "Heading";
 
 const keepsTogether = (node: LayoutNode): boolean => {
   const props = boxProps(node);
@@ -487,7 +519,7 @@ function layoutStack(
       // A heading must not be left behind at the bottom of the page.
       while (placed.length > 1) {
         const last = placed.at(-1) as (typeof placed)[number];
-        if (!last.whole || !boxProps(children[last.index] as LayoutNode).keepWithNext) break;
+        if (!last.whole || !keepsWithNext(children[last.index] as LayoutNode)) break;
         placed.pop();
         box.children.splice(box.children.indexOf(last.box), 1);
         y = last.y;
@@ -960,6 +992,207 @@ function layoutCanvas(node: LayoutNode<"Canvas">, context: TextContext, area: Ar
   return { box };
 }
 
+/** Font size of each heading level, as a multiple of the surrounding text size. */
+const HEADING_SCALE = [2, 1.5, 1.25, 1.1, 1, 0.9];
+
+/** A heading is a paragraph with a default size; this is that paragraph. */
+function headingText(node: LayoutNode<"Heading">, context: TextContext): LayoutNode<"Text"> {
+  const { level, bookmark: _bookmark, ...props } = node.props as HeadingProps;
+  const scale = HEADING_SCALE[(level ?? 1) - 1] ?? 1;
+  return {
+    type: "Text",
+    props: { ...props, size: props.size ?? inherit(context, props).size * scale },
+    children: node.children,
+  };
+}
+
+/** The plain text of an element's children. */
+function plainText(children: readonly Child[]): string {
+  let text = "";
+  const visit = (child: Child): void => {
+    if (typeof child === "string" || typeof child === "number") text += String(child);
+    else if (Array.isArray(child)) for (const item of child as readonly Child[]) visit(item);
+    else if (child && typeof child === "object")
+      for (const item of (child as LayoutNode).children) visit(item);
+  };
+  for (const child of children) visit(child);
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function layoutHeading(
+  node: LayoutNode<"Heading">,
+  context: TextContext,
+  area: Area,
+  state: TextState | undefined,
+  sink: LayoutSink,
+): LayoutResult {
+  const props = node.props as HeadingProps;
+  const result = layoutText(headingText(node, context), context, area, state, sink);
+  if (result.box && state === undefined && props.bookmark !== false) {
+    // Each heading gets an anchor, so bookmarks and the table of contents can point at it.
+    const number = ++sink.headingCount;
+    result.box.id = props.id ?? `heading-${number}`;
+    result.box.heading = {
+      level: props.level ?? 1,
+      title: typeof props.bookmark === "string" ? props.bookmark : plainText(node.children),
+    };
+  }
+  return result;
+}
+
+/** A table of contents is a stack of rows: title, dotted leader, page number. */
+function expandToc(
+  node: LayoutNode<"TableOfContents">,
+  context: TextContext,
+  sink: LayoutSink,
+): LayoutNode {
+  const { levels, indent, gap, leaders, ...box } = node.props as TableOfContentsProps;
+  const [from, to] = levels ?? [1, 3];
+  const own = inherit(context, box);
+  const entries = sink.toc.filter((entry) => entry.level >= from && entry.level <= to);
+  const leaderHeight = own.size * (own.lineHeight ?? 1.15);
+  return {
+    type: "Stack",
+    props: { ...box, ...(gap !== undefined ? { gap } : {}) },
+    children: entries.map(
+      (entry): LayoutNode => ({
+        type: "Row",
+        props: { gap: 4, align: "end", keepTogether: true },
+        children: [
+          {
+            type: "Text",
+            props: { margin: { left: (indent ?? 12) * (entry.level - from) }, shrink: 1 },
+            children: [{ type: "Span", props: { to: entry.id }, children: [entry.title] }],
+          },
+          leaders === false
+            ? { type: "Spacer", props: {}, children: [] }
+            : {
+                type: "Canvas",
+                props: {
+                  width: 0,
+                  grow: 1,
+                  height: leaderHeight,
+                  // Dots: dashes of no length with round ends.
+                  draw: (g: CanvasContext, size: { width: number; height: number }) => {
+                    g.line(2, size.height * 0.72, size.width - 2, size.height * 0.72).stroke({
+                      width: Math.max(0.6, own.size / 12),
+                      dash: [0, own.size / 3],
+                      cap: "round",
+                    });
+                  },
+                },
+                children: [],
+              },
+          {
+            type: "Text",
+            props: { shrink: 0, features: { tnum: true } },
+            children: [{ type: "Span", props: { to: entry.id }, children: [String(entry.page)] }],
+          },
+        ],
+      }),
+    ),
+  };
+}
+
+interface ColumnsState {
+  /** Where the flow of children has got to. */
+  flow: unknown;
+}
+
+function layoutColumns(
+  node: LayoutNode<"Columns">,
+  context: TextContext,
+  area: Area,
+  state: ColumnsState | undefined,
+  sink: LayoutSink,
+): LayoutResult {
+  const props = node.props as ColumnsProps;
+  const own = inherit(context, props);
+  const decoration = decorationOf(node, context);
+  const first = state === undefined;
+  const top = first ? decoration.inset.top : 0;
+  const width = widthIn(node, context, area);
+  const innerWidth = Math.max(0, width - decoration.inset.left - decoration.inset.right);
+  const count = Math.max(1, Math.floor(props.count ?? 2));
+  const gap = props.gap ?? 12;
+  const columnWidth = Math.max(0, (innerWidth - gap * (count - 1)) / count);
+  const flow: LayoutNode = {
+    type: "Stack",
+    props: props.rowGap !== undefined ? { gap: props.rowGap } : {},
+    children: node.children,
+  };
+  const available = area.height - top - decoration.inset.bottom;
+
+  /** Pours the flow into columns of a given height. */
+  const fill = (height: number): { boxes: Box[]; rest: unknown } => {
+    const boxes: Box[] = [];
+    let rest = state?.flow;
+    for (let column = 0; column < count; column++) {
+      const result = layout(
+        flow,
+        own,
+        { width: columnWidth, height, fresh: area.fresh && column === 0 },
+        rest,
+        sink,
+      );
+      if (result.box) {
+        result.box.x = decoration.inset.left + column * (columnWidth + gap);
+        result.box.y = top;
+        boxes.push(result.box);
+      }
+      rest = result.state;
+      // Nothing more to place, or nothing more fits: later columns stay empty.
+      if (rest === undefined || !result.box) break;
+    }
+    return { boxes, rest };
+  };
+
+  // Headings are numbered as they are laid out; trial fills must not use numbers up.
+  const headingCount = sink.headingCount;
+  let filled = fill(available);
+  if (filled.boxes.length === 0 && filled.rest !== undefined) return { state: state ?? RETRY };
+  if (filled.rest === undefined && props.balance !== false && count > 1) {
+    // Everything fits: find the lowest height at which it still does, so the columns end level.
+    let low = 0;
+    let high = Math.max(...filled.boxes.map((box) => box.height));
+    for (let i = 0; i < 12 && high - low > 0.5; i++) {
+      const middle = (low + high) / 2;
+      sink.headingCount = headingCount;
+      if (fill(middle).rest === undefined) high = middle;
+      else low = middle;
+    }
+    sink.headingCount = headingCount;
+    filled = fill(high);
+  }
+
+  const finished = filled.rest === undefined;
+  const columnsHeight = finished
+    ? Math.max(0, ...filled.boxes.map((box) => box.height))
+    : available;
+  const box: Box = {
+    x: 0,
+    y: 0,
+    width,
+    height: top + columnsHeight + (finished ? decoration.inset.bottom : 0),
+    children: filled.boxes,
+  };
+  if (props.rule && props.rule.width > 0) {
+    const color = props.rule.color === undefined ? own.color : toColor(props.rule.color);
+    for (let column = 1; column < count; column++) {
+      box.children.push({
+        x: decoration.inset.left + column * (columnWidth + gap) - gap / 2 - props.rule.width / 2,
+        y: top,
+        width: props.rule.width,
+        height: columnsHeight,
+        children: [],
+        background: color,
+      });
+    }
+  }
+  decorate(box, node, decoration, { top: !first, bottom: !finished });
+  return finished ? { box } : { box, state: { flow: filled.rest } satisfies ColumnsState };
+}
+
 const ROMAN: readonly (readonly [number, string])[] = [
   [1000, "m"],
   [900, "cm"],
@@ -1155,6 +1388,31 @@ export function layout(
       );
     case "QrCode":
       return layoutQrCode(node as LayoutNode<"QrCode">, context, area);
+    case "Heading":
+      return layoutHeading(
+        node as LayoutNode<"Heading">,
+        context,
+        area,
+        resume as TextState | undefined,
+        sink,
+      );
+    case "TableOfContents":
+      sink.usesToc = true;
+      return layoutStack(
+        expandToc(node as LayoutNode<"TableOfContents">, context, sink),
+        context,
+        area,
+        resume as StackState | undefined,
+        sink,
+      );
+    case "Columns":
+      return layoutColumns(
+        node as LayoutNode<"Columns">,
+        context,
+        area,
+        resume as ColumnsState | undefined,
+        sink,
+      );
     case "TableRow":
     case "Cell":
       throw new LayoutError(`${node.type} belongs inside a Table`);

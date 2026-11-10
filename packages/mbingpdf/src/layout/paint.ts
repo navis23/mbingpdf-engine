@@ -68,6 +68,17 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
     target = group;
   }
 
+  if (box.id !== undefined) target.push({ type: "anchor", id: box.id, x, y });
+  if (box.heading) {
+    target.push({
+      type: "heading",
+      level: box.heading.level,
+      title: box.heading.title,
+      id: box.id ?? "",
+      x,
+      y,
+    });
+  }
   if (box.background && width > 0 && height > 0) {
     target.push({
       type: "path",
@@ -163,14 +174,16 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             fill: color,
           });
         }
-        if (run.style.link !== undefined) {
+        if (run.style.link !== undefined || run.style.linkTo !== undefined) {
           target.push({
             type: "link",
             x: runX,
             y: y + box.text.y + line.top,
             width: run.width,
             height: line.height,
-            url: run.style.link,
+            ...(run.style.link !== undefined
+              ? { url: run.style.link }
+              : { target: run.style.linkTo as string }),
           });
         }
       }

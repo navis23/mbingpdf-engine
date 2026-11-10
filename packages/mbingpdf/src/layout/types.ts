@@ -105,6 +105,8 @@ export interface BoxProps extends TextProps {
    * it, `"avoid"` keeps it in one piece (the same as `keepTogether`).
    */
   break?: "before" | "after" | "avoid";
+  /** A name for this element that `Link({ to })` can point to. Must be unique in the document. */
+  id?: string;
   /** Moves the whole element to the next page rather than splitting it. */
   keepTogether?: boolean;
   /** Keeps this element on the same page as the start of the next one (for headings). */
@@ -185,6 +187,42 @@ export interface QrCodeProps extends BoxProps {
 export interface SpanProps extends TextProps {
   /** Makes the span a link to this address. */
   href?: string;
+  /** Makes the span a link to the element in this document with this `id`. */
+  to?: string;
+}
+
+export interface HeadingProps extends TextElementProps {
+  /** 1 for a chapter title, 2 for a section, and so on to 6. Default 1. */
+  level?: 1 | 2 | 3 | 4 | 5 | 6;
+  /**
+   * Whether the heading appears in the PDF's bookmarks and in a `TableOfContents`. Default
+   * true. A string gives a different title to show there.
+   */
+  bookmark?: boolean | string;
+}
+
+export interface TableOfContentsProps extends BoxProps {
+  /** The heading levels to list, lowest and highest. Default `[1, 3]`. */
+  levels?: readonly [from: number, to: number];
+  /** How far each level is indented from the one above, in points. Default 12. */
+  indent?: number;
+  /** Space between entries. */
+  gap?: number;
+  /** Draw a dotted line from each title to its page number. Default true. */
+  leaders?: boolean;
+}
+
+export interface ColumnsProps extends BoxProps {
+  /** Number of columns. Default 2. */
+  count?: number;
+  /** Space between columns. Default 12 points. */
+  gap?: number;
+  /** Space between the children as they flow down the columns. */
+  rowGap?: number;
+  /** A line between columns. */
+  rule?: BorderSide;
+  /** Make the columns the same height where the content ends. Default true. */
+  balance?: boolean;
 }
 
 export interface ImageProps extends BoxProps {
@@ -387,6 +425,9 @@ interface PropsByType {
   Cell: CellProps;
   List: ListProps;
   QrCode: QrCodeProps;
+  Heading: HeadingProps;
+  TableOfContents: TableOfContentsProps;
+  Columns: ColumnsProps;
   PageBreak: Record<string, never>;
 }
 
