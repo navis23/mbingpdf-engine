@@ -216,6 +216,7 @@ export class Font {
   readonly #outlines: GlyphVariations | undefined;
   readonly #instanced: Map<number, { data: Uint8Array; xMin: number; advance: number }> = new Map();
   #cffOutlines: CffOutlines | undefined;
+  readonly #instances: Map<string, Font> = new Map();
   readonly #shapeCache: Map<string, ShapedGlyph[]> = new Map();
   #cachedFor: Shaper | undefined;
   readonly #tables: ReadonlyMap<string, Uint8Array>;
@@ -375,6 +376,20 @@ export class Font {
    */
   instance(style: Readonly<Record<string, number>> | string): Font {
     if (this.axes.length === 0) throw new RangeError("This is not a variable font");
+    // The same style asked for twice is the same font: otherwise a document that calls this
+    // for every paragraph would embed the font once per paragraph.
+    const key =
+      typeof style === "string"
+        ? style.toLowerCase()
+        : JSON.stringify(Object.entries(style).sort());
+    const cached = this.#instances.get(key);
+    if (cached) return cached;
+    const made = this.#makeInstance(style);
+    this.#instances.set(key, made);
+    return made;
+  }
+
+  #makeInstance(style: Readonly<Record<string, number>> | string): Font {
     if (typeof style !== "string") return new Font(this.#data, style);
     const named = this.namedInstances.find(
       (instance) => instance.name.toLowerCase() === style.toLowerCase(),

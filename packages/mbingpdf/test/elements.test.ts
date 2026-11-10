@@ -18,6 +18,7 @@ import {
 } from "../src/index.ts";
 import { listMarker } from "../src/layout/engine.ts";
 import { readFont } from "./harness/env.ts";
+import { pathBounds } from "./harness/geometry.ts";
 import { extractText, renderPdf } from "./harness/render.ts";
 
 const { Helvetica } = StandardFonts;
@@ -192,22 +193,15 @@ describe("QR code element", () => {
     const [first] = pagesOf(QrCode({ value: "BIB:0421", size: 84, quiet: 0 }), Text("di bawah"));
     const paths = (first?.items ?? []).filter((item): item is PathItem => item.type === "path");
     expect(paths).toHaveLength(1);
-    const xs =
-      paths[0]?.commands.flatMap((command) => (command.length > 1 ? [command[1] as number] : [])) ??
-      [];
-    const ys =
-      paths[0]?.commands.flatMap((command) => (command.length > 2 ? [command[2] as number] : [])) ??
-      [];
-    expect([Math.min(...xs), Math.max(...xs)]).toEqual([10, 94]);
-    expect([Math.min(...ys), Math.max(...ys)]).toEqual([10, 94]);
+    expect(pathBounds(paths[0] as PathItem)).toEqual({ x: 10, y: 10, width: 84, height: 84 });
     expect(texts(first?.items ?? [])[0]?.y).toBeGreaterThan(94);
   });
 
   test("leaves the quiet zone inside its size by default", () => {
     const [first] = pagesOf(QrCode({ value: "BIB:0421", size: 87 }));
     const path = (first?.items ?? []).find((item): item is PathItem => item.type === "path");
-    const xs =
-      path?.commands.flatMap((command) => (command.length > 1 ? [command[1] as number] : [])) ?? [];
+    const box = pathBounds(path as PathItem);
+    const xs = [box.x, box.x + box.width];
     // Version 1 is 21 modules; with four quiet modules each side, 29 across: 3 points each.
     expect(Math.min(...xs)).toBeCloseTo(10 + 12);
     expect(Math.max(...xs)).toBeCloseTo(10 + 87 - 12);
@@ -239,4 +233,64 @@ describe("QR code element", () => {
     expect(paths).toHaveLength(2);
     expect(paths[1]?.fill).toMatchObject({ space: "rgb", b: 0xd8 / 255 });
   });
+});
+
+describe("a batch of race bibs (the M3 exit test)", () => {
+  test("five thousand bibs with numbers, names and QR codes in one file", async () => {
+    const barlow = new Font(readFont("BarlowCondensed-Bold"));
+    const jakarta = new Font(readFont("PlusJakartaSans-Variable"));
+    const count = 5000;
+    const bib = (n: number) =>
+      Stack(
+        { height: 420.9, padding: 22, border: { bottom: { width: 0.25, color: "#999999" } } },
+        Row(
+          { background: "#0b4ea2", padding: [6, 10], align: "center" },
+          Text(
+            { font: barlow, size: 20, color: "#ffffff", letterSpacing: 2 },
+            "JAKARTA RIVERSIDE RUN 2026",
+          ),
+          Spacer(),
+          Text({ color: "#ffffff", size: 10 }, "HALF MARATHON 21K"),
+        ),
+        Text(
+          { font: barlow, size: 200, fit: { max: 230 }, align: "center", lineHeight: 0.95 },
+          String(n).padStart(4, "0"),
+        ),
+        Row(
+          { align: "end", gap: 12 },
+          Stack(
+            { grow: 1, gap: 2 },
+            // Asking for the same style every time must not embed the font every time.
+            Text(
+              { font: jakarta.instance("Bold"), size: 18, fit: true },
+              `Peserta Nomor ${n} Dengan Nama Panjang`,
+            ),
+            Text({ size: 10, color: "#555555" }, `Gelombang ${String.fromCharCode(65 + (n % 5))}`),
+          ),
+          QrCode({
+            value: `https://contoh.id/bib/${n}?k=${(n * 7919).toString(36)}`,
+            size: 74,
+            quiet: 1,
+          }),
+        ),
+      );
+    const document = Document(
+      { font: jakarta, size: 11 },
+      Page(
+        { size: "A4", margin: 0 },
+        Array.from({ length: count }, (_value, i) => bib(i + 1)),
+      ),
+    );
+    const started = performance.now();
+    const pdf = await render(document, { deterministic: true });
+    const elapsed = performance.now() - started;
+
+    // Two bibs to a sheet: every page opens in a real PDF engine.
+    const pages = await renderPdf("pdfium", pdf, 0.1);
+    expect(pages).toHaveLength(count / 2);
+    // Fonts are embedded once each: three subsets however many bibs there are.
+    expect(pdf.length / count).toBeLessThan(2500);
+    // Budget: a batch this size must stay practical on a server.
+    expect(elapsed).toBeLessThan(60_000);
+  }, 180_000);
 });

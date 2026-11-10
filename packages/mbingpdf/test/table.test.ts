@@ -13,6 +13,7 @@ import {
   TableRow,
   Text,
 } from "../src/index.ts";
+import { pathBounds } from "./harness/geometry.ts";
 import { extractText } from "./harness/render.ts";
 
 const { Helvetica, HelveticaBold } = StandardFonts;
@@ -25,19 +26,7 @@ const pagesOf = (...children: Child[]) =>
 const texts = (items: readonly DisplayItem[]): TextItem[] =>
   items.filter((item): item is TextItem => item.type === "text");
 
-function bounds(item: PathItem): { x: number; y: number; width: number; height: number } {
-  const xs: number[] = [];
-  const ys: number[] = [];
-  for (const command of item.commands) {
-    for (let i = 1; i < command.length; i += 2) {
-      xs.push(command[i] as number);
-      ys.push(command[i + 1] as number);
-    }
-  }
-  const x = Math.min(...xs);
-  const y = Math.min(...ys);
-  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
-}
+const bounds = pathBounds;
 const fills = (items: readonly DisplayItem[]) =>
   items
     .filter((item): item is PathItem => item.type === "path" && item.fill !== undefined)

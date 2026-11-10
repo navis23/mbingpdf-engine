@@ -36,6 +36,11 @@ function css(color: Color): string {
 function pathData(commands: readonly (PathCommand | OutlineCommand)[]): string {
   let d = "";
   for (const command of commands) {
+    if (command[0] === "R") {
+      // A rectangle, written with relative horizontal and vertical lines.
+      d += `M${n(command[1])} ${n(command[2])}h${n(command[3])}v${n(command[4])}h${n(-command[3])}Z`;
+      continue;
+    }
     d += command[0];
     for (let i = 1; i < command.length; i++) d += `${i > 1 ? " " : ""}${n(command[i] as number)}`;
   }

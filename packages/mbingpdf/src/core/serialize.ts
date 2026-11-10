@@ -40,10 +40,21 @@ export function formatNumber(value: number, decimals = 3): string {
     if (!Number.isSafeInteger(value)) throw new RangeError(`Integer out of range: ${value}`);
     return String(value);
   }
+  // Rounding and letting the engine print the shortest form is several times faster than
+  // toFixed() plus trimming zeros, and this is called for every coordinate in a document.
+  // It is safe while the result cannot need an exponent: not too large, and (after rounding
+  // to at most six decimals) never smaller than one millionth.
+  if (decimals <= 6 && value > -1e15 && value < 1e15) {
+    const scale = POWERS_OF_TEN[decimals] as number;
+    const rounded = Math.round(value * scale) / scale;
+    return rounded === 0 ? "0" : String(rounded);
+  }
   let text = value.toFixed(decimals);
   if (text.includes(".")) text = text.replace(/\.?0+$/, "");
   return text === "-0" ? "0" : text;
 }
+
+const POWERS_OF_TEN: readonly number[] = [1, 10, 100, 1000, 10_000, 100_000, 1_000_000];
 
 function writeName(out: ByteWriter, value: string): void {
   out.byte(0x2f);

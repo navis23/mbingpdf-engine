@@ -6,11 +6,7 @@ import type { DisplayItem, PathCommand } from "./display.ts";
 import type { Box } from "./engine.ts";
 
 const rectPath = (x: number, y: number, width: number, height: number): PathCommand[] => [
-  ["M", x, y],
-  ["L", x + width, y],
-  ["L", x + width, y + height],
-  ["L", x, y + height],
-  ["Z"],
+  ["R", x, y, width, height],
 ];
 
 function sameSide(
@@ -33,6 +29,8 @@ function translate(items: DisplayItem[], dx: number, dy: number): DisplayItem[] 
       ...item,
       commands: item.commands.map((command) => {
         if (command[0] === "Z") return command;
+        if (command[0] === "R")
+          return ["R", command[1] + dx, command[2] + dy, command[3], command[4]];
         const shifted: (string | number)[] = [command[0]];
         for (let i = 1; i < command.length; i += 2) {
           shifted.push((command[i] as number) + dx, (command[i + 1] as number) + dy);

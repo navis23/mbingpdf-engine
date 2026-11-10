@@ -46,8 +46,11 @@
 | 43 | Table of contents | Laid out in repeated passes until the page numbers stop changing (at most five); documents without one are laid out once | 2026-11-10 |
 | 44 | Links within the document | Any element takes an `id`; `Link({ to })` points at it. Written as named destinations, so forward references work | 2026-11-10 |
 | 45 | Columns | Filled one after another and balanced where the content ends; no spanning elements | 2026-11-10 |
+| 46 | Long documents | `render()` writes each page to the file as soon as it is painted instead of holding every page's drawing list; documents with a table of contents are written again per layout pass. `layoutDocument()` still returns all pages | 2026-11-10 |
+| 47 | Font instances | `font.instance()` returns the same object for the same style, so asking for "Bold" in every paragraph embeds it once | 2026-11-10 |
+| 48 | Batch budget | 5,000 A5 bibs with fitted numerals and QR codes: under 60 s and 2.5 kB per bib as a test limit; measured about 10 s, 1.3 kB per bib and 300 MB of memory | 2026-11-10 |
 
-Decisions 8–10 and 16–45 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–48 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

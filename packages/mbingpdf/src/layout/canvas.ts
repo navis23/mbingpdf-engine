@@ -53,11 +53,8 @@ export class CanvasContext {
   }
 
   rect(x: number, y: number, width: number, height: number): this {
-    return this.moveTo(x, y)
-      .lineTo(x + width, y)
-      .lineTo(x + width, y + height)
-      .lineTo(x, y + height)
-      .closePath();
+    this.#path.push(["R", x, y, width, height]);
+    return this;
   }
 
   roundedRect(x: number, y: number, width: number, height: number, radius: number): this {
@@ -132,15 +129,7 @@ export function roundedRectPath(
   radius: number,
 ): PathCommand[] {
   const r = Math.max(0, Math.min(radius, width / 2, height / 2));
-  if (r === 0) {
-    return [
-      ["M", x, y],
-      ["L", x + width, y],
-      ["L", x + width, y + height],
-      ["L", x, y + height],
-      ["Z"],
-    ];
-  }
+  if (r === 0) return [["R", x, y, width, height]];
   const k = r * (1 - KAPPA);
   const right = x + width;
   const bottom = y + height;

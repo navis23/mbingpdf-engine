@@ -6,6 +6,7 @@ function tracePath(content: ContentStream, commands: readonly PathCommand[]): vo
   for (const command of commands) {
     if (command[0] === "M") content.moveTo(command[1], command[2]);
     else if (command[0] === "L") content.lineTo(command[1], command[2]);
+    else if (command[0] === "R") content.rect(command[1], command[2], command[3], command[4]);
     else if (command[0] === "C") {
       content.curveTo(command[1], command[2], command[3], command[4], command[5], command[6]);
     } else content.closePath();

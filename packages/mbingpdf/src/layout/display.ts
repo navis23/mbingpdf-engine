@@ -10,6 +10,8 @@ export type PathCommand =
   | readonly ["M", number, number]
   | readonly ["L", number, number]
   | readonly ["C", number, number, number, number, number, number]
+  /** A closed rectangle: x, y, width, height. One command instead of five. */
+  | readonly ["R", number, number, number, number]
   | readonly ["Z"];
 
 export interface StrokeStyle {

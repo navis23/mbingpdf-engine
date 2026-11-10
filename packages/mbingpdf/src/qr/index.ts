@@ -152,42 +152,56 @@ const MASKS: readonly ((x: number, y: number) => boolean)[] = [
 
 /** Scores a finished code: lower is easier for scanners to read. */
 function penalty(modules: boolean[][], size: number): number {
-  let result = 0;
-  const line = (get: (i: number) => boolean): void => {
-    // Runs of five or more of one colour.
-    let run = 1;
-    for (let i = 1; i <= size; i++) {
-      if (i < size && get(i) === get(i - 1)) run++;
-      else {
-        if (run >= 5) result += run - 2;
-        run = 1;
-      }
-    }
-    // Sequences that look like a finder pattern (1:1:3:1:1 with four light modules beside).
-    for (let i = 0; i + 11 <= size; i++) {
-      let bits = 0;
-      for (let k = 0; k < 11; k++) bits = (bits << 1) | (get(i + k) ? 1 : 0);
-      if (bits === 0b10111010000 || bits === 0b00001011101) result += 40;
-    }
-  };
-  for (let y = 0; y < size; y++) line((x) => (modules[y] as boolean[])[x] as boolean);
-  for (let x = 0; x < size; x++) line((y) => (modules[y] as boolean[])[x] as boolean);
-  // Two-by-two blocks of one colour.
-  for (let y = 0; y + 1 < size; y++) {
-    for (let x = 0; x + 1 < size; x++) {
-      const colour = modules[y]?.[x];
-      if (
-        colour === modules[y]?.[x + 1] &&
-        colour === modules[y + 1]?.[x] &&
-        colour === modules[y + 1]?.[x + 1]
-      ) {
-        result += 3;
+  // Work on a flat copy: this runs eight times per code and is the encoder's hot loop.
+  const flat = new Uint8Array(size * size);
+  let dark = 0;
+  for (let y = 0; y < size; y++) {
+    const row = modules[y] as boolean[];
+    for (let x = 0; x < size; x++) {
+      if (row[x]) {
+        flat[y * size + x] = 1;
+        dark++;
       }
     }
   }
+  let result = 0;
+  // Along every row (step 1) and every column (step `size`).
+  for (let direction = 0; direction < 2; direction++) {
+    const step = direction === 0 ? 1 : size;
+    const lineStep = direction === 0 ? size : 1;
+    for (let line = 0; line < size; line++) {
+      let at = line * lineStep;
+      let previous = flat[at] as number;
+      let run = 1;
+      // The last eleven modules as bits, to spot sequences that look like a finder pattern
+      // (dark-light-dark-dark-dark-light-dark with four light modules on one side).
+      let window = previous;
+      for (let i = 1; i < size; i++) {
+        at += step;
+        const module = flat[at] as number;
+        if (module === previous) run++;
+        else {
+          // Runs of five or more of one colour.
+          if (run >= 5) result += run - 2;
+          run = 1;
+          previous = module;
+        }
+        window = ((window << 1) | module) & 0x7ff;
+        if (i >= 10 && (window === 0b10111010000 || window === 0b00001011101)) result += 40;
+      }
+      if (run >= 5) result += run - 2;
+    }
+  }
+  // Two-by-two blocks of one colour.
+  for (let y = 0; y + 1 < size; y++) {
+    for (let x = 0; x + 1 < size; x++) {
+      const at = y * size + x;
+      const colour = flat[at];
+      if (colour === flat[at + 1] && colour === flat[at + size] && colour === flat[at + size + 1])
+        result += 3;
+    }
+  }
   // Imbalance between dark and light.
-  let dark = 0;
-  for (const row of modules) for (const module of row) if (module) dark++;
   const total = size * size;
   result += (Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1) * 10;
   return result;

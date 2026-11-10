@@ -98,6 +98,7 @@ function layoutPass(
   document: LayoutNode<"Document">,
   options: { minImageDpi?: number },
   toc: readonly TocEntry[],
+  consume?: (page: DisplayPage) => void,
 ): DocumentLayout & { usesToc: boolean; headings: TocEntry[] } {
   const lowResolution: string[] = [];
   const sink: LayoutSink = {
@@ -189,7 +190,7 @@ function layoutPass(
   }
 
   // Second pass: now that the page count is known, add headers, footers and backgrounds.
-  const pages: DisplayPage[] = planned.map((plan, index) => {
+  const buildPage = (plan: PlannedPage, index: number): DisplayPage => {
     const props = plan.page.props as PageProps;
     const margin = toSides(props.margin ?? 20 * MM);
     const info: PageInfo = { page: index + 1, pages: planned.length };
@@ -203,13 +204,7 @@ function layoutPass(
     if (props.fill !== undefined) {
       items.push({
         type: "path",
-        commands: [
-          ["M", edge, edge],
-          ["L", plan.width + bleed, edge],
-          ["L", plan.width + bleed, plan.height + bleed],
-          ["L", edge, plan.height + bleed],
-          ["Z"],
-        ],
+        commands: [["R", edge, edge, plan.width + bleed * 2, plan.height + bleed * 2]],
         fill: toColor(props.fill),
       });
     }
@@ -260,12 +255,13 @@ function layoutPass(
       ...(bleed > 0 ? { bleed } : {}),
       ...(marks && (marks.crop || marks.registration) ? { marks } : {}),
     };
-  });
+  };
 
   // Images stretched too far print blurred; say so before the job goes to press.
   const minDpi = options.minImageDpi;
-  if (minDpi !== undefined) {
-    const reported = new Set<object>();
+  const reported = new Set<object>();
+  const checkResolution = (list: readonly DisplayItem[], pageNumber: number): void => {
+    if (minDpi === undefined) return;
     const visit = (list: readonly DisplayItem[], pageNumber: number): void => {
       for (const item of list) {
         if (item.type === "group") visit(item.items, pageNumber);
@@ -282,10 +278,30 @@ function layoutPass(
         }
       }
     };
-    pages.forEach((page, i) => {
-      visit(page.items, i + 1);
-    });
-  }
+    visit(list, pageNumber);
+  };
+
+  const headings: TocEntry[] = [];
+  const collectHeadings = (list: readonly DisplayItem[], pageNumber: number): void => {
+    for (const item of list) {
+      if (item.type === "group") collectHeadings(item.items, pageNumber);
+      else if (item.type === "heading") {
+        headings.push({ title: item.title, level: item.level, id: item.id, page: pageNumber });
+      }
+    }
+  };
+
+  // Pages are painted one at a time and handed on at once when someone is waiting for them,
+  // so a long document never holds more than one page of drawing instructions.
+  const pages: DisplayPage[] = [];
+  planned.forEach((plan, index) => {
+    const page = buildPage(plan, index);
+    plan.body = undefined;
+    checkResolution(page.items, index + 1);
+    collectHeadings(page.items, index + 1);
+    if (consume) consume(page);
+    else pages.push(page);
+  });
 
   const warnings: LayoutWarning[] = [];
   if (sink.missingCharacters.size > 0) {
@@ -297,18 +313,6 @@ function layoutPass(
   }
   for (const message of lowResolution) warnings.push({ code: "low-resolution-image", message });
 
-  const headings: TocEntry[] = [];
-  const collect = (list: readonly DisplayItem[], pageNumber: number): void => {
-    for (const item of list) {
-      if (item.type === "group") collect(item.items, pageNumber);
-      else if (item.type === "heading") {
-        headings.push({ title: item.title, level: item.level, id: item.id, page: pageNumber });
-      }
-    }
-  };
-  pages.forEach((page, i) => {
-    collect(page.items, i + 1);
-  });
   return { pages, warnings, usesToc: sink.usesToc, headings };
 }
 
@@ -322,6 +326,8 @@ function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): Disp
           ...item,
           commands: item.commands.map((command) => {
             if (command[0] === "Z") return command;
+            if (command[0] === "R")
+              return ["R", command[1] + dx, command[2] + dy, command[3], command[4]];
             const moved: (string | number)[] = [command[0]];
             for (let i = 1; i < command.length; i += 2) {
               moved.push((command[i] as number) + dx, (command[i + 1] as number) + dy);
@@ -354,29 +360,44 @@ function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): Disp
 
 /** Lays out a document and writes it as a PDF file. */
 function renderSync(document: LayoutNode<"Document">, options: RenderOptions = {}): Uint8Array {
-  const result = layoutDocument(
-    document,
-    options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {},
-  );
-  for (const warning of result.warnings) options.onWarning?.(warning);
+  if (document?.type !== "Document") throw new LayoutError("render() needs a Document element");
   const props = document.props;
   const info: Record<string, string> = {};
   for (const key of ["title", "author", "subject", "keywords", "creator"] as const) {
     const value = props[key];
     if (value !== undefined) info[key] = value;
   }
-  const pdf = new PdfDocument({
-    info,
-    deterministic: options.deterministic ?? false,
-    compress: options.compress ?? true,
-    ...(props.lang !== undefined ? { lang: props.lang } : {}),
-    ...(options.conformance ? { conformance: options.conformance } : {}),
-    ...(options.outputIntent ? { outputIntent: options.outputIntent } : {}),
-  });
-  for (const page of result.pages) {
-    writeDisplayPage(pdf, page, { boxes: options.conformance !== undefined });
+  const layoutOptions =
+    options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {};
+  // Each page is written as soon as it is painted. A table of contents needs its page numbers
+  // from a finished layout, so such a document is written again until they agree.
+  let toc: TocEntry[] = [];
+  for (let pass = 0; ; pass++) {
+    const pdf = new PdfDocument({
+      info,
+      deterministic: options.deterministic ?? false,
+      compress: options.compress ?? true,
+      ...(props.lang !== undefined ? { lang: props.lang } : {}),
+      ...(options.conformance ? { conformance: options.conformance } : {}),
+      ...(options.outputIntent ? { outputIntent: options.outputIntent } : {}),
+    });
+    const result = layoutPass(document, layoutOptions, toc, (page) =>
+      writeDisplayPage(pdf, page, { boxes: options.conformance !== undefined }),
+    );
+    const settled =
+      !result.usesToc ||
+      pass >= 5 ||
+      (toc.length === result.headings.length &&
+        toc.every(
+          (entry, i) =>
+            entry.id === result.headings[i]?.id && entry.page === result.headings[i]?.page,
+        ));
+    if (settled) {
+      for (const warning of result.warnings) options.onWarning?.(warning);
+      return pdf.finish();
+    }
+    toc = result.headings;
   }
-  return pdf.finish();
 }
 
 export interface Render {

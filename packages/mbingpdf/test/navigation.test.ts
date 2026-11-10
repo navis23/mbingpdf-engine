@@ -16,6 +16,7 @@ import {
   Text,
 } from "../src/index.ts";
 import { renderSvg } from "../src/svg/index.ts";
+import { pathBounds } from "./harness/geometry.ts";
 import { extractText } from "./harness/render.ts";
 
 const { Helvetica } = StandardFonts;
@@ -295,7 +296,7 @@ describe("columns", () => {
     const rule = (first?.items ?? []).find(
       (item) => item.type === "path" && item.fill !== undefined,
     );
-    expect(rule?.type === "path" && rule.commands[0]).toEqual(["M", 99.5, 10]);
+    expect(rule?.type === "path" && pathBounds(rule)).toMatchObject({ x: 99.5, y: 10, width: 1 });
     const items = texts(first?.items ?? []);
     expect((items[1]?.y ?? 0) - (items[0]?.y ?? 0)).toBeCloseTo(11.5 + 5);
     expect(items[2]?.x).toBe(110);

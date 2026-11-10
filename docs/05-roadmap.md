@@ -48,7 +48,7 @@ _Status: done 2026-11-10. The exit test passes: a 53-page report with headings, 
 
 ## M3 — Tables, vector art and print
 
-_Status: in progress — done: tables (the 1,000-row exit test passes); lists; `fit` text; vector QR codes; print output (bleed, marks, CMYK, spot colours, output intent, PDF/X-4 checks, XMP, resolution warnings); headings with PDF bookmarks; links within the document; a generated table of contents; multi-column sections. Both M3 acceptance documents are built as samples. Still to do: themes, SVG input, shared graphics, and the 5,000-bib benchmark. A PDF/X-4 preflight in Acrobat is a manual check that is still open_
+_Status: nearly done — all three exit tests pass: a 1,000-row table with repeated headers; the invoice and finisher-certificate acceptance documents as samples (the certificate with bleed, marks, a spot colour and PDF/X-4); and 5,000 bibs in one file in about 10 s and 6.4 MB. Built: tables, lists, `fit` text, QR codes, print output, headings with bookmarks, internal links, table of contents, columns. Still to do: themes (`defineTheme`), SVG input, and sharing repeated graphics between pages. Open manual checks: an Acrobat PDF/X-4 preflight, and comparing the two acceptance documents with their current printed versions_
 
 - Tables: column sizing, spans, borders, zebra rows, repeated headers and footers, split and non-split rows, group subtotals.
 - Lists, multi-column sections, per-section page size and orientation.
