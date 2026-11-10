@@ -16,7 +16,9 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "test:update": "UPDATE_GOLDEN=1 vitest run",
+    "test:runtime": "pnpm -r test:runtime:node && pnpm -r test:runtime:deno && pnpm -r test:runtime:browser"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",

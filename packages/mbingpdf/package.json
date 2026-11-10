@@ -40,9 +40,20 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
+    "test:runtime:node": "node test/harness/runtime.mjs",
+    "test:runtime:deno": "deno run test/harness/runtime.mjs",
+    "test:runtime:bun": "bun test/harness/runtime.mjs",
+    "test:runtime:browser": "node test/harness/browser.mjs"
   },
   "devDependencies": {
-    "fflate": "0.8.3"
+    "@hyzyla/pdfium": "^3.0.0",
+    "@napi-rs/canvas": "^1.1.0",
+    "@types/pngjs": "^6.0.5",
+    "fflate": "0.8.3",
+    "pdfjs-dist": "^6.5.438",
+    "pixelmatch": "^8.0.0",
+    "playwright": "^1.65.0",
+    "pngjs": "^7.0.0"
   }
 }

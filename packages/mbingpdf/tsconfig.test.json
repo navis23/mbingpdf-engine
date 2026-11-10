@@ -3,7 +3,9 @@
   "compilerOptions": {
     "types": ["node"],
     "isolatedDeclarations": false,
-    "declaration": false
+    "declaration": false,
+    "resolveJsonModule": true,
+    "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src", "test", "tsdown.config.ts"]
 }

@@ -33,4 +33,37 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Upload image diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs-node-${{ matrix.node }}
+          path: packages/mbingpdf/test/.artifacts
+          if-no-files-found: ignore
+          include-hidden-files: true
       - run: pnpm build
+
+  runtimes:
+    name: Bun, Deno and Chromium
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: oven-sh/setup-bun@v2
+      - uses: denoland/setup-deno@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Install Chromium
+        run: pnpm --filter mbingpdf exec playwright install --with-deps chromium
+      - name: Output is byte-identical on Node
+        run: pnpm --filter mbingpdf test:runtime:node
+      - name: Output is byte-identical on Bun
+        run: pnpm --filter mbingpdf test:runtime:bun
+      - name: Output is byte-identical on Deno
+        run: pnpm --filter mbingpdf test:runtime:deno
+      - name: Output is byte-identical in Chromium
+        run: pnpm --filter mbingpdf test:runtime:browser
