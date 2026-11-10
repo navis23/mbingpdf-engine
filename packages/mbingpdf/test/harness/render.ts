@@ -28,8 +28,8 @@ const standardFontDataUrl = `${join(pdfjsRoot, "standard_fonts")}/`;
 
 function openPdfjs(pdf: Uint8Array) {
   return getDocument({
-    // pdf.js takes ownership of the buffer, so hand it a copy.
-    data: pdf.slice(),
+    // pdf.js takes ownership of the buffer and rejects Node Buffers, so hand it a plain copy.
+    data: Uint8Array.from(pdf),
     standardFontDataUrl,
     // Draw glyphs as paths from the font data instead of asking the system for fonts.
     disableFontFace: true,

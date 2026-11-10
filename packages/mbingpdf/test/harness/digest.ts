@@ -3,12 +3,12 @@
  * runtime, so these digests are compared with `test/golden/digests.json` on Node, Bun, Deno and
  * in a browser. Uses only APIs present in all of them.
  */
-import { type CoreModule, samples } from "./samples.ts";
+import { type SampleEnv, samples } from "./samples.ts";
 
-export async function digestSamples(core: CoreModule): Promise<Record<string, string>> {
+export async function digestSamples(env: SampleEnv): Promise<Record<string, string>> {
   const digests: Record<string, string> = {};
   for (const [name, sample] of Object.entries(samples)) {
-    const pdf = sample.build(core);
+    const pdf = sample.build(env);
     const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", pdf.slice().buffer));
     digests[name] = Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join("");
   }

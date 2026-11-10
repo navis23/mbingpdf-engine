@@ -20,8 +20,8 @@ and Chromium. Nothing is published to npm. The root `mbingpdf` entry is still em
 M1 has just started; see `docs/05-roadmap.md`.
 
 ## Next steps (in order)
-1. TrueType parsing and embedding as a CID font with `ToUnicode` (whole font first).
-2. Glyph subsetting for TrueType outlines.
+1. ~~TrueType parsing and embedding as a CID font with `ToUnicode`~~ done (`src/font/`, `src/core/embedded-font.ts`).
+2. ~~Glyph subsetting for TrueType outlines~~ done.
 3. OpenType/CFF embedding and subsetting.
 4. Shaping for simple scripts: kerning and ligatures from GPOS/GSUB; the `Shaper` interface.
 5. Variable-font instancing (two of the four test fonts need it).
@@ -49,6 +49,8 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 - `changeset init` is interactive-only in v3; the config was written by hand.
 - pdf.js in Node needs `standardFontDataUrl` as a file-system path, not a `file:` URL; with a URL it silently
   falls back to system fonts.
+- Node's `Buffer.slice()` returns a view, not a copy. Font input is re-wrapped in `parseSfnt`; in tests read
+  fonts with `readFont()` from `test/harness/env.ts`.
 - An object is serialised when it is set on the writer and cannot change afterwards; allocate a ref first for
   anything that must be completed later.
 - After an intended output change: review `test/.artifacts/`, then `pnpm test:update`.

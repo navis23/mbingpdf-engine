@@ -1,6 +1,7 @@
 import { ByteWriter } from "./bytes.ts";
 import type { Color } from "./color.ts";
-import { PdfName, PdfString } from "./objects.ts";
+import type { FontProgram } from "./embedded-font.ts";
+import { PdfName, type PdfString } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 import type { StandardFont } from "./standard-font.ts";
 
@@ -30,8 +31,19 @@ export interface Opacity {
 export interface ContentResources {
   /** Returns the resource name of a graphics state with these opacities. */
   opacity(fill: number | undefined, stroke: number | undefined): string;
-  /** Returns the resource name of a font. */
-  font(font: StandardFont): string;
+  /** Registers a font with the page and returns how to refer to it and write text in it. */
+  font(font: AnyFont): FontBinding;
+}
+
+/** A font that every viewer has built in, or a font program to embed. */
+export type AnyFont = StandardFont | FontProgram;
+
+/** A font as seen from a content stream. */
+export interface FontBinding {
+  /** The resource name, such as `F1`. */
+  readonly name: string;
+  /** Converts text to the string operand that shows it in this font. */
+  encode(text: string): PdfString;
 }
 
 const TEXT_RENDERING_MODES: Record<TextRenderingMode, number> = {
@@ -65,7 +77,7 @@ export class ContentStream {
   readonly #out: ByteWriter = new ByteWriter();
   readonly #resources: ContentResources | undefined;
   /** The font in effect at each save() level; the last entry is the current one. */
-  readonly #fonts: (StandardFont | undefined)[] = [undefined];
+  readonly #fonts: (FontBinding | undefined)[] = [undefined];
   #inText = false;
 
   constructor(resources?: ContentResources) {
@@ -283,11 +295,12 @@ export class ContentStream {
   // ----- text -----
 
   /** Selects the font and size for the text that follows (`Tf`). Needs a page. */
-  font(font: StandardFont, size: number): this {
+  font(font: AnyFont, size: number): this {
     if (!(size > 0)) throw new RangeError("Font size must be positive");
     if (!this.#resources) throw new Error("font() needs a content stream that belongs to a page");
-    this.#fonts[this.#fonts.length - 1] = font;
-    return this.#op("Tf", this.#name(this.#resources.font(font)), n(size));
+    const binding = this.#resources.font(font);
+    this.#fonts[this.#fonts.length - 1] = binding;
+    return this.#op("Tf", this.#name(binding.name), n(size));
   }
 
   /** Begins a text object (`BT`). Text can only be shown between this and {@link endText}. */
@@ -320,7 +333,7 @@ export class ContentStream {
     this.#needText("showText()");
     const font = this.#fonts.at(-1);
     if (!font) throw new Error("Select a font with font() before showing text");
-    writeObject(this.#out, new PdfString(font.encode(text)));
+    writeObject(this.#out, font.encode(text));
     this.#out.ascii(" Tj\n");
     return this;
   }

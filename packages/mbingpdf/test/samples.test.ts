@@ -3,15 +3,15 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import * as core from "../src/core/index.ts";
 import { compareDigests, digestSamples } from "./harness/digest.ts";
+import { env } from "./harness/env.ts";
 import { readGoldenJson, UPDATE_GOLDEN, writeGoldenJson } from "./harness/golden.ts";
 import { extractText } from "./harness/render.ts";
 import { samples } from "./harness/samples.ts";
 
 const hasQpdf = spawnSync("qpdf", ["--version"]).status === 0;
 const names = Object.keys(samples);
-const build = (name: string): Uint8Array => (samples[name] as (typeof samples)[string]).build(core);
+const build = (name: string): Uint8Array => (samples[name] as (typeof samples)[string]).build(env);
 
 /** pdf.js splits text into runs differently per font; compare the words, not the runs. */
 const words = (runs: readonly string[]): string => runs.join(" ").replace(/\s+/g, " ").trim();
@@ -22,7 +22,7 @@ describe("samples", () => {
   });
 
   test("output bytes match the approved digests", async () => {
-    const actual = await digestSamples(core);
+    const actual = await digestSamples(env);
     if (UPDATE_GOLDEN) {
       writeGoldenJson("digests.json", actual);
       return;

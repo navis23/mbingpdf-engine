@@ -1,23 +1,44 @@
 /**
  * Sample documents used by the structural, visual and cross-runtime checks.
  *
- * Each builder receives the core module instead of importing it, so the same file can be run
- * against the source (in Vitest) and against the built package (on Bun, Deno and in a browser).
- * Only type-only imports are allowed here, and every sample must be deterministic.
+ * Each builder receives the library modules and the test fonts instead of importing them, so
+ * the same file can be run against the source (in Vitest) and against the built package (on
+ * Bun, Deno and in a browser). Only type-only imports are allowed here, and every sample must
+ * be deterministic.
  */
 import type * as Core from "../../src/core/index.ts";
+import type * as Font from "../../src/font/index.ts";
 
 export type CoreModule = typeof Core;
+
+/** Font files in `test/fonts/`, without the `.ttf` extension. */
+export const FONT_FILES = [
+  "Inter-Variable",
+  "JetBrainsMono-Variable",
+  "PlusJakartaSans-Variable",
+  "BarlowCondensed-Regular",
+  "BarlowCondensed-Bold",
+] as const;
+
+export type FontFile = (typeof FONT_FILES)[number];
+
+/** Everything a sample may use. */
+export interface SampleEnv {
+  readonly core: CoreModule;
+  readonly font: typeof Font;
+  /** The bytes of each test font. */
+  readonly fonts: Readonly<Record<FontFile, Uint8Array>>;
+}
 
 export interface Sample {
   /** The text each page is expected to yield when extracted, in reading order. */
   readonly text: readonly (readonly string[])[];
-  build(core: CoreModule): Uint8Array;
+  build(env: SampleEnv): Uint8Array;
 }
 
 const shapes: Sample = {
   text: [[], []],
-  build(core) {
+  build({ core }) {
     const { PdfDocument, PageSizes, printBoxes, mm, rgb, cmyk, gray, hex } = core;
     const doc = new PdfDocument({ deterministic: true, info: { title: "Shapes" } });
 
@@ -128,7 +149,7 @@ const text: Sample = {
       "Rotated text",
     ],
   ],
-  build(core) {
+  build({ core }) {
     const { PdfDocument, PageSizes, StandardFonts, rgb, gray } = core;
     const doc = new PdfDocument({ deterministic: true, info: { title: "Text" } });
     const page = doc.addPage({ size: PageSizes.A5 });
@@ -187,7 +208,7 @@ const report: Sample = {
     `Halaman ${n} dari 3`,
     ...[1, 2, 3, 4, 5, 6].map((row) => `Baris ${row} — nilai ${n * row * 125}`),
   ]),
-  build(core) {
+  build({ core }) {
     const { PdfDocument, PageSizes, StandardFonts, rgb, gray, hex } = core;
     const doc = new PdfDocument({
       deterministic: true,
@@ -232,4 +253,63 @@ const report: Sample = {
   },
 };
 
-export const samples: Readonly<Record<string, Sample>> = { shapes, text, report };
+const EMBEDDED_LINE = "Rp 1.250.000 — “lunas” é ü ŵ ß fi";
+
+/** Embedded TrueType fonts: subsetting, composite glyphs, text extraction. */
+const fonts: Sample = {
+  text: [
+    [
+      `Inter: ${EMBEDDED_LINE}`,
+      `JetBrains Mono: ${EMBEDDED_LINE}`,
+      `Plus Jakarta Sans: ${EMBEDDED_LINE}`,
+      `Barlow Condensed: ${EMBEDDED_LINE}`,
+      `Barlow Condensed: ${EMBEDDED_LINE}`,
+      "Sertifikat Penghargaan",
+      "Åsa Ørsted — Zoë Müller — Đặng",
+      "Helvetica next to embedded fonts",
+    ],
+  ],
+  build(env) {
+    const { PdfDocument, PageSizes, StandardFonts, rgb, gray } = env.core;
+    const doc = new PdfDocument({ deterministic: true, info: { title: "Fonts" } });
+    const page = doc.addPage({ size: PageSizes.A5 });
+    const c = page.content;
+    const loaded = FONT_FILES.map((file) => new env.font.TrueTypeFont(env.fonts[file]));
+    let y = page.height - 50;
+    for (const font of loaded) {
+      const line = `${font.familyName}: ${EMBEDDED_LINE}`;
+      c.fillColor(gray(0)).font(font, 12).text(line, 30, y);
+      c.strokeColor(rgb(1, 0, 0))
+        .lineWidth(0.3)
+        .rect(
+          30,
+          y - font.descent(12),
+          font.widthOfText(line, 12),
+          font.ascent(12) + font.descent(12),
+        )
+        .stroke();
+      y -= 38;
+    }
+    const [inter, , jakarta, , barlowBold] = loaded as [
+      Font.TrueTypeFont,
+      Font.TrueTypeFont,
+      Font.TrueTypeFont,
+      Font.TrueTypeFont,
+      Font.TrueTypeFont,
+    ];
+    const title = "Sertifikat Penghargaan";
+    const size = 34;
+    c.fillColor(rgb(0.1, 0.2, 0.5))
+      .font(barlowBold, size)
+      .text(title, (page.width - barlowBold.widthOfText(title, size)) / 2, y - 20);
+    c.fillColor(gray(0.2))
+      .font(jakarta, 13)
+      .text("Åsa Ørsted — Zoë Müller — Đặng", 30, y - 60);
+    c.font(StandardFonts.Helvetica, 11).text("Helvetica next to embedded fonts", 30, y - 90);
+    // The same font used again must reuse its subset.
+    c.font(inter, 9).text("Inter again, smaller: 0123456789", 30, y - 110);
+    return doc.finish();
+  },
+};
+
+export const samples: Readonly<Record<string, Sample>> = { shapes, text, report, fonts };

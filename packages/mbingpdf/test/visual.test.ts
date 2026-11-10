@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import * as core from "../src/core/index.ts";
+import { env } from "./harness/env.ts";
 import { compareWithGolden } from "./harness/golden.ts";
 import { type Renderer, renderPdf } from "./harness/render.ts";
 import { samples } from "./harness/samples.ts";
@@ -12,7 +12,7 @@ const cases = Object.keys(samples).flatMap((name) =>
 describe("visual regression", () => {
   test.each(cases)("%s renders as approved in %s", async (name, renderer) => {
     const sample = samples[name] as (typeof samples)[string];
-    const pages = await renderPdf(renderer, sample.build(core));
+    const pages = await renderPdf(renderer, sample.build(env));
     expect(pages.length).toBe(sample.text.length);
     const failures = pages
       .map((page, i) => compareWithGolden(`${name}.${renderer}.${i + 1}`, page))

@@ -1,6 +1,8 @@
+import type { AnyFont, FontBinding } from "./content.ts";
+import { EmbeddedFont } from "./embedded-font.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
 import { PdfPage, type PdfPageOptions } from "./page.ts";
-import type { StandardFont } from "./standard-font.ts";
+import { StandardFont } from "./standard-font.ts";
 import { PdfWriter, type PdfWriterOptions } from "./writer.ts";
 
 /** Document information shown in a viewer's properties dialog. */
@@ -37,7 +39,8 @@ export class PdfDocument {
   readonly #pagesRef: PdfRef;
   readonly #pages: PdfPage[] = [];
   readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
-  readonly #fonts: Map<StandardFont, { name: string; ref: PdfRef }> = new Map();
+  readonly #fonts: Map<AnyFont, FontBinding & { ref: PdfRef }> = new Map();
+  readonly #embedded: { font: EmbeddedFont; ref: PdfRef }[] = [];
 
   constructor(options: PdfDocumentOptions = {}) {
     this.writer = new PdfWriter(options);
@@ -70,6 +73,7 @@ export class PdfDocument {
     const writer = this.writer;
     if (this.#pages.length === 0) throw new Error("A PDF needs at least one page");
     for (const page of this.#pages) page.end();
+    for (const { font, ref } of this.#embedded) font.write(writer, ref);
     writer.set(
       this.#pagesRef,
       new PdfDict({
@@ -100,10 +104,12 @@ export class PdfDocument {
     return state;
   }
 
-  /** One font object per standard font, shared by every page that uses it. */
-  #fontResource(font: StandardFont): { name: string; ref: PdfRef } {
+  /** One font object per font, shared by every page that uses it. */
+  #fontResource(font: AnyFont): FontBinding & { ref: PdfRef } {
     let resource = this.#fonts.get(font);
-    if (!resource) {
+    if (resource) return resource;
+    const name = `F${this.#fonts.size + 1}`;
+    if (font instanceof StandardFont) {
       const ref = this.writer.add(
         new PdfDict({
           Type: new PdfName("Font"),
@@ -113,9 +119,15 @@ export class PdfDocument {
           Encoding: font.symbolic ? undefined : new PdfName("WinAnsiEncoding"),
         }),
       );
-      resource = { name: `F${this.#fonts.size + 1}`, ref };
-      this.#fonts.set(font, resource);
+      resource = { name, ref, encode: (text) => new PdfString(font.encode(text)) };
+    } else {
+      // The subset is only known once every page is drawn, so the object is written in finish().
+      const embedded = new EmbeddedFont(font);
+      const ref = this.writer.allocate();
+      this.#embedded.push({ font: embedded, ref });
+      resource = { name, ref, encode: (text) => embedded.encode(text) };
     }
+    this.#fonts.set(font, resource);
     return resource;
   }
 

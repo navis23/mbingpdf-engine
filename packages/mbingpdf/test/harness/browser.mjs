@@ -15,7 +15,12 @@ import golden from "../golden/digests.json" with { type: "json" };
 import { compareDigests } from "./digest.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const TYPES = { ".js": "text/javascript", ".ts": "text/javascript", ".json": "application/json" };
+const TYPES = {
+  ".js": "text/javascript",
+  ".ts": "text/javascript",
+  ".json": "application/json",
+  ".ttf": "font/ttf",
+};
 
 const server = createServer(async (request, response) => {
   try {
@@ -32,9 +37,9 @@ const server = createServer(async (request, response) => {
       response.writeHead(403).end();
       return;
     }
-    let body = await readFile(path, "utf8");
+    let body = await readFile(path);
     // Browsers cannot run TypeScript; the harness files only use erasable syntax.
-    if (extname(path) === ".ts") body = stripTypeScriptTypes(body);
+    if (extname(path) === ".ts") body = stripTypeScriptTypes(body.toString("utf8"));
     response.writeHead(200, { "content-type": TYPES[extname(path)] ?? "text/plain" }).end(body);
   } catch {
     response.writeHead(404).end();
@@ -54,8 +59,16 @@ try {
   await page.goto(`${origin}/`);
   const actual = await page.evaluate(async () => {
     const core = await import("/dist/core/index.js");
+    const font = await import("/dist/font/index.js");
     const { digestSamples } = await import("/test/harness/digest.ts");
-    return digestSamples(core);
+    const { FONT_FILES } = await import("/test/harness/samples.ts");
+    const fonts = {};
+    for (const file of FONT_FILES) {
+      const response = await fetch(`/test/fonts/${file}.ttf`);
+      if (!response.ok) throw new Error(`Could not load ${file}: ${response.status}`);
+      fonts[file] = new Uint8Array(await response.arrayBuffer());
+    }
+    return digestSamples({ core, font, fonts });
   });
   if (errors.length > 0) throw new Error(`Page errors: ${errors.join("; ")}`);
   const different = compareDigests(actual, golden);

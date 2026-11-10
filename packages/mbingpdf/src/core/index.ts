@@ -5,15 +5,18 @@
 export { ByteWriter } from "./bytes.ts";
 export { type Color, cmyk, gray, hex, rgb } from "./color.ts";
 export {
+  type AnyFont,
   type ContentResources,
   ContentStream,
   type FillRule,
+  type FontBinding,
   type LineCap,
   type LineJoin,
   type Opacity,
   type TextRenderingMode,
 } from "./content.ts";
 export { PdfDocument, type PdfDocumentOptions, type PdfInfo } from "./document.ts";
+export { EmbeddedFont, type FontProgram } from "./embedded-font.ts";
 export {
   dict,
   name,

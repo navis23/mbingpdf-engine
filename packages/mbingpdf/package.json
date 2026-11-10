@@ -36,13 +36,17 @@
       "import": "./dist/core/index.js",
       "require": "./dist/core/index.cjs"
     },
+    "./font": {
+      "import": "./dist/font/index.js",
+      "require": "./dist/font/index.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsdown",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json",
     "test:runtime:node": "node test/harness/runtime.mjs",
-    "test:runtime:deno": "deno run test/harness/runtime.mjs",
+    "test:runtime:deno": "deno run --allow-read test/harness/runtime.mjs",
     "test:runtime:bun": "bun test/harness/runtime.mjs",
     "test:runtime:browser": "node test/harness/browser.mjs"
   },
@@ -51,6 +55,7 @@
     "@napi-rs/canvas": "^1.1.0",
     "@types/pngjs": "^6.0.5",
     "fflate": "0.8.3",
+    "harfbuzzjs": "^1.6.4",
     "pdfjs-dist": "^6.5.438",
     "pixelmatch": "^8.0.0",
     "playwright": "^1.65.0",

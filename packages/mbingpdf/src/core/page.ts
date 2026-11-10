@@ -1,6 +1,5 @@
-import { ContentStream } from "./content.ts";
+import { type AnyFont, ContentStream, type FontBinding } from "./content.ts";
 import { PdfDict, PdfName, type PdfRef, PdfStream } from "./objects.ts";
-import type { StandardFont } from "./standard-font.ts";
 import type { Box, PageSize } from "./units.ts";
 import type { PdfWriter } from "./writer.ts";
 
@@ -19,8 +18,8 @@ export interface PageHost {
   readonly pagesRef: PdfRef;
   /** A shared graphics state with the given opacities. */
   opacityState(fill: number | undefined, stroke: number | undefined): { name: string; ref: PdfRef };
-  /** The shared font object for a standard font. */
-  fontResource(font: StandardFont): { name: string; ref: PdfRef };
+  /** The document-wide font object and encoder for a font. */
+  fontResource(font: AnyFont): FontBinding & { ref: PdfRef };
 }
 
 function contains(outer: Box, inner: Box): boolean {
@@ -79,7 +78,7 @@ export class PdfPage {
       font: (font) => {
         const resource = host.fontResource(font);
         this.setResource("Font", resource.name, resource.ref);
-        return resource.name;
+        return resource;
       },
     });
   }
