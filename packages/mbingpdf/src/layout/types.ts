@@ -2,7 +2,7 @@
  * The document tree: plain data that describes a document. Element functions build it; the
  * layout engine reads it. Nothing here does any work.
  */
-import type { Color, PdfImage } from "../core/index.ts";
+import type { Color, PdfImage, StructureRole } from "../core/index.ts";
 import type { Hyphenator, TextAlign, TextFont, TextTransform } from "../text/index.ts";
 import type { CanvasContext } from "./canvas.ts";
 import type { Theme, ThemeColorName, ThemeFontName, ThemeTextStyleName } from "./theme.ts";
@@ -124,6 +124,22 @@ export interface BoxProps extends TextProps {
   keepTogether?: boolean;
   /** Keeps this element on the same page as the start of the next one (for headings). */
   keepWithNext?: boolean;
+  /**
+   * In a tagged PDF: what this element is, when it is not what it looks like. On a `Text` it
+   * replaces "paragraph" (`"Caption"`, `"BlockQuote"`, `"Note"`); on a container it groups
+   * what is inside (`"Sect"`, `"Div"`, `"Figure"`).
+   */
+  role?: StructureRole;
+  /**
+   * In a tagged PDF: the element is decoration, and readers that work from the structure
+   * skip it and everything in it.
+   */
+  decorative?: boolean;
+  /**
+   * In a tagged PDF: a description that stands in for the element, for people who cannot see
+   * it. Meant for images, drawings and QR codes, which are skipped as decoration without one.
+   */
+  alt?: string;
 }
 
 export interface StackProps extends BoxProps {

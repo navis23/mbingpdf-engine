@@ -213,6 +213,27 @@ await render(document, {
 
 `size` stays the finished size; the sheet grows to hold the bleed and the marks. PDF/X-4 needs every font embedded, so use a font file rather than the built-in fonts.
 
+## For an archive, and for screen readers
+
+```ts
+await render(document, { conformance: "PDF/A-2b" });                 // long-term archiving
+await render(document, { conformance: ["PDF/A-2a", "PDF/UA-1"] });   // archived and accessible
+await render(document, { tagged: true });                            // just the structure
+```
+
+PDF/A fixes what a file may depend on, so that it opens the same in thirty years: every font embedded (use font files, not the built-in fonts) and every colour tied to a profile, sRGB unless you give an `outputIntent`.
+
+A tagged file carries its structure: which text is a heading, what the rows and header cells of a table are, in what order to read. That comes from the elements you already use. What the layout cannot know, you say:
+
+```ts
+Document({ title: "Laporan tahunan", lang: "id", font: inter }, ...);   // PDF/UA needs both
+Image({ src: photo, width: mm(60), alt: "Bus pariwisata di depan kantor" });
+Image({ src: ornament, width: mm(60), decorative: true });              // skipped by screen readers
+Stack({ role: "Sect" }, Heading({ level: 2 }, "Ketentuan"), Text("…"));
+```
+
+A picture with neither `alt` nor `decorative` is treated as decoration, with a warning. Page headers and footers, backgrounds and borders are marked as decoration automatically.
+
 ## JSX
 
 The same documents can be written as JSX; no React is involved. Set `"jsx": "react-jsx"` and `"jsxImportSource": "mbingpdf"` in `tsconfig.json`.

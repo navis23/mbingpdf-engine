@@ -3,7 +3,7 @@
  * points from the top-left corner of the page, y growing downward. A backend (PDF, SVG) turns
  * it into output without knowing anything about layout.
  */
-import type { Color, PdfImage, PositionedGlyph } from "../core/index.ts";
+import type { Color, PdfImage, PositionedGlyph, StructureRole } from "../core/index.ts";
 import type { TextFont } from "../text/index.ts";
 
 export type PathCommand =
@@ -94,7 +94,34 @@ export type DisplayItem =
       readonly rotate?: { readonly degrees: number; readonly cx: number; readonly cy: number };
       readonly items: readonly DisplayItem[];
     }
-  | SharedItem;
+  | SharedItem
+  | {
+      /** Items that make up (part of) one element of the document's logical structure. */
+      readonly type: "tagged";
+      readonly tag: StructureTag;
+      readonly items: readonly DisplayItem[];
+    };
+
+/**
+ * What a piece of a tagged document is: a paragraph, a table cell, a figure. Or, with the
+ * role `"Artifact"`, that it is page furniture and no part of the text.
+ */
+export interface StructureTag {
+  readonly role: StructureRole | "Artifact";
+  /**
+   * Identifies the element. An element that runs over several pages yields several tagged
+   * items with the same key, all but the first marked `continued`.
+   */
+  readonly key?: object;
+  readonly continued?: boolean;
+  /** A description, for figures. */
+  readonly alt?: string;
+  /** For header cells. */
+  readonly scope?: "Column" | "Row";
+  readonly colSpan?: number;
+  /** For artifacts: a running head or foot. */
+  readonly furniture?: "Header" | "Footer";
+}
 
 /**
  * Artwork that may appear many times in a document, such as a logo on every page. Its items

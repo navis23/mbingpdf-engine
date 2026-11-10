@@ -198,6 +198,9 @@ class PageWriter {
           out += `<g${opacity}${rotate}>${this.items(item.items)}</g>`;
           break;
         }
+        case "tagged":
+          out += this.items(item.items);
+          break;
         case "shared": {
           // Drawn once per page in <defs>, however often the page uses it.
           let id = this.#shared.get(item.items);
@@ -319,6 +322,8 @@ function collectAreas(
           ]);
       }
       collectAreas(item.items, inner, links, anchors);
+    } else if (item.type === "tagged") {
+      collectAreas(item.items, transform, links, anchors);
     }
   }
 }

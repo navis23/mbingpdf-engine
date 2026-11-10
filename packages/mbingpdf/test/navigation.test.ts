@@ -125,7 +125,7 @@ describe("links within the document", () => {
       { deterministic: true, compress: false },
     );
     const out = latin1(pdf);
-    expect(out).toMatch(/\/Subtype\/Link\/Rect\[[\d. ]+\]\/Border\[0 0 0\]\/Dest\/lampiran/);
+    expect(out).toMatch(/\/Subtype\/Link\/Rect\[[\d. ]+\]\/Border\[0 0 0\]\/F 4\/Dest\/lampiran/);
     // The destination is on the second page, 50 points from its top.
     const pageRefs = [...out.matchAll(/\/Kids\[(\d+) 0 R (\d+) 0 R\]/g)][0];
     expect(out).toContain(`/Dests<</lampiran[${pageRefs?.[2]} 0 R/XYZ 10 250 null]>>`);

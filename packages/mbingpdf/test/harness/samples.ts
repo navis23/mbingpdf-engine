@@ -52,7 +52,8 @@ export interface SampleEnv {
 export interface Sample {
   /** The text each page is expected to yield when extracted, in reading order. */
   readonly text: readonly (readonly string[])[];
-  build(env: SampleEnv): Uint8Array;
+  /** `options` are added to the render options of samples built with the document API. */
+  build(env: SampleEnv, options?: Root.RenderOptions): Uint8Array;
 }
 
 const shapes: Sample = {
@@ -503,7 +504,7 @@ const tour: Sample = {
     ["Kotak yang tidak terpisah", "Halaman 4 dari 5"],
     ["Label", "Peserta 20", "Halaman 5 dari 5"],
   ],
-  build(env) {
+  build(env, options) {
     const d = env.doc;
     const inter = new d.Font(env.fonts["Inter-Variable"]);
     const bold = inter.instance("Bold");
@@ -533,7 +534,7 @@ const tour: Sample = {
         d.Text({ font: bold, size: 20, keepWithNext: true }, "Ringkasan"),
         d.Row(
           { gap: 10, align: "start" },
-          d.Image({ src: env.photo, width: 90 }),
+          d.Image({ src: env.photo, width: 90, alt: "A sample photograph" }),
           d.Stack(
             { grow: 1, gap: 4 },
             d.Text({ font: bold }, "Judul di samping gambar"),
@@ -615,7 +616,7 @@ const tour: Sample = {
         ),
       ),
     );
-    return d.render.sync(document, { deterministic: true });
+    return d.render.sync(document, { deterministic: true, ...options });
   },
 };
 
@@ -633,7 +634,7 @@ const certificate: Sample = {
       "01:47:32",
     ],
   ],
-  build(env) {
+  build(env, options) {
     const d = env.doc;
     const jakarta = new d.Font(env.fonts["PlusJakartaSans-Variable"]);
     const bold = jakarta.instance("Bold");
@@ -732,6 +733,7 @@ const certificate: Sample = {
         identifier: "CGATS TR 001",
         info: "U.S. Web Coated (SWOP) stand-in",
       },
+      ...options,
     });
   },
 };
@@ -805,7 +807,7 @@ const agreement: Sample = {
     ["Penyelesaian perselisihan", "Pihak Pertama", "Pihak Kedua", "Halaman 2 dari 3"],
     ["LAPORAN PEMERIKSAAN", "Lecet pada bumper depan kiri", "Halaman 3 dari 3"],
   ],
-  build(env) {
+  build(env, options) {
     const d = env.doc;
     const inter = new d.Font(env.fonts["Inter-Variable"]);
     const mono = new d.Font(env.fonts["JetBrainsMono-Variable"]);
@@ -855,7 +857,7 @@ const agreement: Sample = {
               padding: [0, 0, 6, 0],
               border: { bottom: { width: 0.75, color: "brand" } },
             },
-            d.Image({ src: env.photo, height: 22 }),
+            d.Image({ src: env.photo, height: 22, alt: "Logo" }),
             d.Spacer(),
             d.Stack(
               { align: "end" },
@@ -952,21 +954,27 @@ const agreement: Sample = {
           ["Depan", "Belakang", "Kiri", "Kanan"].map((side) =>
             d.Stack(
               { gap: 2 },
-              d.Image({ src: env.photo, width: "100%", height: 62, fit: "cover" }),
+              d.Image({
+                src: env.photo,
+                width: "100%",
+                height: 62,
+                fit: "cover",
+                alt: "Foto kendaraan",
+              }),
               d.Text({ style: "label", align: "center" }, side),
             ),
           ),
         ),
       ),
     );
-    return d.render.sync(document, { deterministic: true });
+    return d.render.sync(document, { deterministic: true, ...options });
   },
 };
 
 /** The invoice from the API design. */
 const invoice: Sample = {
   text: [["Invoice", "INV-0042", "Sewa bus pariwisata", "Total Rp 4.850.000", "Page 1 of 1"]],
-  build(env) {
+  build(env, options) {
     const d = env.doc;
     const inter = new d.Font(env.fonts["Inter-Variable"]);
     const semiBold = inter.instance("SemiBold");
@@ -991,7 +999,7 @@ const invoice: Sample = {
         },
         d.Row(
           { justify: "space-between", align: "start" },
-          d.Image({ src: env.photo, width: d.mm(40) }),
+          d.Image({ src: env.photo, width: d.mm(40), alt: "Logo" }),
           d.Stack(
             { align: "end", gap: 2 },
             d.Text({ font: semiBold, size: 22 }, "Invoice"),
@@ -1030,7 +1038,7 @@ const invoice: Sample = {
         ),
       ),
     );
-    return d.render.sync(document, { deterministic: true });
+    return d.render.sync(document, { deterministic: true, ...options });
   },
 };
 

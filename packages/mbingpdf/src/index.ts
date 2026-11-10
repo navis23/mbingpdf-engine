@@ -7,6 +7,7 @@
  */
 export {
   type Color,
+  type Conformance,
   cm,
   cmyk,
   gray,

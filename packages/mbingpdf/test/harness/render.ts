@@ -143,3 +143,64 @@ export function decodePng(bytes: Uint8Array): RenderedPage {
   const png = PNG.sync.read(Buffer.from(bytes));
   return { width: png.width, height: png.height, pixels: new Uint8Array(png.data) };
 }
+
+/**
+ * The logical structure of a tagged PDF as pdf.js reads it: for each page, an outline with one
+ * line per element that has content there, indented by depth: `"  P: Hello"`. A description
+ * is shown in brackets: `"Figure [Logo]"`.
+ */
+export async function structureOutline(pdf: Uint8Array): Promise<string[][]> {
+  interface Node {
+    role?: string;
+    alt?: string;
+    type?: string;
+    id?: string;
+    children?: Node[];
+  }
+  const task = openPdfjs(pdf);
+  const pages: string[][] = [];
+  try {
+    const doc = await task.promise;
+    for (let n = 1; n <= doc.numPages; n++) {
+      const page = await doc.getPage(n);
+      // The text of each run of marked content, by the run's id.
+      const content = await page.getTextContent({ includeMarkedContent: true });
+      const texts = new Map<string, string>();
+      const open: string[] = [];
+      for (const item of content.items) {
+        if ("str" in item) {
+          const id = open.at(-1);
+          if (id !== undefined) texts.set(id, (texts.get(id) ?? "") + item.str);
+        } else if (item.type === "beginMarkedContentProps" || item.type === "beginMarkedContent") {
+          open.push(item.id ?? "");
+        } else if (item.type === "endMarkedContent") open.pop();
+      }
+      const lines: string[] = [];
+      const walk = (node: Node, depth: number): void => {
+        const kids = node.children ?? [];
+        const text = kids
+          .filter((kid) => kid.type === "content" && kid.id !== undefined)
+          .map((kid) => texts.get(kid.id as string) ?? "")
+          .join("")
+          .trim();
+        const links = kids.filter(
+          (kid) => kid.type === "object" || kid.type === "annotation",
+        ).length;
+        lines.push(
+          "  ".repeat(depth) +
+            (node.role ?? "?") +
+            (node.alt !== undefined ? ` [${node.alt}]` : "") +
+            (links > 0 ? ` (${links} link${links > 1 ? "s" : ""})` : "") +
+            (text ? `: ${text}` : ""),
+        );
+        for (const kid of kids) if (kid.role !== undefined) walk(kid, depth + 1);
+      };
+      const tree = (await page.getStructTree()) as Node | null;
+      for (const kid of tree?.children ?? []) walk(kid, 0);
+      pages.push(lines);
+    }
+  } finally {
+    await task.destroy();
+  }
+  return pages;
+}

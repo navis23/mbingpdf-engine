@@ -6,7 +6,9 @@ import { type PdfImage, writeImage } from "./image.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
 import { type PageHost, PdfForm, PdfPage, type PdfPageOptions } from "./page.ts";
 import { writeObject } from "./serialize.ts";
+import { srgbProfile } from "./srgb.ts";
 import { StandardFont } from "./standard-font.ts";
+import { PdfStructElement } from "./structure.ts";
 import type { Box } from "./units.ts";
 import { PdfWriter, type PdfWriterOptions } from "./writer.ts";
 
@@ -36,16 +38,48 @@ export interface OutputIntent {
   registry?: string;
 }
 
+/**
+ * A standard a file can be made to meet.
+ *
+ * - `"PDF/X-4"`: commercial printing. Needs an output intent, a trim box on every page and
+ *   every font embedded.
+ * - `"PDF/A-2b"`, `"PDF/A-2u"`: long-term archiving. Every font embedded and every colour tied
+ *   to a profile; `u` adds that all text can be read back as Unicode, which this library's
+ *   output always can.
+ * - `"PDF/A-3b"`, `"PDF/A-3u"`: the same, and other files may be attached (an e-invoice's XML).
+ * - `"PDF/A-2a"`, `"PDF/A-3a"`: the `u` level plus a tagged structure.
+ * - `"PDF/UA-1"`: accessibility. A tagged structure, a title and a language, every font
+ *   embedded, and a description for every figure and link.
+ */
+export type Conformance =
+  | "PDF/X-4"
+  | "PDF/A-2b"
+  | "PDF/A-2u"
+  | "PDF/A-2a"
+  | "PDF/A-3b"
+  | "PDF/A-3u"
+  | "PDF/A-3a"
+  | "PDF/UA-1";
+
 export interface PdfDocumentOptions extends PdfWriterOptions {
   info?: PdfInfo;
   /**
-   * A standard the file must meet. `"PDF/X-4"` is for commercial printing: it needs an
-   * output intent, a trim box on every page, and every font embedded.
+   * The standard the file must meet, or several: `["PDF/X-4", "PDF/A-2b"]`. The file is
+   * checked against them as it is written, and what cannot be met is an error.
    */
-  conformance?: "PDF/X-4";
+  conformance?: Conformance | readonly Conformance[];
+  /**
+   * The printing condition the document is prepared for. Required for PDF/X-4. For PDF/A it
+   * is optional: without one the file is declared to be in sRGB.
+   */
   outputIntent?: OutputIntent;
   /** Language of the document's text, as a BCP 47 tag such as `"id"` or `"en-GB"`. */
   lang?: string;
+  /**
+   * Make a tagged PDF: one that carries its logical structure, built through
+   * {@link PdfDocument.structure}. Implied by PDF/UA-1 and the `a` levels of PDF/A.
+   */
+  tagged?: boolean;
   /**
    * When true the library never reads the clock: dates appear only if given in `info`, so the
    * same input always yields the same bytes. Default `false`, which stamps the current time.
@@ -62,8 +96,19 @@ export class PdfDocument {
   readonly #info: PdfInfo;
   readonly #deterministic: boolean;
   readonly #lang: string | undefined;
-  readonly #conformance: "PDF/X-4" | undefined;
+  /** True when the file must be PDF/X-4. */
+  readonly #print: boolean;
+  /** The PDF/A flavour the file must be, if any. */
+  readonly #archive: { part: 2 | 3; level: "B" | "U" | "A" } | undefined;
+  /** True when the file must be PDF/UA-1. */
+  readonly #accessible: boolean;
+  readonly #structure: PdfStructElement | undefined;
+  readonly #structRoot: PdfRef | undefined;
+  /** The parent tree: for each key, the elements of a page's content or of an annotation. */
+  readonly #parents: PdfObject[] = [];
   readonly #outputIntent: OutputIntent | undefined;
+  #intentProfile: PdfRef | undefined;
+  #srgb: { name: string; ref: PdfRef } | undefined;
   readonly #spots: Map<string, { name: string; ref: PdfRef }> = new Map();
   readonly #destinations: Map<string, PdfObject> = new Map();
   readonly #bookmarks: { title: string; level: number; dest: PdfObject }[] = [];
@@ -82,18 +127,74 @@ export class PdfDocument {
     this.#info = options.info ?? {};
     this.#deterministic = options.deterministic ?? false;
     this.#lang = options.lang;
-    this.#conformance = options.conformance;
-    this.#outputIntent = options.outputIntent;
-    if (options.conformance === "PDF/X-4" && !options.outputIntent) {
+    const standards =
+      options.conformance === undefined
+        ? []
+        : typeof options.conformance === "string"
+          ? [options.conformance]
+          : [...options.conformance];
+    this.#print = standards.includes("PDF/X-4");
+    const archives = standards.filter((standard) => standard.startsWith("PDF/A"));
+    if (archives.length > 1) {
+      throw new Error(`A file can meet one PDF/A level, not ${archives.join(" and ")}`);
+    }
+    const archive = archives[0];
+    this.#archive = archive
+      ? {
+          part: archive.includes("-3") ? 3 : 2,
+          level: archive.endsWith("u") ? "U" : archive.endsWith("a") ? "A" : "B",
+        }
+      : undefined;
+    this.#accessible = standards.includes("PDF/UA-1");
+    if (this.#accessible) {
+      if (!options.info?.title) throw new Error("PDF/UA needs the document to have a title");
+      if (!options.lang) {
+        throw new Error('PDF/UA needs the language of the document, such as lang: "id"');
+      }
+    }
+    if (this.#print && !options.outputIntent) {
       throw new Error("PDF/X-4 needs an output intent: the ICC profile of the printing condition");
     }
+    // An archived file must say what its colours mean; without a printing condition, sRGB.
+    this.#outputIntent =
+      options.outputIntent ??
+      (archive ? { profile: srgbProfile(), identifier: "sRGB IEC61966-2.1" } : undefined);
     if (options.outputIntent) {
       const profile = options.outputIntent.profile;
       const signature = String.fromCharCode(...profile.subarray(36, 40));
       if (profile.length < 132 || signature !== "acsp")
         throw new Error("The output intent profile is not an ICC profile");
     }
+    if (archive && options.outputIntent) {
+      const profile = options.outputIntent.profile;
+      const deviceClass = String.fromCharCode(...profile.subarray(12, 16));
+      if (deviceClass !== "prtr" && deviceClass !== "mntr") {
+        throw new Error(
+          "PDF/A needs the output intent to be a printer or display profile; " +
+            `this one is of class "${deviceClass.trim()}"`,
+        );
+      }
+    }
     this.#pagesRef = this.writer.allocate();
+    if (options.tagged || this.#accessible || this.#archive?.level === "A") {
+      this.#structRoot = this.writer.allocate();
+      this.#structure = new PdfStructElement(this.writer, "Document", this.#structRoot, {});
+    }
+  }
+
+  /**
+   * The root of the document's logical structure, in a tagged document: add the document's
+   * paragraphs, headings and tables under it with `add()`, in reading order, and tie content
+   * to them with `page.beginContent(element)`.
+   */
+  get structure(): PdfStructElement {
+    if (!this.#structure) throw new Error("This document is not tagged: pass tagged: true");
+    return this.#structure;
+  }
+
+  /** Whether the document carries a logical structure. */
+  get tagged(): boolean {
+    return this.#structure !== undefined;
   }
 
   get pageCount(): number {
@@ -108,6 +209,17 @@ export class PdfDocument {
       fontResource: (font) => this.#fontResource(font),
       imageResource: (image) => this.#imageResource(image),
       spotColorResource: (color) => this.#spotColor(color),
+      defaultColorSpace: (space) => this.#defaultColorSpace(space),
+      ...(this.#structure
+        ? {
+            structure: {
+              nextKey: () => this.#parents.push(null) - 1,
+              setParent: (key, value) => {
+                this.#parents[key] = value;
+              },
+            },
+          }
+        : {}),
     };
   }
 
@@ -237,35 +349,56 @@ export class PdfDocument {
         Count: this.#pages.length,
       }),
     );
-    if (this.#conformance === "PDF/X-4") {
-      if (this.#usesStandardFonts) {
-        throw new Error(
-          "PDF/X-4 requires every font to be embedded; the 14 standard fonts cannot be used",
-        );
-      }
+    if ((this.#print || this.#archive || this.#accessible) && this.#usesStandardFonts) {
+      const standard = this.#print ? "PDF/X-4" : this.#archive ? "PDF/A" : "PDF/UA";
+      throw new Error(
+        `${standard} requires every font to be embedded; the 14 standard fonts cannot be used`,
+      );
+    }
+    if (this.#print) {
       for (const page of this.#pages) {
         if (!page.trimBox) throw new Error("PDF/X-4 requires a trim box on every page");
       }
     }
     const intent = this.#outputIntent;
+    // One entry per standard that reads it; they share the profile.
+    const purposes = [
+      ...(this.#print || !this.#archive ? ["GTS_PDFX"] : []),
+      ...(this.#archive ? ["GTS_PDFA1"] : []),
+    ];
     const outputIntents = intent
-      ? [
-          new PdfDict({
-            Type: new PdfName("OutputIntent"),
-            S: new PdfName("GTS_PDFX"),
-            OutputConditionIdentifier: PdfString.text(intent.identifier),
-            Info: PdfString.text(intent.info ?? intent.identifier),
-            RegistryName: PdfString.text(intent.registry ?? "http://www.color.org"),
-            DestOutputProfile: writer.add(
-              new PdfStream(intent.profile, new PdfDict({ N: iccComponents(intent.profile) })),
-            ),
-          }),
-        ]
+      ? purposes.map(
+          (purpose) =>
+            new PdfDict({
+              Type: new PdfName("OutputIntent"),
+              S: new PdfName(purpose),
+              OutputConditionIdentifier: PdfString.text(intent.identifier),
+              Info: PdfString.text(intent.info ?? intent.identifier),
+              RegistryName: PdfString.text(intent.registry ?? "http://www.color.org"),
+              DestOutputProfile: this.#profile(),
+            }),
+        )
       : undefined;
     const infoDict = this.#infoDict();
     const outline = this.#outline();
     const destinations =
       this.#destinations.size > 0 ? new PdfDict(Object.fromEntries(this.#destinations)) : undefined;
+    let structTree: PdfRef | undefined;
+    if (this.#structure && this.#structRoot) {
+      this.#structure.write();
+      structTree = this.#structRoot;
+      writer.set(
+        structTree,
+        new PdfDict({
+          Type: new PdfName("StructTreeRoot"),
+          K: this.#structure.ref,
+          ParentTree: writer.add(
+            new PdfDict({ Nums: this.#parents.flatMap((value, key) => [key, value]) }),
+          ),
+          ParentTreeNextKey: this.#parents.length,
+        }),
+      );
+    }
     const root = writer.add(
       new PdfDict({
         Type: new PdfName("Catalog"),
@@ -284,6 +417,11 @@ export class PdfDocument {
         Outlines: outline,
         // Open the bookmarks panel when the document has bookmarks.
         PageMode: outline ? new PdfName("UseOutlines") : undefined,
+        MarkInfo: structTree ? new PdfDict({ Marked: true }) : undefined,
+        StructTreeRoot: structTree,
+        // A reader announces the title rather than the file name.
+        ViewerPreferences:
+          structTree && this.#info.title ? new PdfDict({ DisplayDocTitle: true }) : undefined,
       }),
     );
     const info = writer.add(infoDict);
@@ -305,6 +443,40 @@ export class PdfDocument {
       this.#opacityStates.set(key, state);
     }
     return state;
+  }
+
+  /** The output intent's profile, written once. */
+  #profile(): PdfRef {
+    const intent = this.#outputIntent as OutputIntent;
+    this.#intentProfile ??= this.writer.add(
+      new PdfStream(intent.profile, new PdfDict({ N: iccComponents(intent.profile) })),
+    );
+    return this.#intentProfile;
+  }
+
+  /**
+   * In an archived file a plain colour must agree with the output intent or be read through
+   * a profile of its own. RGB can always be: sRGB is built in. CMYK has no such default.
+   */
+  #defaultColorSpace(space: "rgb" | "cmyk"): { name: string; ref: PdfRef } | undefined {
+    if (!this.#archive) return undefined;
+    const intent = this.#outputIntent as OutputIntent;
+    const components = iccComponents(intent.profile);
+    if (space === "cmyk") {
+      if (components === 4) return undefined;
+      throw new Error(
+        "PDF/A: CMYK and spot colours need a CMYK output intent (the profile of the printing condition)",
+      );
+    }
+    if (components === 3) return undefined;
+    this.#srgb ??= {
+      name: "DefaultRGB",
+      ref: this.writer.add([
+        new PdfName("ICCBased"),
+        this.writer.add(new PdfStream(srgbProfile(), new PdfDict({ N: 3 }))),
+      ]),
+    };
+    return this.#srgb;
   }
 
   /** One Separation colour space per ink, whatever tints of it are used. */
@@ -431,17 +603,30 @@ export class PdfDocument {
       lines.push(`<xmp:ModifyDate>${date(modified)}</xmp:ModifyDate>`);
       lines.push(`<xmp:MetadataDate>${date(modified)}</xmp:MetadataDate>`);
     }
-    if (this.#conformance === "PDF/X-4") {
+    if (this.#print) {
       lines.push("<pdfxid:GTS_PDFXVersion>PDF/X-4</pdfxid:GTS_PDFXVersion>");
       lines.push("<pdf:Trapped>False</pdf:Trapped>");
     }
+    if (this.#archive) {
+      lines.push(`<pdfaid:part>${this.#archive.part}</pdfaid:part>`);
+      lines.push(`<pdfaid:conformance>${this.#archive.level}</pdfaid:conformance>`);
+      // PDF/A accepts only properties it knows or that the file itself describes.
+      const described = extensionSchemas([
+        ...(this.#print ? [PDFX_SCHEMA, TRAPPED_SCHEMA] : []),
+        ...(this.#accessible ? [PDFUA_SCHEMA] : []),
+      ]);
+      if (described) lines.push(described);
+    }
+    if (this.#accessible) lines.push("<pdfuaid:part>1</pdfuaid:part>");
     const xml =
       '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>\n' +
       '<x:xmpmeta xmlns:x="adobe:ns:meta/">\n' +
       '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n' +
       '<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" ' +
       'xmlns:pdf="http://ns.adobe.com/pdf/1.3/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" ' +
-      'xmlns:pdfxid="http://www.npes.org/pdfx/ns/id/">\n' +
+      'xmlns:pdfxid="http://www.npes.org/pdfx/ns/id/" ' +
+      'xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/" ' +
+      'xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/">\n' +
       `${lines.join("\n")}\n` +
       "</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n" +
       '<?xpacket end="w"?>';
@@ -462,7 +647,7 @@ export class PdfDocument {
       Producer: PdfString.text(info.producer ?? "mbingpdf"),
       CreationDate: created && PdfString.date(created),
       ModDate: modified && PdfString.date(modified),
-      ...(this.#conformance === "PDF/X-4"
+      ...(this.#print
         ? { GTS_PDFXVersion: PdfString.text("PDF/X-4"), Trapped: new PdfName("False") }
         : {}),
     });
@@ -473,4 +658,71 @@ export class PdfDocument {
 function iccComponents(profile: Uint8Array): number {
   const space = String.fromCharCode(...profile.subarray(16, 20));
   return space === "CMYK" ? 4 : space === "GRAY" ? 1 : 3;
+}
+
+/** A group of metadata properties that PDF/A does not know and must be told about. */
+interface MetadataSchema {
+  readonly name: string;
+  readonly uri: string;
+  readonly prefix: string;
+  readonly properties: readonly {
+    readonly name: string;
+    readonly type: string;
+    readonly description: string;
+  }[];
+}
+
+const PDFX_SCHEMA: MetadataSchema = {
+  name: "PDF/X identification",
+  uri: "http://www.npes.org/pdfx/ns/id/",
+  prefix: "pdfxid",
+  properties: [
+    { name: "GTS_PDFXVersion", type: "Text", description: "The PDF/X version of the file" },
+  ],
+};
+
+const PDFUA_SCHEMA: MetadataSchema = {
+  name: "PDF/UA identification",
+  uri: "http://www.aiim.org/pdfua/ns/id/",
+  prefix: "pdfuaid",
+  properties: [{ name: "part", type: "Integer", description: "The part of PDF/UA the file meets" }],
+};
+
+const TRAPPED_SCHEMA: MetadataSchema = {
+  name: "Adobe PDF",
+  uri: "http://ns.adobe.com/pdf/1.3/",
+  prefix: "pdf",
+  properties: [{ name: "Trapped", type: "Text", description: "Whether the file has been trapped" }],
+};
+
+/** The XMP block that describes metadata properties from outside the PDF/A set. */
+function extensionSchemas(schemas: readonly MetadataSchema[]): string | undefined {
+  if (schemas.length === 0) return undefined;
+  const items = schemas.map((schema) => {
+    const properties = schema.properties
+      .map(
+        (property) =>
+          '<rdf:li rdf:parseType="Resource">' +
+          `<pdfaProperty:name>${property.name}</pdfaProperty:name>` +
+          `<pdfaProperty:valueType>${property.type}</pdfaProperty:valueType>` +
+          "<pdfaProperty:category>internal</pdfaProperty:category>" +
+          `<pdfaProperty:description>${property.description}</pdfaProperty:description>` +
+          "</rdf:li>",
+      )
+      .join("");
+    return (
+      '<rdf:li rdf:parseType="Resource">' +
+      `<pdfaSchema:schema>${schema.name}</pdfaSchema:schema>` +
+      `<pdfaSchema:namespaceURI>${schema.uri}</pdfaSchema:namespaceURI>` +
+      `<pdfaSchema:prefix>${schema.prefix}</pdfaSchema:prefix>` +
+      `<pdfaSchema:property><rdf:Seq>${properties}</rdf:Seq></pdfaSchema:property>` +
+      "</rdf:li>"
+    );
+  });
+  return (
+    '<pdfaExtension:schemas xmlns:pdfaExtension="http://www.aiim.org/pdfa/ns/extension/" ' +
+    'xmlns:pdfaSchema="http://www.aiim.org/pdfa/ns/schema#" ' +
+    'xmlns:pdfaProperty="http://www.aiim.org/pdfa/ns/property#">' +
+    `<rdf:Bag>${items.join("")}</rdf:Bag></pdfaExtension:schemas>`
+  );
 }

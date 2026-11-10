@@ -3,14 +3,17 @@ import {
   type AnyFont,
   type ContentStream,
   cmyk,
+  type LinkOptions,
   type PdfDocument,
   type PdfForm,
+  type PdfPage,
+  type PdfStructElement,
 } from "../core/index.ts";
-import type { DisplayItem, DisplayPage, PathCommand, SharedItem } from "./display.ts";
+import type { DisplayItem, DisplayPage, PathCommand, SharedItem, StructureTag } from "./display.ts";
 
 /** What links, anchors and headings turn into; they belong to a page, not to its drawing. */
 interface Hooks {
-  link(item: Extract<DisplayItem, { type: "link" }>): void;
+  link(item: Extract<DisplayItem, { type: "link" }>, options: LinkOptions): void;
   anchor(item: Extract<DisplayItem, { type: "anchor" }>): void;
   heading(item: Extract<DisplayItem, { type: "heading" }>): void;
 }
@@ -32,11 +35,82 @@ function formFor(document: PdfDocument, item: SharedItem): PdfForm {
     form = document.createForm([0, 0, item.width, item.height]);
     // Display items measure down from the top; a form measures up from its bottom.
     form.content.transform(1, 0, 0, -1, 0, item.height);
-    drawItems(document, form.content, item.items, NO_HOOKS);
+    drawItems(document, form.content, item.items, NO_HOOKS, undefined);
     form.end();
     forms.set(item.items, form);
   }
   return form;
+}
+
+/**
+ * The elements made so far for each document, by their parent and their key: an element that
+ * continues on a later page is found here and added to.
+ */
+const elements: WeakMap<PdfStructElement, Map<object, PdfStructElement>> = new WeakMap();
+
+/** The element a tagged item stands for: the one begun on an earlier page, or a new one. */
+function elementFor(parent: PdfStructElement, tag: StructureTag): PdfStructElement {
+  let known = elements.get(parent);
+  if (tag.key !== undefined && tag.continued) {
+    const begun = known?.get(tag.key);
+    if (begun) return begun;
+  }
+  const element = parent.add(tag.role as Exclude<StructureTag["role"], "Artifact">, {
+    ...(tag.alt !== undefined ? { alt: tag.alt } : {}),
+    ...(tag.scope !== undefined ? { scope: tag.scope } : {}),
+    ...(tag.colSpan !== undefined ? { colSpan: tag.colSpan } : {}),
+  });
+  if (tag.key !== undefined) {
+    if (!known) {
+      known = new Map();
+      elements.set(parent, known);
+    }
+    known.set(tag.key, element);
+  }
+  return element;
+}
+
+/**
+ * Keeps what is drawn on a tagged page inside marked content: each mark belongs either to an
+ * element of the structure or to an artifact. A run is opened when the first mark needs it
+ * and closed when the next one belongs elsewhere.
+ */
+class Marker {
+  readonly #page: PdfPage;
+  #open: PdfStructElement | StructureTag | undefined;
+
+  constructor(page: PdfPage) {
+    this.#page = page;
+  }
+
+  /** Makes sure the marks that follow belong to `owner`: an element, or an artifact's tag. */
+  enter(owner: PdfStructElement | StructureTag): void {
+    if (this.#open === owner) return;
+    this.close();
+    if ("add" in owner) this.#page.beginContent(owner);
+    else {
+      this.#page.beginArtifact(
+        owner.furniture ? { type: "Pagination", subtype: owner.furniture } : {},
+      );
+    }
+    this.#open = owner;
+  }
+
+  close(): void {
+    if (this.#open) this.#page.endContent();
+    this.#open = undefined;
+  }
+}
+
+const PLAIN_ARTIFACT: StructureTag = { role: "Artifact" };
+
+/** Where drawing stands in a tagged document. */
+interface Tagging {
+  readonly marker: Marker;
+  /** The element that content belongs to. */
+  readonly element: PdfStructElement;
+  /** Set inside an artifact: everything is furniture, whatever tags it carries. */
+  readonly artifact?: StructureTag;
 }
 
 function tracePath(content: ContentStream, commands: readonly PathCommand[]): void {
@@ -55,10 +129,17 @@ function drawItems(
   content: ContentStream,
   items: readonly DisplayItem[],
   hooks: Hooks,
+  tagging: Tagging | undefined,
 ): void {
+  // Rules, backgrounds and underlines are decoration, except inside a figure, where the
+  // shapes are the picture. Text and images are always content.
+  const shapes =
+    tagging?.artifact ?? (tagging?.element.role === "Figure" ? tagging.element : PLAIN_ARTIFACT);
+  const marks = tagging?.artifact ?? tagging?.element;
   for (const item of items) {
     switch (item.type) {
       case "path": {
+        tagging?.marker.enter(shapes);
         const stroke = item.stroke;
         if (stroke) {
           content.save().strokeColor(stroke.color).lineWidth(stroke.width);
@@ -77,6 +158,7 @@ function drawItems(
         break;
       }
       case "text":
+        if (marks) tagging?.marker.enter(marks);
         // The page is drawn with y pointing down; flipping the text matrix stands the glyphs
         // back upright.
         content
@@ -88,15 +170,27 @@ function drawItems(
           .endText();
         break;
       case "image":
+        if (marks) tagging?.marker.enter(marks);
         if (item.clip) {
           content.save().rect(item.clip.x, item.clip.y, item.clip.width, item.clip.height).clip();
         }
         content.image(item.image, item.x, item.y + item.height, item.width, -item.height);
         if (item.clip) content.restore();
         break;
-      case "link":
-        hooks.link(item);
+      case "link": {
+        if (!tagging) {
+          hooks.link(item, {});
+          break;
+        }
+        // A link's clickable area belongs to a Link element; one outside any (in a running
+        // foot, say) gets an element of its own.
+        const element =
+          tagging.element.role === "Link" && !tagging.artifact
+            ? tagging.element
+            : (document.structure as PdfStructElement).add("Link");
+        hooks.link(item, { element, description: item.url ?? `Go to ${item.target}` });
         break;
+      }
       case "anchor":
         hooks.anchor(item);
         break;
@@ -104,13 +198,29 @@ function drawItems(
         hooks.heading(item);
         break;
       case "group":
+        // A run of marked content may not straddle a change of graphics state.
+        tagging?.marker.close();
         content.save();
         if (item.rotate) content.rotate(item.rotate.degrees, item.rotate.cx, item.rotate.cy);
         if (item.opacity !== undefined) content.opacity(item.opacity);
-        drawItems(document, content, item.items, hooks);
+        drawItems(document, content, item.items, hooks, tagging);
+        tagging?.marker.close();
         content.restore();
         break;
+      case "tagged": {
+        if (!tagging || tagging.artifact) {
+          drawItems(document, content, item.items, hooks, tagging);
+          break;
+        }
+        const inner: Tagging =
+          item.tag.role === "Artifact"
+            ? { ...tagging, artifact: item.tag }
+            : { ...tagging, element: elementFor(tagging.element, item.tag) };
+        drawItems(document, content, item.items, hooks, inner);
+        break;
+      }
       case "shared":
+        if (marks) tagging?.marker.enter(marks);
         // Stored once in the file; here it is only placed. The form's origin is its bottom-left
         // corner, which sits `height × scale` below the item's top-left corner.
         content
@@ -151,6 +261,8 @@ export function writeDisplayPage(
       : {}),
   });
   const content = pdfPage.content;
+  const marker = document.tagged ? new Marker(pdfPage) : undefined;
+  const tagging: Tagging | undefined = marker ? { marker, element: document.structure } : undefined;
   // The display list measures from the top-left corner of the finished page; PDF measures
   // from the bottom-left corner of the sheet.
   content.transform(1, 0, 0, -1, offset, offset + page.height);
@@ -165,13 +277,20 @@ export function writeDisplayPage(
   // the sheet's own, which measure up from its bottom-left corner.
   const sheetX = (x: number): number => x + offset;
   const sheetY = (y: number): number => offset + page.height - y;
-  drawItems(document, content, page.items, {
-    link: (item) => {
+  const hooks: Hooks = {
+    link: (item, options) => {
       const bottom = sheetY(item.y + item.height);
       if (item.url !== undefined)
-        pdfPage.addLink(sheetX(item.x), bottom, item.width, item.height, item.url);
+        pdfPage.addLink(sheetX(item.x), bottom, item.width, item.height, item.url, options);
       else if (item.target !== undefined) {
-        pdfPage.addInternalLink(sheetX(item.x), bottom, item.width, item.height, item.target);
+        pdfPage.addInternalLink(
+          sheetX(item.x),
+          bottom,
+          item.width,
+          item.height,
+          item.target,
+          options,
+        );
       }
     },
     anchor: (item) => document.addDestination(item.id, pdfPage, sheetX(item.x), sheetY(item.y)),
@@ -179,13 +298,16 @@ export function writeDisplayPage(
       if (options.bookmarks !== false)
         document.addBookmark(item.title, item.level, pdfPage, sheetY(item.y));
     },
-  });
+  };
+  drawItems(document, content, page.items, hooks, tagging);
+  marker?.close();
   if (printed) content.restore();
 
   if (page.marks) {
     // Marks print on every plate: registration colour is all four process inks at full.
     const gap = bleed + 2 * MM;
     const length = 5 * MM;
+    marker?.enter(PLAIN_ARTIFACT);
     content
       .save()
       .strokeColor(cmyk(1, 1, 1, 1))
@@ -222,6 +344,7 @@ export function writeDisplayPage(
       }
     }
     content.restore();
+    marker?.close();
   }
   pdfPage.end();
 }

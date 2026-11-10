@@ -36,7 +36,7 @@ import {
 } from "../src/index.ts";
 import { renderSvg } from "../src/svg/index.ts";
 import { env, readFont } from "./harness/env.ts";
-import { extractText } from "./harness/render.ts";
+import { extractText, structureOutline } from "./harness/render.ts";
 
 const inter = new Font(readFont("Inter-Variable"));
 
@@ -206,6 +206,36 @@ describe("quick start guide", () => {
       ),
     );
     expect(pages[0]?.boxes[0]?.children?.map((box) => box.height)).toEqual([28, 11.2]);
+  });
+
+  test("for an archive, and for screen readers", async () => {
+    const photo = env.photo;
+    const ornament = env.photo;
+    const document = Document(
+      { title: "Laporan tahunan", lang: "id", font: inter },
+      Page(
+        Image({ src: photo, width: mm(60), alt: "Bus pariwisata di depan kantor" }),
+        Image({ src: ornament, width: mm(60), decorative: true }),
+        Stack({ role: "Sect" }, Heading({ level: 2 }, "Ketentuan"), Text("…")),
+      ),
+    );
+    const warnings: string[] = [];
+    const onWarning = (warning: { message: string }): number => warnings.push(warning.message);
+    const archived = await render(document, { conformance: "PDF/A-2b", onWarning });
+    const both = await render(document, { conformance: ["PDF/A-2a", "PDF/UA-1"], onWarning });
+    const tagged = await render(document, { tagged: true, onWarning });
+    expect(warnings).toEqual([]);
+    const text = (pdf: Uint8Array): string => new TextDecoder("latin1").decode(pdf);
+    expect(text(archived)).toContain("<pdfaid:part>2</pdfaid:part>");
+    expect(text(both)).toContain("<pdfuaid:part>1</pdfuaid:part>");
+    expect((await structureOutline(tagged))[0]).toEqual([
+      "Document",
+      "  Figure [Bus pariwisata di depan kantor]",
+      "  Sect",
+      "    H2: Ketentuan",
+      "    P: …",
+    ]);
+    expect(await structureOutline(archived)).toEqual([[]]);
   });
 
   test("preview, print, and diagnostics", async () => {

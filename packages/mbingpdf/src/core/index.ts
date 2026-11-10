@@ -16,6 +16,7 @@ export {
   type TextRenderingMode,
 } from "./content.ts";
 export {
+  type Conformance,
   type OutputIntent,
   PdfDocument,
   type PdfDocumentOptions,
@@ -35,10 +36,17 @@ export {
   PdfString,
   str,
 } from "./objects.ts";
-export { PdfForm, PdfPage, type PdfPageOptions } from "./page.ts";
+export { type LinkOptions, PdfForm, PdfPage, type PdfPageOptions } from "./page.ts";
 export { formatNumber, writeObject } from "./serialize.ts";
+export { srgbProfile } from "./srgb.ts";
 export { StandardFont } from "./standard-font.ts";
 export * as StandardFonts from "./standard-fonts.ts";
+export {
+  type ArtifactOptions,
+  PdfStructElement,
+  type StructureOptions,
+  type StructureRole,
+} from "./structure.ts";
 export {
   type Box,
   cm,

@@ -1,5 +1,5 @@
 /** Painting: turns laid-out boxes into the display list of a page. */
-import type { Color } from "../core/index.ts";
+import type { Color, PositionedGlyph } from "../core/index.ts";
 import type { TextFont } from "../text/index.ts";
 import { CanvasContext, roundedRectPath } from "./canvas.ts";
 import type { DisplayItem, PathCommand } from "./display.ts";
@@ -41,6 +41,17 @@ function translate(items: DisplayItem[], dx: number, dy: number): DisplayItem[] 
   });
 }
 
+const spaces: WeakMap<TextFont, PositionedGlyph | undefined> = new WeakMap();
+
+/** The glyph a font uses for a space, if it has one. */
+function spaceOf(font: TextFont): PositionedGlyph | undefined {
+  if (!spaces.has(font)) {
+    const glyph = font.shape?.(" ")[0];
+    spaces.set(font, glyph && glyph.id !== 0 ? glyph : undefined);
+  }
+  return spaces.get(font);
+}
+
 /**
  * Adds everything a box and its children draw to `items`.
  *
@@ -53,6 +64,14 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
   const { width, height } = box;
 
   let target = items;
+  if (box.tags) {
+    for (const tag of box.tags) {
+      const inside: DisplayItem[] = [];
+      target.push({ type: "tagged", tag, items: inside });
+      target = inside;
+    }
+  }
+  const tagged = box.tags !== undefined;
   if (box.opacity !== undefined || box.rotate) {
     const group: DisplayItem[] = [];
     items.push({
@@ -131,12 +150,32 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
   }
 
   if (box.text) {
+    const paragraph = target;
+    // In a tagged document the pieces of one link, which may run over lines, form one element.
+    let link: { to: string; items: DisplayItem[] } | undefined;
     for (const line of box.text.lines) {
       const baseline = y + box.text.y + line.baseline;
       for (const run of line.runs) {
         const runX = x + box.text.x + run.x;
         const color = run.style.color as Color;
+        const to = run.style.link ?? run.style.linkTo;
+        if (!tagged || to === undefined) {
+          target = paragraph;
+          link = undefined;
+        } else {
+          if (link?.to !== to) {
+            link = { to, items: [] };
+            paragraph.push({ type: "tagged", tag: { role: "Link" }, items: link.items });
+          }
+          target = link.items;
+        }
         if (run.glyphs.length > 0) {
+          // The space a line was broken at is not drawn. A reader that takes the text from
+          // the structure needs it back, or the words either side of the break run together.
+          const spaced =
+            tagged && run === line.runs.at(-1) && !line.hyphenated && !/\s$/.test(run.text)
+              ? spaceOf(run.font)
+              : undefined;
           target.push({
             type: "text",
             x: runX,
@@ -144,8 +183,8 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             font: run.font,
             size: run.size,
             color,
-            glyphs: run.glyphs,
-            text: run.text,
+            glyphs: spaced ? [...run.glyphs, { ...spaced, cluster: run.text.length }] : run.glyphs,
+            text: spaced ? `${run.text} ` : run.text,
           });
         }
         // Underline and strike-through follow the font's own metrics where it has them.
@@ -186,6 +225,7 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
         }
       }
     }
+    target = paragraph;
   }
 
   if (box.image) {

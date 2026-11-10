@@ -16,6 +16,16 @@ Every element is called as `Element(properties?, ...children)`. Properties are o
 | `opacity` | 0–1 | Transparency of the element and everything in it |
 | `id` | string | A name that `Link({ to })` can point to |
 
+### In a tagged PDF
+
+These say what an element is, for `render(document, { tagged: true })` and the standards built on it. They change nothing that is seen.
+
+| Property | Meaning |
+| --- | --- |
+| `alt` | A description that stands in for a picture. `Image`, `Svg` and `Canvas` are left out of the structure without one (with a warning); a `QrCode` is described by its value unless you say otherwise |
+| `decorative` | The element and everything in it is decoration and is skipped by screen readers. `alt: ""` does the same |
+| `role` | What the element is, when it is not what it looks like: on a `Text`, `"Caption"`, `"BlockQuote"` or `"Note"` instead of a paragraph; on a `Stack` or `Box`, a grouping such as `"Sect"`, `"Div"` or `"Figure"` |
+
 ### In a `Row`
 
 | Property | Meaning |
@@ -123,4 +133,34 @@ A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is f
 | `renderSvg(document)` from `mbingpdf/svg` | `string[]`, one SVG per page |
 | `inspect(document)` | every box on every page, as plain data |
 
-Options: `deterministic`, `compress`, `onWarning`, `strict`, `debug`, `minImageDpi`, `conformance: "PDF/X-4"`, `outputIntent: { profile, identifier }`.
+Options: `deterministic`, `compress`, `onWarning`, `strict`, `debug`, `minImageDpi`, `tagged`, `conformance`, `outputIntent: { profile, identifier }`.
+
+### Standards
+
+`conformance` takes one standard or a list, such as `["PDF/A-2a", "PDF/UA-1"]`. The file is checked as it is written, and what cannot be met is an error.
+
+| Standard | For | Needs |
+| --- | --- | --- |
+| `"PDF/X-4"` | Commercial printing | An `outputIntent`; every font embedded |
+| `"PDF/A-2b"`, `"PDF/A-2u"` | Archiving | Every font embedded. Colours are declared as sRGB unless an `outputIntent` says otherwise; CMYK and spot colours need a CMYK one |
+| `"PDF/A-2a"` | Archiving, with structure | The same, and the file is tagged |
+| `"PDF/A-3b"`, `"PDF/A-3u"`, `"PDF/A-3a"` | As PDF/A-2, for files that carry attachments | The same |
+| `"PDF/UA-1"` | Accessibility | A `title` and a `lang` on the `Document`; every font embedded; the file is tagged |
+
+### A tagged PDF
+
+With `tagged: true` the file carries the document's structure and reading order, which screen readers and reflowing viewers work from. It comes from the elements:
+
+| Element | In the structure |
+| --- | --- |
+| `Text` | A paragraph (`P`) |
+| `Heading` | `H1` to `H6`, by its `level` |
+| `Link` | A `Link`, with the address as its description |
+| `List` | A list (`L`) of items (`LI`), each a label (`Lbl`) and a body (`LBody`) |
+| `Table` | A `Table` of rows (`TR`) of header cells (`TH`, for the `header` rows) and data cells (`TD`). A header repeated on later pages counts once |
+| `TableOfContents` | A `TOC` of entries (`TOCI`) |
+| `Image`, `Svg`, `QrCode`, `Canvas` | A `Figure` with its `alt` |
+| `Stack`, `Row`, `Box`, `Grid`, `Columns` | Nothing, unless given a `role`; their children are read in the order they are written |
+| Page `header`, `footer`, `background`, `fill`; borders, backgrounds, rules | Artifacts: drawn, but not part of the text |
+
+An element that runs over several pages is one element. Words hyphenated at a line end are read with their hyphen.

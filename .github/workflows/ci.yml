@@ -34,7 +34,10 @@ jobs:
       - run: pnpm typecheck
       # Built before the tests: the command-line tests run the built packages.
       - run: pnpm build
+      # veraPDF validates the PDF/A and PDF/UA output. One job is enough; the others skip it.
       - run: pnpm test
+        env:
+          VERAPDF: ${{ matrix.node == 24 && 'required' || '' }}
       - name: Upload image diffs
         if: failure()
         uses: actions/upload-artifact@v4

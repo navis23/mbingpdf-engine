@@ -1,5 +1,5 @@
 /** From a document tree to pages, and from pages to a PDF file. */
-import { type OutputIntent, orientedSize, PdfDocument } from "../core/index.ts";
+import { type Conformance, type OutputIntent, orientedSize, PdfDocument } from "../core/index.ts";
 import type { DisplayItem, DisplayPage } from "./display.ts";
 import {
   type Box,
@@ -24,7 +24,7 @@ import type { Child, DocumentProps, LayoutNode, PageInfo, PageProps } from "./ty
 
 export interface LayoutWarning {
   /** What kind of problem this is. */
-  readonly code: "missing-glyph" | "low-resolution-image";
+  readonly code: "missing-glyph" | "low-resolution-image" | "missing-alt-text";
   readonly message: string;
   /** Where in the document the problem was first met: `Document > Page[0] > Text[2]`. */
   readonly path?: string;
@@ -41,14 +41,24 @@ export interface RenderOptions {
   /** Called for problems that do not stop the document from being made. */
   onWarning?: (warning: LayoutWarning) => void;
   /**
-   * A standard the file must meet. `"PDF/X-4"`, for commercial printing, needs an
-   * `outputIntent`, embedded fonts throughout, and is checked when the file is written.
+   * A standard the file must meet, or a list of them. `"PDF/X-4"` is for commercial printing
+   * and needs an `outputIntent`; `"PDF/A-2b"` and its relatives are for archiving. All of them
+   * need embedded fonts throughout, and are checked when the file is written.
    */
-  conformance?: "PDF/X-4";
-  /** The printing condition the document is prepared for: an ICC profile and its name. */
+  conformance?: Conformance | readonly Conformance[];
+  /**
+   * The printing condition the document is prepared for: an ICC profile and its name.
+   * Optional for PDF/A, which is taken to be sRGB without one.
+   */
   outputIntent?: OutputIntent;
   /** Warn about images that would print below this resolution, such as 300. */
   minImageDpi?: number;
+  /**
+   * Make a tagged PDF: the file carries the document's structure (headings, paragraphs,
+   * lists, tables, figures) and reading order, for screen readers and for text that reflows.
+   * Give pictures an `alt`. Implied by `"PDF/UA-1"` and the `a` levels of PDF/A.
+   */
+  tagged?: boolean;
   /** Treat warnings as errors: the first one stops the render. */
   strict?: boolean;
   /** Outline every element's box, to see how a layout is put together. */
@@ -113,6 +123,7 @@ function layoutPass(
   options: {
     minImageDpi?: number;
     debug?: boolean;
+    tagged?: boolean;
     onBoxes?: (page: number, boxes: InspectedBox[]) => void;
   },
   toc: readonly TocEntry[],
@@ -126,6 +137,7 @@ function layoutPass(
     toc,
     headingCount: 0,
     usesToc: false,
+    ...(options.tagged ? { tagged: true } : {}),
   };
   // The theme's "body" style, if it has one, is the document's default text.
   const theme = (document.props as DocumentProps).theme;
@@ -217,6 +229,18 @@ function layoutPass(
     } while (state !== undefined);
   }
 
+  // In a tagged document, running heads, feet and backgrounds are furniture, not text.
+  const furnish = (painted: DisplayItem[], furniture?: "Header" | "Footer"): DisplayItem[] =>
+    options.tagged && painted.length > 0
+      ? [
+          {
+            type: "tagged",
+            tag: { role: "Artifact", ...(furniture ? { furniture } : {}) },
+            items: painted,
+          },
+        ]
+      : painted;
+
   // Second pass: now that the page count is known, add headers, footers and backgrounds.
   const buildPage = (plan: PlannedPage, index: number): DisplayPage => {
     const props = plan.page.props as PageProps;
@@ -251,7 +275,7 @@ function layoutPass(
       if (box) {
         const painted: DisplayItem[] = [];
         paintBox(box, 0, 0, painted);
-        items.push(...shiftItems(painted, -bleed, -bleed));
+        items.push(...furnish(shiftItems(painted, -bleed, -bleed)));
       }
       sink.page = { width: plan.width, height: plan.height };
     }
@@ -261,7 +285,11 @@ function layoutPass(
       contentWidth,
       contentHeight,
     );
-    if (header) paintBox(header, margin.left, margin.top, items);
+    if (header) {
+      const painted: DisplayItem[] = [];
+      paintBox(header, margin.left, margin.top, painted);
+      items.push(...furnish(painted, "Header"));
+    }
     if (plan.body) paintBox(plan.body, 0, 0, items);
     const placed: [Box, number, number][] = [];
     if (header) placed.push([header, margin.left, margin.top]);
@@ -272,7 +300,11 @@ function layoutPass(
       contentWidth,
       contentHeight,
     );
-    if (footer) paintBox(footer, margin.left, plan.height - margin.bottom - footer.height, items);
+    if (footer) {
+      const painted: DisplayItem[] = [];
+      paintBox(footer, margin.left, plan.height - margin.bottom - footer.height, painted);
+      items.push(...furnish(painted, "Footer"));
+    }
     if (footer) placed.push([footer, margin.left, plan.height - margin.bottom - footer.height]);
     if (options.debug) {
       // Outline every box, nested boxes in fainter lines.
@@ -321,7 +353,7 @@ function layoutPass(
     if (minDpi === undefined) return;
     const visit = (list: readonly DisplayItem[], pageNumber: number): void => {
       for (const item of list) {
-        if (item.type === "group") visit(item.items, pageNumber);
+        if (item.type === "group" || item.type === "tagged") visit(item.items, pageNumber);
         else if (item.type === "image" && !reported.has(item.image)) {
           const size = orientedSize(item.image);
           const dpi = Math.min((size.width * 72) / item.width, (size.height * 72) / item.height);
@@ -341,7 +373,7 @@ function layoutPass(
   const headings: TocEntry[] = [];
   const collectHeadings = (list: readonly DisplayItem[], pageNumber: number): void => {
     for (const item of list) {
-      if (item.type === "group") collectHeadings(item.items, pageNumber);
+      if (item.type === "group" || item.type === "tagged") collectHeadings(item.items, pageNumber);
       else if (item.type === "heading") {
         headings.push({ title: item.title, level: item.level, id: item.id, page: pageNumber });
       }
@@ -371,6 +403,15 @@ function layoutPass(
     });
   }
   for (const message of lowResolution) warnings.push({ code: "low-resolution-image", message });
+  if (sink.missingAlt !== undefined) {
+    warnings.push({
+      code: "missing-alt-text",
+      message:
+        "A picture has no description, so it is left out of the document's structure. " +
+        "Give it an `alt`, or mark it `decorative`.",
+      path: sink.missingAlt,
+    });
+  }
 
   return { pages, warnings, usesToc: sink.usesToc, headings };
 }
@@ -459,6 +500,8 @@ function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): Disp
         };
       case "shared":
         return { ...item, x: item.x + dx, y: item.y + dy };
+      case "tagged":
+        return { ...item, items: shiftItems(item.items, dx, dy) };
       case "group":
         return {
           ...item,
@@ -491,9 +534,22 @@ function renderSync(document: LayoutNode, options: RenderOptions = {}): Uint8Arr
     const value = props[key];
     if (value !== undefined) info[key] = value;
   }
+  const standards =
+    options.conformance === undefined
+      ? []
+      : typeof options.conformance === "string"
+        ? [options.conformance]
+        : options.conformance;
+  const tagged =
+    options.tagged === true ||
+    standards.some(
+      (standard) =>
+        standard === "PDF/UA-1" || (standard.startsWith("PDF/A") && standard.endsWith("a")),
+    );
   const layoutOptions = {
     ...(options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {}),
     ...(options.debug ? { debug: true } : {}),
+    ...(tagged ? { tagged: true } : {}),
   };
   // Each page is written as soon as it is painted. A table of contents needs its page numbers
   // from a finished layout, so such a document is written again until they agree.
@@ -506,6 +562,7 @@ function renderSync(document: LayoutNode, options: RenderOptions = {}): Uint8Arr
       ...(props.lang !== undefined ? { lang: props.lang } : {}),
       ...(options.conformance ? { conformance: options.conformance } : {}),
       ...(options.outputIntent ? { outputIntent: options.outputIntent } : {}),
+      ...(tagged ? { tagged: true } : {}),
     });
     const result = layoutPass(document, layoutOptions, toc, (page) =>
       writeDisplayPage(pdf, page, { boxes: options.conformance !== undefined }),

@@ -331,6 +331,7 @@ export function layoutTable(
     height: number,
     split: boolean,
     resume: unknown[] | undefined,
+    header = false,
   ): PlacedRow | undefined => {
     const results = row.cells.map((cell, i) => {
       if (resume && resume[i] === undefined) return undefined;
@@ -357,9 +358,24 @@ export function layoutTable(
       children: [],
     };
     if (row.background) box.background = row.background;
+    if (sink.tagged) {
+      box.tags = [{ role: "TR", key: row, ...(resume ? { continued: true } : {}) }];
+    }
     row.cells.forEach((cell, i) => {
       const cellBox = results[i]?.box;
       if (!cellBox) return;
+      if (sink.tagged) {
+        cellBox.tags = [
+          {
+            role: header ? "TH" : "TD",
+            key: cell,
+            ...(resume?.[i] !== undefined ? { continued: true } : {}),
+            ...(header ? { scope: "Column" as const } : {}),
+            ...(cell.span > 1 ? { colSpan: cell.span } : {}),
+          },
+          ...(cellBox.tags ?? []),
+        ];
+      }
       // The cell fills the row; its content moves down inside it for middle and bottom.
       const slack = rowHeight - cellBox.height;
       const shift =
@@ -420,9 +436,11 @@ export function layoutTable(
   const withHeader = model.header.length > 0 && (first || props.repeatHeader !== false);
   const headerRows = withHeader
     ? model.header.map(
-        (row) => layoutRow(row, Number.POSITIVE_INFINITY, false, undefined) as PlacedRow,
+        (row) => layoutRow(row, Number.POSITIVE_INFINITY, false, undefined, true) as PlacedRow,
       )
     : [];
+  // A header repeated on a later page is there for the eye; the table has it once.
+  if (!first) for (const row of headerRows) row.box.tags &&= [{ role: "Artifact" }];
   const footerRows = model.footer.map(
     (row) => layoutRow(row, Number.POSITIVE_INFINITY, false, undefined) as PlacedRow,
   );
@@ -501,6 +519,8 @@ export function layoutTable(
       // The rows are done but the footer does not fit: it goes on the next page.
       next = { widths, row: model.body.length, cells: undefined };
     } else if (footerRows.length > 0) {
+      // Likewise a footer repeated before the table's end.
+      if (!finished) for (const row of footerRows) row.box.tags &&= [{ role: "Artifact" }];
       rule(model.lines.footer);
       footerRows.forEach((row, i) => {
         if (i > 0) rule(model.lines.horizontal);

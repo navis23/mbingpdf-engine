@@ -3,7 +3,7 @@ import type { Color } from "./color.ts";
 import type { FontProgram } from "./embedded-font.ts";
 import type { PositionedGlyph } from "./glyph-run.ts";
 import { orientationMatrix, type PdfImage } from "./image.ts";
-import { PdfName, type PdfRef } from "./objects.ts";
+import { type PdfDict, PdfName, type PdfRef } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 import type { StandardFont } from "./standard-font.ts";
 
@@ -41,6 +41,8 @@ export interface ContentResources {
   spotColor(color: Extract<Color, { space: "spot" }>): string;
   /** Registers a form with the page and returns its resource name. */
   form(form: FormResource): string;
+  /** Told whenever a plain RGB or CMYK colour is set, for documents that must tie it to a profile. */
+  deviceColor?(space: "rgb" | "cmyk"): void;
 }
 
 /** A drawing kept as an object of its own in the file, to be placed any number of times. */
@@ -110,6 +112,8 @@ export class ContentStream {
   /** The text state at each save() level; the last entry is the current one. */
   readonly #text: TextState[] = [{ font: undefined, size: 0, rise: 0 }];
   #inText = false;
+  /** How many runs of marked content are open. */
+  #marked = 0;
 
   constructor(resources?: ContentResources) {
     this.#resources = resources;
@@ -438,6 +442,28 @@ export class ContentStream {
 
   // ----- escape hatch and output -----
 
+  /**
+   * Starts a run of marked content: operators up to the matching {@link endMarkedContent}
+   * belong together under `tag`, with optional properties (`BDC`, or `BMC` without any).
+   */
+  beginMarkedContent(tag: string, properties?: PdfDict): this {
+    this.#noText("beginMarkedContent()");
+    this.#marked++;
+    if (!properties) return this.#op("BMC", this.#name(tag));
+    this.#out.ascii(`${this.#name(tag)} `);
+    writeObject(this.#out, properties);
+    this.#out.byte(0x20);
+    return this.#op("BDC");
+  }
+
+  /** Ends the run of marked content begun last (`EMC`). */
+  endMarkedContent(): this {
+    this.#noText("endMarkedContent()");
+    if (this.#marked === 0) throw new Error("endMarkedContent() without a matching begin");
+    this.#marked--;
+    return this.#op("EMC");
+  }
+
   /** Appends operators verbatim. */
   raw(operators: string): this {
     this.#out.ascii(operators);
@@ -451,6 +477,7 @@ export class ContentStream {
     if (this.#text.length !== 1) {
       throw new Error(`${this.#text.length - 1} save() call(s) without a matching restore()`);
     }
+    if (this.#marked !== 0) throw new Error("beginMarkedContent() without a matching end");
     return this.#out.toBytes();
   }
 
@@ -459,8 +486,10 @@ export class ContentStream {
       case "gray":
         return this.#op(stroking ? "G" : "g", n(color.gray));
       case "rgb":
+        this.#resources?.deviceColor?.("rgb");
         return this.#op(stroking ? "RG" : "rg", n(color.r), n(color.g), n(color.b));
       case "cmyk":
+        this.#resources?.deviceColor?.("cmyk");
         return this.#op(stroking ? "K" : "k", n(color.c), n(color.m), n(color.y), n(color.k));
       case "spot": {
         if (!this.#resources)

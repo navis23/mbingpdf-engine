@@ -15,7 +15,7 @@ import {
   type TextLine,
 } from "../text/index.ts";
 import type { CanvasContext } from "./canvas.ts";
-import type { DisplayItem } from "./display.ts";
+import type { DisplayItem, StructureTag } from "./display.ts";
 import {
   borderWidths,
   inherit,
@@ -101,6 +101,11 @@ export interface Box {
   id?: string;
   /** Set on the first box of a heading: its level and its title for bookmarks. */
   heading?: { level: number; title: string };
+  /**
+   * In a tagged document: what the box is in the document's structure. Several when one box
+   * stands for nested elements (a table cell holding a paragraph), outermost first.
+   */
+  tags?: StructureTag[];
 }
 
 /** The space an element is laid out in. */
@@ -148,6 +153,10 @@ export interface LayoutSink {
   usesToc: boolean;
   /** Size of the page being laid out, for elements positioned against it. */
   page: { width: number; height: number };
+  /** Note what each box is in the document's structure, for a tagged PDF. */
+  tagged?: boolean;
+  /** Where the first picture without a description was met, in a tagged document. */
+  missingAlt?: string;
 }
 
 /** Marks "not started; try again on the next page". */
@@ -1096,11 +1105,15 @@ function expandToc(
     children: entries.map(
       (entry): LayoutNode => ({
         type: "Row",
-        props: { gap: 4, align: "end", keepTogether: true },
+        props: { gap: 4, align: "end", keepTogether: true, role: "TOCI" },
         children: [
           {
             type: "Text",
-            props: { margin: { left: (indent ?? 12) * (entry.level - from) }, shrink: 1 },
+            props: {
+              margin: { left: (indent ?? 12) * (entry.level - from) },
+              shrink: 1,
+              role: "Reference",
+            },
             children: [{ type: "Span", props: { to: entry.id }, children: [entry.title] }],
           },
           leaders === false
@@ -1110,6 +1123,7 @@ function expandToc(
                 props: {
                   width: 0,
                   grow: 1,
+                  decorative: true,
                   height: leaderHeight,
                   // Dots: dashes of no length with round ends.
                   draw: (g: CanvasContext, size: { width: number; height: number }) => {
@@ -1124,7 +1138,7 @@ function expandToc(
               },
           {
             type: "Text",
-            props: { shrink: 0, features: { tnum: true } },
+            props: { shrink: 0, features: { tnum: true }, role: "Reference" },
             children: [{ type: "Span", props: { to: entry.id }, children: [String(entry.page)] }],
           },
         ],
@@ -1317,11 +1331,15 @@ function expandList(node: LayoutNode<"List">, context: TextContext): LayoutNode 
         props: {
           gap: markerGap ?? own.size / 2,
           align: "start",
+          role: "LI",
           ...(splitItems ? {} : { keepTogether: true }),
         },
         children: [
-          { ...(markerNodes[i] as LayoutNode), props: { align: "right", width, shrink: 0 } },
-          { type: "Stack", props: { grow: 1, basis: 0 }, children: [item] },
+          {
+            ...(markerNodes[i] as LayoutNode),
+            props: { align: "right", width, shrink: 0, role: "Lbl" },
+          },
+          { type: "Stack", props: { grow: 1, basis: 0, role: "LBody" }, children: [item] },
         ],
       }),
     ),
@@ -1430,8 +1448,66 @@ export function layout(
   sink: LayoutSink,
 ): LayoutResult {
   const result = layoutNode(node, context, area, state, sink);
-  if (result.box && result.box.kind === undefined) result.box.kind = node.type;
+  if (result.box) {
+    if (result.box.kind === undefined) result.box.kind = node.type;
+    if (sink.tagged) {
+      const tag = tagOf(node, state !== undefined && state !== RETRY, sink);
+      if (tag) result.box.tags = [tag, ...(result.box.tags ?? [])];
+    }
+  }
   return result;
+}
+
+/** What an element is in the structure of a tagged document, if anything. */
+function tagOf(node: LayoutNode, continued: boolean, sink: LayoutSink): StructureTag | undefined {
+  const props = node.props as BoxProps;
+  // An empty description is the usual way to say "this is decoration".
+  if (props.decorative || props.alt === "") return { role: "Artifact" };
+  let role = props.role;
+  let alt = props.alt;
+  if (role === undefined) {
+    switch (node.type) {
+      case "Text":
+        role = "P";
+        break;
+      case "Heading": {
+        const level = Math.min(6, Math.max(1, Math.floor((props as HeadingProps).level ?? 1)));
+        role = `H${level as 1 | 2 | 3 | 4 | 5 | 6}`;
+        break;
+      }
+      case "Table":
+        role = "Table";
+        break;
+      case "List":
+        role = "L";
+        break;
+      case "TableOfContents":
+        role = "TOC";
+        break;
+      case "QrCode":
+        alt ??= `QR code: ${(props as QrCodeProps).value}`;
+        role = "Figure";
+        break;
+      case "Image":
+      case "Svg":
+      case "Canvas":
+        if (alt === undefined) {
+          // Nothing says what the picture shows: leave it out of the structure, and say so.
+          sink.missingAlt ??= sink.path.join(" > ");
+          return { role: "Artifact" };
+        }
+        role = "Figure";
+        break;
+      default:
+        return undefined;
+    }
+  }
+  return {
+    role,
+    key: node,
+    ...(continued ? { continued: true } : {}),
+    ...(alt !== undefined ? { alt } : {}),
+  };
 }
 
 function layoutNode(
