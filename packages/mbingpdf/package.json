@@ -1,0 +1,45 @@
+{
+  "name": "mbingpdf",
+  "version": "0.0.0",
+  "description": "Generate production-grade PDF documents in any JavaScript runtime.",
+  "license": "MIT",
+  "author": "Navis Zarkasy",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/navis23/mbingpdf-engine.git",
+    "directory": "packages/mbingpdf"
+  },
+  "keywords": [
+    "pdf",
+    "pdf-generation",
+    "typescript",
+    "layout",
+    "print"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "import": "./dist/core/index.js",
+      "require": "./dist/core/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
