@@ -210,7 +210,7 @@ export function pageToSvg(page: DisplayPage): string {
  * Text in embedded fonts is drawn as shapes. Text in the 14 standard fonts, which have no
  * shapes to draw, uses the viewer's closest font and may differ slightly.
  */
-export function renderSvg(document: LayoutNode<"Document"> | DocumentLayout): string[] {
+export function renderSvg(document: LayoutNode | DocumentLayout): string[] {
   const layout = "pages" in document ? document : layoutDocument(document);
   return layout.pages.map(pageToSvg);
 }

@@ -93,6 +93,8 @@ export interface Box {
     y: number;
     scale: number;
   };
+  /** The kind of element the box belongs to, for `inspect()` and the debug overlay. */
+  kind?: string;
   /** The name links use to point at this box. */
   id?: string;
   /** Set on the first box of a heading: its level and its title for bookmarks. */
@@ -132,7 +134,10 @@ export interface TocEntry {
 }
 
 export interface LayoutSink {
-  missingCharacters: Set<string>;
+  /** Characters no font could show, with the element they were first found in. */
+  missingCharacters: Map<string, string>;
+  /** Where layout is in the tree, as a list such as `["Page[0]", "Stack[2]", "Text[0]"]`. */
+  path: string[];
   /** Headings found by the previous layout pass, for tables of contents to list. */
   toc: readonly TocEntry[];
   /** Counts headings in this pass, to give each a stable anchor name. */
@@ -155,11 +160,13 @@ export class LayoutError extends Error {
 export function normalize(children: readonly Child[]): LayoutNode[] {
   const out: LayoutNode[] = [];
   const visit = (child: Child): void => {
-    if (child === null || child === undefined || child === false) return;
+    if (child === null || child === undefined || typeof child === "boolean") return;
     if (typeof child === "string" || typeof child === "number") {
       out.push({ type: "Text", props: {}, children: [child] });
     } else if (Array.isArray(child)) {
       for (const item of child as readonly Child[]) visit(item);
+    } else if ((child as LayoutNode).type === "Fragment") {
+      for (const item of (child as LayoutNode).children) visit(item);
     } else {
       out.push(child as LayoutNode);
     }
@@ -241,11 +248,13 @@ function collectSpans(
   linkTo?: string,
 ): void {
   const visit = (child: Child): void => {
-    if (child === null || child === undefined || child === false) return;
+    if (child === null || child === undefined || typeof child === "boolean") return;
     if (typeof child === "string" || typeof child === "number") {
       out.push({ text: String(child), style: inlineStyle(context, link, linkTo) });
     } else if (Array.isArray(child)) {
       for (const item of child as readonly Child[]) visit(item);
+    } else if ((child as LayoutNode).type === "Fragment") {
+      for (const item of (child as LayoutNode).children) visit(item);
     } else {
       const element = child as LayoutNode;
       if (element.type !== "Span") {
@@ -510,6 +519,7 @@ function layoutStack(
     const fresh = area.fresh && placed.length === 0;
     const childAlign = boxProps(child).alignSelf ?? align;
     const resuming = childState !== undefined && childState !== RETRY;
+    sink.path.push(`${child.type}[${index}]`);
     let result = layout(
       child,
       own,
@@ -522,6 +532,7 @@ function layoutStack(
       childState,
       sink,
     );
+    sink.path.pop();
     // An element that must stay whole goes to the next page instead of being split.
     if (result.state !== undefined && result.box && keepsTogether(child) && !fresh && !resuming) {
       result = { state: RETRY };
@@ -529,7 +540,7 @@ function layoutStack(
     if (!result.box) {
       if (fresh) {
         throw new LayoutError(
-          `A ${child.type} element does not fit on an empty page and cannot be split`,
+          `A ${child.type} element does not fit on an empty page and cannot be split (at ${[...sink.path, `${child.type}[${index}]`].join(" > ")})`,
         );
       }
       next = { index, child: result.state ?? RETRY, broke: true };
@@ -831,9 +842,13 @@ function layoutText(
     decorate(box, node, decoration, { top: false, bottom: false });
     return { box };
   }
-  if (first)
-    for (const character of paragraph.missingCharacters) sink.missingCharacters.add(character);
-
+  if (first) {
+    for (const character of paragraph.missingCharacters) {
+      if (!sink.missingCharacters.has(character)) {
+        sink.missingCharacters.set(character, sink.path.join(" > "));
+      }
+    }
+  }
   const lines = paragraph.lines;
   const from = state?.line ?? 0;
   const origin = lines[from]?.top ?? 0;
@@ -1405,6 +1420,18 @@ function layoutQrCode(node: LayoutNode<"QrCode">, context: TextContext, area: Ar
  * @param state what a previous call returned, to continue the element on a new page
  */
 export function layout(
+  node: LayoutNode,
+  context: TextContext,
+  area: Area,
+  state: unknown,
+  sink: LayoutSink,
+): LayoutResult {
+  const result = layoutNode(node, context, area, state, sink);
+  if (result.box && result.box.kind === undefined) result.box.kind = node.type;
+  return result;
+}
+
+function layoutNode(
   node: LayoutNode,
   context: TextContext,
   area: Area,

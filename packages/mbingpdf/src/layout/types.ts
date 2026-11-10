@@ -450,6 +450,8 @@ interface PropsByType {
   TableOfContents: TableOfContentsProps;
   Columns: ColumnsProps;
   PageBreak: Record<string, never>;
+  /** A list of children with no box of its own; what a JSX fragment becomes. */
+  Fragment: Record<string, never>;
 }
 
 export type NodeType = keyof PropsByType;
@@ -463,6 +465,6 @@ export interface LayoutNode<T extends NodeType = NodeType> {
 
 /**
  * Anything that may appear in a list of children. Strings and numbers are text; `null`,
- * `undefined` and `false` are skipped, so `condition && Text(...)` works.
+ * `undefined`, `false` and `true` are skipped, so `condition && Text(...)` works.
  */
-export type Child = LayoutNode | string | number | null | undefined | false | readonly Child[];
+export type Child = LayoutNode | string | number | boolean | null | undefined | readonly Child[];

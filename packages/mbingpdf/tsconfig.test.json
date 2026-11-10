@@ -5,6 +5,7 @@
     "isolatedDeclarations": false,
     "declaration": false,
     "resolveJsonModule": true,
+    "jsx": "react-jsx",
     "noPropertyAccessFromIndexSignature": false
   },
   "include": ["src", "test", "tsdown.config.ts"]

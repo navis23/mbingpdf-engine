@@ -31,6 +31,8 @@ export {
 export { LayoutError } from "./engine.ts";
 export {
   type DocumentLayout,
+  type InspectedBox,
+  inspect,
   type LayoutWarning,
   layoutDocument,
   type Render,

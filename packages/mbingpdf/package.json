@@ -56,6 +56,14 @@
       "import": "./dist/text/index.js",
       "require": "./dist/text/index.cjs"
     },
+    "./jsx-runtime": {
+      "import": "./dist/jsx-runtime.js",
+      "require": "./dist/jsx-runtime.cjs"
+    },
+    "./jsx-dev-runtime": {
+      "import": "./dist/jsx-dev-runtime.js",
+      "require": "./dist/jsx-dev-runtime.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

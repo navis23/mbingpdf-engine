@@ -20,12 +20,14 @@ import {
   toSides,
   useTheme,
 } from "./style.ts";
-import type { Child, LayoutNode, PageInfo, PageProps } from "./types.ts";
+import type { Child, DocumentProps, LayoutNode, PageInfo, PageProps } from "./types.ts";
 
 export interface LayoutWarning {
   /** What kind of problem this is. */
   readonly code: "missing-glyph" | "low-resolution-image";
   readonly message: string;
+  /** Where in the document the problem was first met: `Document > Page[0] > Text[2]`. */
+  readonly path?: string;
 }
 
 export interface RenderOptions {
@@ -47,6 +49,10 @@ export interface RenderOptions {
   outputIntent?: OutputIntent;
   /** Warn about images that would print below this resolution, such as 300. */
   minImageDpi?: number;
+  /** Treat warnings as errors: the first one stops the render. */
+  strict?: boolean;
+  /** Outline every element's box, to see how a layout is put together. */
+  debug?: boolean;
 }
 
 /** The result of laying out a document: its pages, ready for any backend. */
@@ -70,16 +76,16 @@ function furniture(
   source: Child | ((info: PageInfo) => Child) | undefined,
   info: PageInfo,
 ): LayoutNode | undefined {
-  if (source === undefined || source === null || source === false) return undefined;
+  if (source === undefined || source === null || typeof source === "boolean") return undefined;
   const content = typeof source === "function" ? source(info) : source;
-  if (content === undefined || content === null || content === false) return undefined;
+  if (content === undefined || content === null || typeof content === "boolean") return undefined;
   return { type: "Stack", props: {}, children: [content] };
 }
 
 /** Lays out a document into pages of drawing instructions, without writing a file. */
 export function layoutDocument(
-  document: LayoutNode<"Document">,
-  options: { minImageDpi?: number } = {},
+  document: LayoutNode,
+  options: { minImageDpi?: number; debug?: boolean } = {},
 ): DocumentLayout {
   if (document?.type !== "Document") throw new LayoutError("render() needs a Document element");
   // A table of contents shows page numbers that are only known once the document is laid out,
@@ -103,24 +109,29 @@ export function layoutDocument(
 
 /** One run of layout, given the headings found by the run before. */
 function layoutPass(
-  document: LayoutNode<"Document">,
-  options: { minImageDpi?: number },
+  document: LayoutNode,
+  options: {
+    minImageDpi?: number;
+    debug?: boolean;
+    onBoxes?: (page: number, boxes: InspectedBox[]) => void;
+  },
   toc: readonly TocEntry[],
   consume?: (page: DisplayPage) => void,
 ): DocumentLayout & { usesToc: boolean; headings: TocEntry[] } {
   const lowResolution: string[] = [];
   const sink: LayoutSink = {
-    missingCharacters: new Set(),
+    missingCharacters: new Map(),
+    path: ["Document"],
     page: { width: 0, height: 0 },
     toc,
     headingCount: 0,
     usesToc: false,
   };
   // The theme's "body" style, if it has one, is the document's default text.
-  const theme = document.props.theme;
+  const theme = (document.props as DocumentProps).theme;
   useTheme(theme);
   const themed: TextContext = { ...DEFAULT_TEXT, theme };
-  const { theme: _theme, ...documentText } = document.props;
+  const { theme: _theme, ...documentText } = document.props as DocumentProps;
   const base = inherit(
     theme?.text?.body ? inherit(themed, { style: "body" }) : themed,
     documentText,
@@ -152,7 +163,8 @@ function layoutPass(
 
   // First pass: flow each section's content onto as many pages as it needs.
   const planned: PlannedPage[] = [];
-  for (const page of sections) {
+  for (const [sectionIndex, page] of sections.entries()) {
+    sink.path = ["Document", `Page[${sectionIndex}]`];
     const props = page.props as PageProps;
     const [width, height] = toPageSize(props.size, props.orientation);
     const margin = toSides(props.margin ?? 20 * MM);
@@ -251,6 +263,9 @@ function layoutPass(
     );
     if (header) paintBox(header, margin.left, margin.top, items);
     if (plan.body) paintBox(plan.body, 0, 0, items);
+    const placed: [Box, number, number][] = [];
+    if (header) placed.push([header, margin.left, margin.top]);
+    if (plan.body) placed.push([plan.body, 0, 0]);
     const footer = measureIn(
       furniture(props.footer, info),
       plan.context,
@@ -258,6 +273,32 @@ function layoutPass(
       contentHeight,
     );
     if (footer) paintBox(footer, margin.left, plan.height - margin.bottom - footer.height, items);
+    if (footer) placed.push([footer, margin.left, plan.height - margin.bottom - footer.height]);
+    if (options.debug) {
+      // Outline every box, nested boxes in fainter lines.
+      const outline = (box: Box, originX: number, originY: number, depth: number): void => {
+        const x = box.page ? box.x : originX + box.x;
+        const y = box.page ? box.y : originY + box.y;
+        if (box.width > 0 && box.height > 0) {
+          items.push({
+            type: "path",
+            commands: [["R", x, y, box.width, box.height]],
+            stroke: {
+              color: { space: "rgb", r: 1, g: 0, b: Math.min(1, depth * 0.25) },
+              width: 0.25,
+            },
+          });
+        }
+        for (const child of box.children) outline(child, x, y, depth + 1);
+      };
+      for (const [box, x, y] of placed) outline(box, x, y, 0);
+    }
+    if (options.onBoxes) {
+      options.onBoxes(
+        index,
+        placed.map(([box, x, y]) => describeBox(box, x, y)),
+      );
+    }
     const marks =
       props.marks === true
         ? { crop: true, registration: true }
@@ -321,15 +362,80 @@ function layoutPass(
 
   const warnings: LayoutWarning[] = [];
   if (sink.missingCharacters.size > 0) {
-    const list = [...sink.missingCharacters].map((character) => `"${character}"`).join(", ");
+    const list = [...sink.missingCharacters.keys()].map((character) => `"${character}"`).join(", ");
+    const [where] = sink.missingCharacters.values();
     warnings.push({
       code: "missing-glyph",
       message: `No font in use has a glyph for ${list}. Add a font that covers them to the font list.`,
+      ...(where ? { path: where } : {}),
     });
   }
   for (const message of lowResolution) warnings.push({ code: "low-resolution-image", message });
 
   return { pages, warnings, usesToc: sink.usesToc, headings };
+}
+
+/** One box of a laid-out document, as `inspect()` reports it. */
+export interface InspectedBox {
+  /** The kind of element: `"Stack"`, `"Text"`, `"Table"`, … */
+  readonly type: string;
+  /** Position and size on the page in points, from its top-left corner. */
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  /** For text: its lines. */
+  readonly text?: readonly string[];
+  readonly id?: string;
+  readonly children?: readonly InspectedBox[];
+}
+
+function describeBox(box: Box, originX: number, originY: number): InspectedBox {
+  const round = (value: number): number => Math.round(value * 1000) / 1000;
+  const x = box.page ? box.x : originX + box.x;
+  const y = box.page ? box.y : originY + box.y;
+  return {
+    type: box.kind ?? "Box",
+    x: round(x),
+    y: round(y),
+    width: round(box.width),
+    height: round(box.height),
+    ...(box.text ? { text: box.text.lines.map((line) => line.text) } : {}),
+    ...(box.id !== undefined ? { id: box.id } : {}),
+    ...(box.children.length > 0
+      ? { children: box.children.map((child) => describeBox(child, x, y)) }
+      : {}),
+  };
+}
+
+/**
+ * Lays out a document and returns the box of every element on every page, as plain data.
+ * For tests ("the total is on the last page, right-aligned") and for bug reports: positions
+ * are rounded to a thousandth of a point, so the result can be compared or stored as JSON.
+ */
+export function inspect(document: LayoutNode): { page: number; boxes: InspectedBox[] }[] {
+  if (document?.type !== "Document") throw new LayoutError("inspect() needs a Document element");
+  let pages: { page: number; boxes: InspectedBox[] }[] = [];
+  let toc: TocEntry[] = [];
+  for (let pass = 0; pass < 6; pass++) {
+    pages = [];
+    const result = layoutPass(
+      document,
+      { onBoxes: (index, boxes) => pages.push({ page: index + 1, boxes }) },
+      toc,
+      () => {},
+    );
+    const settled =
+      !result.usesToc ||
+      (toc.length === result.headings.length &&
+        toc.every(
+          (entry, i) =>
+            entry.id === result.headings[i]?.id && entry.page === result.headings[i]?.page,
+        ));
+    if (settled) break;
+    toc = result.headings;
+  }
+  return pages;
 }
 
 /** Moves display items by an offset. */
@@ -375,16 +481,18 @@ function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): Disp
 }
 
 /** Lays out a document and writes it as a PDF file. */
-function renderSync(document: LayoutNode<"Document">, options: RenderOptions = {}): Uint8Array {
+function renderSync(document: LayoutNode, options: RenderOptions = {}): Uint8Array {
   if (document?.type !== "Document") throw new LayoutError("render() needs a Document element");
-  const props = document.props;
+  const props = document.props as DocumentProps;
   const info: Record<string, string> = {};
   for (const key of ["title", "author", "subject", "keywords", "creator"] as const) {
     const value = props[key];
     if (value !== undefined) info[key] = value;
   }
-  const layoutOptions =
-    options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {};
+  const layoutOptions = {
+    ...(options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {}),
+    ...(options.debug ? { debug: true } : {}),
+  };
   // Each page is written as soon as it is painted. A table of contents needs its page numbers
   // from a finished layout, so such a document is written again until they agree.
   let toc: TocEntry[] = [];
@@ -409,7 +517,14 @@ function renderSync(document: LayoutNode<"Document">, options: RenderOptions = {
             entry.id === result.headings[i]?.id && entry.page === result.headings[i]?.page,
         ));
     if (settled) {
-      for (const warning of result.warnings) options.onWarning?.(warning);
+      for (const warning of result.warnings) {
+        if (options.strict) {
+          throw new LayoutError(
+            warning.path ? `${warning.message} (at ${warning.path})` : warning.message,
+          );
+        }
+        options.onWarning?.(warning);
+      }
       return pdf.finish();
     }
     toc = result.headings;
@@ -418,22 +533,19 @@ function renderSync(document: LayoutNode<"Document">, options: RenderOptions = {
 
 export interface Render {
   /** Lays out a document and returns the bytes of the PDF file. */
-  (document: LayoutNode<"Document">, options?: RenderOptions): Promise<Uint8Array>;
+  (document: LayoutNode, options?: RenderOptions): Promise<Uint8Array>;
   /** The same, as a stream of bytes for writing to a file or a network response. */
-  stream(document: LayoutNode<"Document">, options?: RenderOptions): ReadableStream<Uint8Array>;
+  stream(document: LayoutNode, options?: RenderOptions): ReadableStream<Uint8Array>;
   /** The same, without a promise, for code that cannot wait. */
-  sync(document: LayoutNode<"Document">, options?: RenderOptions): Uint8Array;
+  sync(document: LayoutNode, options?: RenderOptions): Uint8Array;
 }
 
 export const render: Render = Object.assign(
-  async (document: LayoutNode<"Document">, options?: RenderOptions): Promise<Uint8Array> =>
+  async (document: LayoutNode, options?: RenderOptions): Promise<Uint8Array> =>
     renderSync(document, options),
   {
     sync: renderSync,
-    stream: (
-      document: LayoutNode<"Document">,
-      options?: RenderOptions,
-    ): ReadableStream<Uint8Array> =>
+    stream: (document: LayoutNode, options?: RenderOptions): ReadableStream<Uint8Array> =>
       new ReadableStream<Uint8Array>({
         start(controller) {
           try {

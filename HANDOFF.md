@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 17:30 WIB · Session 2 · Milestone: M0–M3 done; M4 (developer experience and first release) next · Branch: main_
+_Updated: 2026-11-10 18:00 WIB · Session 2 · Milestone: M0–M3 done; M4 in progress · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -47,10 +47,20 @@ M1 has just started; see `docs/05-roadmap.md`.
     5,000-bib benchmark (now a test). Themes (`src/layout/theme.ts`) and SVG input (`src/layout/svg-input.ts`, the `Svg` element) are done.
     M3 is closed; deferred to M4:
     shared graphics (Form XObjects; less urgent now that batches are fast and small).
-13. Then M4 (developer experience and first release): see the roadmap.
+13. M4 done so far: JSX runtime (`src/jsx-runtime.ts`), `inspect()`, warning paths, `strict`, `debug`.
+14. M4 remaining, in this order: third acceptance document (rental agreement with inspection report, generic
+    content) as a sample; starter templates under `examples/`; quick-start guide; bundle-size budget in CI;
+    release preparation (package metadata, changeset, release workflow — do not publish); `@mbingpdf/react`
+    and `@mbingpdf/vue` preview components; preview server; shared graphics; benchmarks against PDFKit,
+    pdfmake and @react-pdf/renderer.
 
 ## Waiting on the owner
-None. The owner asked for autonomous work: decide, commit and push without asking, and report afterwards.
+The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
+things do need them, all part of the M4 exit:
+- publishing `0.1.0` to npm (their account and their decision);
+- switching one document type in each of the two private apps to mbingpdf;
+- the manual checks: Acrobat PDF/X-4 preflight of the certificate, copying text out of Acrobat, and comparing
+  the acceptance documents with the current printed versions.
 
 ## Decisions this session
 - Row 14: fflate, pinned and compiled into the build; zero runtime dependencies.
@@ -63,7 +73,7 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 398 tests, build). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 409 tests, build). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 

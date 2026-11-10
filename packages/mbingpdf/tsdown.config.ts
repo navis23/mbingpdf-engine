@@ -3,6 +3,8 @@ import { defineConfig, type UserConfig } from "tsdown";
 const config: UserConfig = defineConfig({
   entry: {
     index: "src/index.ts",
+    "jsx-runtime": "src/jsx-runtime.ts",
+    "jsx-dev-runtime": "src/jsx-dev-runtime.ts",
     "core/index": "src/core/index.ts",
     "font/index": "src/font/index.ts",
     "image/index": "src/image/index.ts",

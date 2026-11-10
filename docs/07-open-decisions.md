@@ -53,8 +53,10 @@
 | 50 | Theme conventions | The `body` text style is the document default; `h1`–`h6` style `Heading`. A style's `leading` (points) is kept as a ratio of the style's size. A font family is a variable font or a set of sources keyed by weight (`"400i"` for italic) | 2026-11-10 |
 | 51 | SVG input | `Svg({ src })` reads paths, basic shapes, groups, transforms, solid fills and strokes, opacity and `<use>`, and draws them as vectors. Gradients, patterns, text, images, filters, clipping and masks are not read; a shape that depends on one is drawn plain or skipped. Checked against librsvg | 2026-11-10 |
 | 52 | Shared graphics | Deferred from M3 to M4: no Form XObjects yet. Fonts and images are embedded once already | 2026-11-10 |
+| 53 | JSX | `jsxImportSource: "mbingpdf"`. Element functions accept `children` as a property, so every tag is a plain function call; fragments and your own function components work; there are no lower-case intrinsic tags. `render()` and `inspect()` take any element and check at run time that it is a `Document` | 2026-11-10 |
+| 54 | Diagnostics | `inspect(document)` returns each page's boxes as JSON-safe data rounded to 0.001 pt. Warnings carry the element path where the problem was first met. `strict: true` throws on the first warning. `debug: true` outlines every box | 2026-11-10 |
 
-Decisions 8–10 and 16–52 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–54 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

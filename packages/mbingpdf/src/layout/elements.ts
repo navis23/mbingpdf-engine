@@ -42,15 +42,18 @@ function isProps(value: unknown): boolean {
 /** Builds an element from `(props, ...children)` or just `(...children)`. */
 function element<T extends NodeType>(type: T, args: readonly unknown[]): LayoutNode<T> {
   const [first, ...rest] = args;
-  const hasProps = isProps(first);
+  if (!isProps(first))
+    return { type, props: {} as LayoutNode<T>["props"], children: args as Child[] };
+  // Children may also arrive as a property, which is how JSX passes them.
+  const { children, ...props } = first as { children?: Child };
   return {
     type,
-    props: (hasProps ? first : {}) as LayoutNode<T>["props"],
-    children: (hasProps ? rest : args) as Child[],
+    props: props as LayoutNode<T>["props"],
+    children: children === undefined ? (rest as Child[]) : [children, ...(rest as Child[])],
   };
 }
 
-type Args<P> = [props: P, ...children: Child[]] | Child[];
+type Args<P> = [props: P & { children?: Child }, ...children: Child[]] | Child[];
 
 /** The whole document. Text properties set here are the defaults for everything inside. */
 export function Document(...args: Args<DocumentProps>): LayoutNode<"Document"> {
@@ -95,7 +98,7 @@ export function Span(...args: Args<SpanProps>): LayoutNode<"Span"> {
  * (`to`, the element's `id`).
  */
 export function Link(
-  props: SpanProps & ({ href: string } | { to: string }),
+  props: SpanProps & ({ href: string } | { to: string }) & { children?: Child },
   ...children: Child[]
 ): LayoutNode<"Span"> {
   return element("Span", [props, ...children]);
