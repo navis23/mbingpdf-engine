@@ -4,7 +4,7 @@ Milestones are ordered by dependency. Each ends with something a user can run an
 
 ## M0 — Foundations
 
-_Status: built; waiting on CI to confirm the exit test on Bun (not installed locally). Node, Deno and Chromium pass locally_
+_Status: done 2026-11-10. Exit test passes in CI on Node 22/24/26, Bun, Deno and Chromium. Left out on purpose: kerning for the standard fonts, XMP metadata, streaming output, printer's marks_
 
 Repository, toolchain and a valid PDF.
 
@@ -19,7 +19,7 @@ Repository, toolchain and a valid PDF.
 
 ## M1 — Fonts and text
 
-_Status: not started_
+_Status: in progress_
 
 - TrueType and OpenType/CFF parsing, WOFF2 decoding, variable-font instancing.
 - Glyph subsetting, CID font embedding, `ToUnicode` maps.
