@@ -1,8 +1,8 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 13:40 WIB · Session 2 · Milestone: M0 and M1 done, M2 (Layout and pagination) nearly done · Branch: main_
+_Updated: 2026-11-10 14:20 WIB · Session 2 · Milestone: M0, M1 and M2 done; M3 (Tables, vector art and print) next · Branch: main_
 
 ## Where we are
-M0 and M1 are finished; M2 is finished except for the SVG preview backend. The root `mbingpdf` entry now has
+M0, M1 and M2 are finished. The root `mbingpdf` entry now has
 the document API: `Document`, `Page`, `Stack`, `Row`, `Box`, `Text`, `Span`, `Link`, `Image`, `Grid`,
 `Spacer`, `Absolute`, `Canvas`, `PageBreak` and `render()`. Underneath are `mbingpdf/core` (PDF writer),
 `mbingpdf/font` (TrueType, CFF, WOFF2, shaping, variable fonts), `mbingpdf/text` (line breaking, hyphenation,
@@ -39,7 +39,7 @@ M1 has just started; see `docs/05-roadmap.md`.
    and still open; text extraction is checked with pdf.js meanwhile.
 9. ~~M2 layout engine~~ done (`src/layout/`, exported from the root `mbingpdf` entry): elements, flex,
    fragmentation, headers/footers, `render()`. Images are in `src/image/` (`mbingpdf/image`).
-10. M2 leftovers: SVG preview backend (`mbingpdf/svg`), Web Worker check.
+10. ~~M2 leftovers~~ done: `mbingpdf/svg` (`renderSvg`), Web Worker check in `test/harness/browser.mjs`.
 11. Then M3: tables, lists, multi-column, outlines, SVG input, QR codes, themes, print marks, PDF/X-4.
 
 ## Waiting on the owner
@@ -56,7 +56,8 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 275 tests, build). Runtime digests match on Node, Deno, Chromium.
+- Checks: `pnpm check` green (lint, typecheck, 290 tests, build). Runtime digests match on Node, Deno, Chromium
+  and in a Web Worker.
 - Published: not published.
 
 ## Gotchas / don't redo

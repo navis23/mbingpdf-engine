@@ -44,6 +44,10 @@
       "import": "./dist/image/index.js",
       "require": "./dist/image/index.cjs"
     },
+    "./svg": {
+      "import": "./dist/svg/index.js",
+      "require": "./dist/svg/index.cjs"
+    },
     "./text": {
       "import": "./dist/text/index.js",
       "require": "./dist/text/index.cjs"

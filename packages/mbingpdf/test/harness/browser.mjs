@@ -60,21 +60,20 @@ try {
   page.on("pageerror", (error) => errors.push(String(error)));
   await page.goto(`${origin}/`);
   const actual = await page.evaluate(async () => {
-    const core = await import("/dist/core/index.js");
-    const font = await import("/dist/font/index.js");
-    const text = await import("/dist/text/index.js");
-    const doc = await import("/dist/index.js");
-    const { digestSamples } = await import("/test/harness/digest.ts");
-    const { ALL_FONT_FILES, fontFileName } = await import("/test/harness/samples.ts");
-    const fonts = {};
-    for (const file of ALL_FONT_FILES) {
-      const response = await fetch(`/test/fonts/${fontFileName(file)}`);
-      if (!response.ok) throw new Error(`Could not load ${file}: ${response.status}`);
-      fonts[file] = new Uint8Array(await response.arrayBuffer());
-    }
-    const photo = new Uint8Array(await (await fetch("/test/images/photo.jpg")).arrayBuffer());
-    return digestSamples({ core, font, text, doc, photo, fonts });
+    const { runSamples } = await import("/test/harness/browser-run.ts");
+    return runSamples();
   });
+  // The same again inside a Web Worker, where there is no DOM.
+  const worker = await page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const instance = new Worker("/test/harness/browser-worker.ts", { type: "module" });
+        instance.onmessage = (event) => resolve(event.data);
+        instance.onerror = (event) => reject(new Error(event.message || "worker failed to start"));
+      }),
+  );
+  if (worker.error) throw new Error(`Web Worker: ${worker.error}`);
+  if (worker.hasDocument) throw new Error("The worker check did not run in a worker");
   if (errors.length > 0) throw new Error(`Page errors: ${errors.join("; ")}`);
   const different = compareDigests(actual, golden);
   const name = `Chromium ${browser.version()}`;
@@ -87,6 +86,13 @@ try {
     );
   }
   console.log(`${name}: ${Object.keys(actual).length} samples match the approved digests`);
+  const differentInWorker = compareDigests(worker.digests, golden);
+  if (differentInWorker.length > 0) {
+    throw new Error(`${name} Web Worker: output differs for ${differentInWorker.join(", ")}`);
+  }
+  console.log(
+    `${name} Web Worker: ${Object.keys(worker.digests).length} samples match the approved digests`,
+  );
 } finally {
   await browser.close();
   server.close();

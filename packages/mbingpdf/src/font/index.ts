@@ -3,6 +3,7 @@
  */
 
 export { Font, type FontSubset, loadFont } from "./font.ts";
+export type { OutlineCommand } from "./outline.ts";
 export {
   openTypeShaper,
   type ShapableFont,

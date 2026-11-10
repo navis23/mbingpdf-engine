@@ -301,7 +301,10 @@ export function applyGposLookup(
   if (!lookup) return;
   let index = 0;
   while (index < buffer.glyphs.length) {
-    if (buffer.skips(index, lookup)) {
+    if (
+      !lookup.starts.has((buffer.glyphs[index] as BufferGlyph).id) ||
+      buffer.skips(index, lookup)
+    ) {
       index++;
       continue;
     }

@@ -32,8 +32,10 @@
 | 29 | Split boxes | A box split across pages is cut open at the split (no bottom border on the first part, no top border on the second) and its background runs to the page edge | 2026-11-10 |
 | 30 | Unsplittable content | An image taller than a page is scaled to fit; a fixed-height box is clipped to the page; `keepTogether` is ignored for blocks taller than a page. Layout does not throw for these | 2026-11-10 |
 | 31 | Image size without dimensions | 96 pixels per inch (1 px = 0.75 pt), as in CSS, shrunk to the available width | 2026-11-10 |
+| 32 | Text in the SVG preview | Embedded fonts are drawn as glyph shapes, so the preview matches the PDF and needs no fonts installed. The 14 standard fonts have no shapes to draw and fall back to `<text>` in a similar system font | 2026-11-10 |
+| 33 | Shaping speed | Each OpenType lookup keeps the set of glyphs it can start at, and `Font.shape()` caches results (4,096 entries). Layout of a 53-page report went from 2.2 s to 0.2 s | 2026-11-10 |
 
-Decisions 8–10 and 16–31 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–33 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

@@ -10,6 +10,7 @@ import {
   WE_HAVE_AN_X_AND_Y_SCALE,
 } from "./glyf.ts";
 import { applyDeltas, GlyphVariations } from "./gvar.ts";
+import { CffOutlines, type OutlineCommand, trueTypeOutline } from "./outline.ts";
 import { BinaryReader, BinaryWriter } from "./reader.ts";
 import { buildSfnt, parseSfnt } from "./sfnt.ts";
 import { openTypeShaper, type ShapedGlyph, type ShapeOptions, type Shaper } from "./shaper.ts";
@@ -214,6 +215,9 @@ export class Font {
   readonly #advances: AdvanceVariations | undefined;
   readonly #outlines: GlyphVariations | undefined;
   readonly #instanced: Map<number, { data: Uint8Array; xMin: number; advance: number }> = new Map();
+  #cffOutlines: CffOutlines | undefined;
+  readonly #shapeCache: Map<string, ShapedGlyph[]> = new Map();
+  #cachedFor: Shaper | undefined;
   readonly #tables: ReadonlyMap<string, Uint8Array>;
   readonly #cmap: Map<number, number>;
   readonly #hmtx: BinaryReader;
@@ -411,11 +415,38 @@ export class Font {
   }
 
   /**
+   * The shape of a glyph as drawing commands, in font units with y growing upward. For an
+   * instance of a variable font this is the instance's shape.
+   */
+  glyphOutline(glyph: number): OutlineCommand[] {
+    if (this.outlines === "cff") {
+      this.#cffOutlines ??= new CffOutlines(required(this.#tables, "CFF "));
+      return this.#cffOutlines.outline(glyph);
+    }
+    return trueTypeOutline(glyph, (id) =>
+      this.variationCoords ? this.#instancedGlyph(id).data : this.#glyphData(id),
+    );
+  }
+
+  /**
    * Shapes text: maps characters to glyphs and applies the font's ligatures, kerning and
    * accent positioning. A glyph ID of 0 marks a character the font cannot show.
    */
   shape(text: string, options?: ShapeOptions): ShapedGlyph[] {
-    return this.shaper.shape(this, text, options);
+    // Layout shapes the same strings again and again (to measure, then to place; the same
+    // header on every page), so results are remembered. The glyph objects are read-only.
+    if (this.#cachedFor !== this.shaper) {
+      this.#shapeCache.clear();
+      this.#cachedFor = this.shaper;
+    }
+    const key = options ? `${JSON.stringify(options)}\u0000${text}` : text;
+    let shaped = this.#shapeCache.get(key);
+    if (!shaped) {
+      shaped = this.shaper.shape(this, text, options);
+      if (this.#shapeCache.size >= 4096) this.#shapeCache.clear();
+      this.#shapeCache.set(key, shaped);
+    }
+    return shaped.slice();
   }
 
   /** The width of `text` at `size` in points, after shaping. */

@@ -1,4 +1,4 @@
-import type { ByteWriter } from "./bytes.ts";
+import { ByteWriter } from "./bytes.ts";
 import { PdfString } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 
@@ -53,12 +53,11 @@ export function writeGlyphRun(
 
   const closeString = (): void => {
     if (run.length === 0) return;
-    const bytes = Uint8Array.from(run);
-    const start = out.length;
-    writeObject(out, new PdfString(bytes, encoder.bytesPerGlyph === 2));
-    // Buffer the string so that a lone string can become a Tj instead of a one-item TJ.
-    pendingArray += String.fromCharCode(...out.toBytes().subarray(start));
-    out.truncate(start);
+    // Written to a scratch buffer first, so that a lone string can become a Tj instead of a
+    // one-item TJ array.
+    const scratch = new ByteWriter();
+    writeObject(scratch, new PdfString(Uint8Array.from(run), encoder.bytesPerGlyph === 2));
+    pendingArray += String.fromCharCode(...scratch.toBytes());
     items++;
     run = [];
   };

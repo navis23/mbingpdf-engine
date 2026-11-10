@@ -24,6 +24,7 @@ What works today:
 - **Documents** (`mbingpdf`) — elements laid out with flexbox-style rows and stacks, text with mixed styles and links, images, grids, absolute positioning and free drawing; content flows over pages with forced breaks, keep-together, keep-with-next and widow/orphan control; headers and footers know the page number and total.
 - **Text** (`mbingpdf/text`) — Unicode line breaking, hyphenation for English and Indonesian, justification, font fallback and fit-to-width.
 - **Fonts** (`mbingpdf/font`) — TrueType, OpenType/CFF and WOFF2: subsetting, variable-font instancing, and shaping (ligatures, kerning, accents) that matches HarfBuzz for Latin, Greek and Cyrillic.
+- **Preview** (`mbingpdf/svg`) — the same pages as SVG, for showing a document on screen.
 - **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
 - **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
 

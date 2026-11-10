@@ -55,6 +55,21 @@ export function classOf(r: BinaryReader, offset: number, glyph: number): number 
   return 0;
 }
 
+/** Adds every glyph of a Coverage table to a set. */
+function collectCoverage(r: BinaryReader, offset: number, into: Set<number>): void {
+  const format = r.u16At(offset);
+  const count = r.u16At(offset + 2);
+  if (format === 1) {
+    for (let i = 0; i < count; i++) into.add(r.u16At(offset + 4 + i * 2));
+  } else if (format === 2) {
+    for (let i = 0; i < count; i++) {
+      const at = offset + 4 + i * 6;
+      const end = r.u16At(at + 2);
+      for (let glyph = r.u16At(at); glyph <= end; glyph++) into.add(glyph);
+    }
+  }
+}
+
 export const GLYPH_CLASS_BASE = 1;
 export const GLYPH_CLASS_LIGATURE = 2;
 export const GLYPH_CLASS_MARK = 3;
@@ -108,6 +123,11 @@ export interface Lookup {
   readonly markFilteringSet: number;
   /** Absolute offsets of the subtables, with extension subtables already resolved. */
   readonly subtables: readonly number[];
+  /**
+   * The glyphs at which any of the subtables can apply. Checking this first spares the far
+   * costlier walk through the subtables for the many glyphs a lookup has nothing to do with.
+   */
+  readonly starts: ReadonlySet<number>;
 }
 
 /** A lookup to run, with the value of the feature that switched it on. */
@@ -272,7 +292,19 @@ export class LayoutTable {
       subtables.push(subtable);
     }
     const markFilteringSet = flag & USE_MARK_FILTERING_SET ? r.u16At(base + 6 + count * 2) : 0;
-    lookup = { type, flag, markFilteringSet, subtables };
+    // Every subtable starts from a Coverage table for its first glyph. Contextual lookups in
+    // their coverage-based format keep it after the backtrack sequence instead of up front.
+    const starts = new Set<number>();
+    const context = this.#extensionType === 7 ? 5 : 7;
+    for (const subtable of subtables) {
+      let coverage = subtable + 2;
+      if ((type === context || type === context + 1) && r.u16At(subtable) === 3) {
+        if (type === context) coverage = subtable + 6;
+        else coverage = subtable + 4 + r.u16At(subtable + 2) * 2 + 2;
+      }
+      collectCoverage(r, subtable + r.u16At(coverage), starts);
+    }
+    lookup = { type, flag, markFilteringSet, subtables, starts };
     this.#lookups.set(index, lookup);
     return lookup;
   }

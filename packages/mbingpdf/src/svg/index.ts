@@ -1,0 +1,201 @@
+/**
+ * `mbingpdf/svg` — the SVG backend: one SVG image per page, from the same layout that makes
+ * the PDF. For showing a document on screen, where inline PDF viewing is unreliable (phones
+ * in particular).
+ */
+import type { Color, PdfImage } from "../core/index.ts";
+import { StandardFont } from "../core/index.ts";
+import type { OutlineCommand } from "../font/index.ts";
+import type { DisplayItem, DisplayPage, PathCommand } from "../layout/display.ts";
+import { type DocumentLayout, layoutDocument } from "../layout/render.ts";
+import type { LayoutNode } from "../layout/types.ts";
+import type { TextFont } from "../text/index.ts";
+import { encodePng } from "./png.ts";
+
+/** Formats a number for SVG: at most three decimals, no trailing zeros. */
+function n(value: number): string {
+  const text = value.toFixed(3);
+  return text.includes(".") ? text.replace(/\.?0+$/, "") : text;
+}
+
+const escapeXml = (text: string): string =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function css(color: Color): string {
+  const byte = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 255);
+  if (color.space === "gray")
+    return `rgb(${byte(color.gray)},${byte(color.gray)},${byte(color.gray)})`;
+  if (color.space === "rgb") return `rgb(${byte(color.r)},${byte(color.g)},${byte(color.b)})`;
+  // A screen cannot show CMYK; this is the plain conversion, good enough for a preview.
+  return `rgb(${byte((1 - color.c) * (1 - color.k))},${byte((1 - color.m) * (1 - color.k))},${byte((1 - color.y) * (1 - color.k))})`;
+}
+
+function pathData(commands: readonly (PathCommand | OutlineCommand)[]): string {
+  let d = "";
+  for (const command of commands) {
+    d += command[0];
+    for (let i = 1; i < command.length; i++) d += `${i > 1 ? " " : ""}${n(command[i] as number)}`;
+  }
+  return d;
+}
+
+function base64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+const imageUris: WeakMap<PdfImage, string> = new WeakMap();
+
+function imageUri(image: PdfImage): string {
+  let uri = imageUris.get(image);
+  if (!uri) {
+    uri =
+      image.encoding === "jpeg"
+        ? `data:image/jpeg;base64,${base64(image.data)}`
+        : `data:image/png;base64,${base64(encodePng(image))}`;
+    imageUris.set(image, uri);
+  }
+  return uri;
+}
+
+/** A font that can give the shapes of its glyphs. */
+interface OutlineFont {
+  glyphOutline(glyph: number): readonly OutlineCommand[];
+  unitsPerEm: number;
+}
+
+const hasOutlines = (font: TextFont): font is TextFont & OutlineFont =>
+  typeof (font as Partial<OutlineFont>).glyphOutline === "function";
+
+/** The CSS font that stands in for a standard PDF font, which has no outlines to draw. */
+function standardFontCss(font: StandardFont): string {
+  const name = font.name;
+  const family = name.startsWith("Courier")
+    ? "'Courier New',Courier,monospace"
+    : name.startsWith("Times")
+      ? "'Times New Roman',Times,serif"
+      : "Helvetica,Arial,sans-serif";
+  const weight = name.includes("Bold") ? ' font-weight="bold"' : "";
+  const style = name.includes("Oblique") || name.includes("Italic") ? ' font-style="italic"' : "";
+  return `font-family="${family}"${weight}${style}`;
+}
+
+class PageWriter {
+  readonly defs: string[] = [];
+  readonly #fontIds: Map<TextFont, number> = new Map();
+  readonly #glyphs: Set<string> = new Set();
+  #clips = 0;
+
+  /** The id of a glyph's shape in `<defs>`, defining it on first use. */
+  glyph(font: TextFont & OutlineFont, glyph: number): string {
+    let fontId = this.#fontIds.get(font);
+    if (fontId === undefined) {
+      fontId = this.#fontIds.size + 1;
+      this.#fontIds.set(font, fontId);
+    }
+    const id = `f${fontId}g${glyph}`;
+    if (!this.#glyphs.has(id)) {
+      this.#glyphs.add(id);
+      this.defs.push(`<path id="${id}" d="${pathData(font.glyphOutline(glyph))}"/>`);
+    }
+    return id;
+  }
+
+  items(items: readonly DisplayItem[]): string {
+    let out = "";
+    for (const item of items) {
+      switch (item.type) {
+        case "path": {
+          const fill = item.fill ? css(item.fill) : "none";
+          let attributes = ` fill="${fill}"`;
+          if (item.stroke) {
+            attributes += ` stroke="${css(item.stroke.color)}" stroke-width="${n(item.stroke.width)}"`;
+            if (item.stroke.dash?.length)
+              attributes += ` stroke-dasharray="${item.stroke.dash.map(n).join(" ")}"`;
+            if (item.stroke.cap) attributes += ` stroke-linecap="${item.stroke.cap}"`;
+            if (item.stroke.join) attributes += ` stroke-linejoin="${item.stroke.join}"`;
+          }
+          out += `<path d="${pathData(item.commands)}"${attributes}/>`;
+          break;
+        }
+        case "text": {
+          const font = item.font;
+          if (hasOutlines(font)) {
+            // Glyphs are drawn as shapes, so the preview matches the PDF exactly and needs no
+            // fonts installed. Font units have y pointing up, hence the negative scale.
+            const scale = item.size / font.unitsPerEm;
+            let uses = "";
+            let pen = 0;
+            for (const glyph of item.glyphs) {
+              const x = pen + glyph.xOffset;
+              uses += `<use href="#${this.glyph(font, glyph.id)}"${x !== 0 ? ` x="${n(x)}"` : ""}${glyph.yOffset !== 0 ? ` y="${n(glyph.yOffset)}"` : ""}/>`;
+              pen += glyph.xAdvance;
+            }
+            // The scale is tiny (size ÷ units per em), so it needs more digits than a coordinate.
+            const factor = String(Number(scale.toPrecision(9)));
+            out += `<g transform="translate(${n(item.x)} ${n(item.y)}) scale(${factor} -${factor})" fill="${css(item.color)}">${uses}</g>`;
+          } else if (font instanceof StandardFont) {
+            let width = 0;
+            for (const glyph of item.glyphs) width += glyph.xAdvance;
+            width = (width * item.size) / font.unitsPerEm;
+            const stretch =
+              width > 0 ? ` textLength="${n(width)}" lengthAdjust="spacingAndGlyphs"` : "";
+            out += `<text x="${n(item.x)}" y="${n(item.y)}" ${standardFontCss(font)} font-size="${n(item.size)}" fill="${css(item.color)}"${stretch} xml:space="preserve">${escapeXml(item.text)}</text>`;
+          }
+          break;
+        }
+        case "image": {
+          let clip = "";
+          if (item.clip) {
+            const id = `c${++this.#clips}`;
+            this.defs.push(
+              `<clipPath id="${id}"><rect x="${n(item.clip.x)}" y="${n(item.clip.y)}" width="${n(item.clip.width)}" height="${n(item.clip.height)}"/></clipPath>`,
+            );
+            clip = ` clip-path="url(#${id})"`;
+          }
+          out += `<image x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" preserveAspectRatio="none" href="${imageUri(item.image)}"${clip}/>`;
+          break;
+        }
+        case "link":
+          out += `<a href="${escapeXml(item.url)}"><rect x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width)}" height="${n(item.height)}" fill="none" pointer-events="all"/></a>`;
+          break;
+        case "group": {
+          const opacity = item.opacity !== undefined ? ` opacity="${n(item.opacity)}"` : "";
+          const rotate = item.rotate
+            ? ` transform="rotate(${n(item.rotate.degrees)} ${n(item.rotate.cx)} ${n(item.rotate.cy)})"`
+            : "";
+          out += `<g${opacity}${rotate}>${this.items(item.items)}</g>`;
+          break;
+        }
+      }
+    }
+    return out;
+  }
+}
+
+/** Draws one laid-out page as an SVG document. */
+export function pageToSvg(page: DisplayPage): string {
+  const writer = new PageWriter();
+  const body = writer.items(page.items);
+  const defs = writer.defs.length > 0 ? `<defs>${writer.defs.join("")}</defs>` : "";
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(page.width)}pt" height="${n(page.height)}pt" ` +
+    `viewBox="0 0 ${n(page.width)} ${n(page.height)}">` +
+    `<rect width="${n(page.width)}" height="${n(page.height)}" fill="white"/>${defs}${body}</svg>`
+  );
+}
+
+/**
+ * Lays out a document and returns one SVG image per page. The pages are the same as the PDF's:
+ * the same line breaks, the same page breaks, the same positions.
+ *
+ * Text in embedded fonts is drawn as shapes. Text in the 14 standard fonts, which have no
+ * shapes to draw, uses the viewer's closest font and may differ slightly.
+ */
+export function renderSvg(document: LayoutNode<"Document"> | DocumentLayout): string[] {
+  const layout = "pages" in document ? document : layoutDocument(document);
+  return layout.pages.map(pageToSvg);
+}

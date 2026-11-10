@@ -1,0 +1,24 @@
+/**
+ * Builds every sample with the built package inside a browser and returns their digests. Runs
+ * unchanged in a page and in a Web Worker: it uses nothing but `fetch` and dynamic `import`.
+ */
+import { digestSamples } from "./digest.ts";
+import { ALL_FONT_FILES, type FontFile, fontFileName, type SampleEnv } from "./samples.ts";
+
+export async function runSamples(): Promise<Record<string, string>> {
+  const load = async (path: string): Promise<Uint8Array> => {
+    const response = await fetch(path);
+    if (!response.ok) throw new Error(`Could not load ${path}: ${response.status}`);
+    return new Uint8Array(await response.arrayBuffer());
+  };
+  const [core, font, text, doc] = await Promise.all([
+    import("/dist/core/index.js" as string),
+    import("/dist/font/index.js" as string),
+    import("/dist/text/index.js" as string),
+    import("/dist/index.js" as string),
+  ]);
+  const fonts = {} as Record<FontFile, Uint8Array>;
+  for (const file of ALL_FONT_FILES) fonts[file] = await load(`/test/fonts/${fontFileName(file)}`);
+  const photo = await load("/test/images/photo.jpg");
+  return digestSamples({ core, font, text, doc, photo, fonts } as SampleEnv);
+}
