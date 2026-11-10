@@ -3,7 +3,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { Document, layoutDocument, Page, Row, render, Svg, Text } from "../src/index.ts";
+import type { SharedItem } from "../src/index.ts";
+import { Document, layoutDocument, Page, Row, render, Stack, Svg, Text } from "../src/index.ts";
 import { parsePathData, parseSvg } from "../src/layout/svg-input.ts";
 import { type PathItem, pathBounds } from "./harness/geometry.ts";
 import { decodePng, type RenderedPage, renderPdf } from "./harness/render.ts";
@@ -185,9 +186,16 @@ describe("SVG input", () => {
           Page({ size: [300, 300], margin: 10 }, Svg({ src: markup, ...props }), Text("di bawah")),
         ),
       ).pages[0];
-      const path = page?.items.find((item): item is PathItem => item.type === "path");
+      // The drawing is placed as shared artwork: its own shapes, a position and a scale.
+      const shared = page?.items.find((item): item is SharedItem => item.type === "shared");
+      if (!shared) throw new Error("no shared artwork on the page");
+      const path = shared.items.find((item): item is PathItem => item.type === "path");
+      const bounds = pathBounds(path as PathItem);
       return {
-        ...pathBounds(path as PathItem),
+        x: shared.x + bounds.x * shared.scale,
+        y: shared.y + bounds.y * shared.scale,
+        width: bounds.width * shared.scale,
+        height: bounds.height * shared.scale,
         text: page?.items.find((item) => item.type === "text"),
       };
     };
@@ -210,7 +218,58 @@ describe("SVG input", () => {
     const page = layoutDocument(
       Document({ color: "#ff0000" }, Page({ size: [300, 300], margin: 10 }, Svg({ src: markup }))),
     ).pages[0];
-    expect(page?.items[0]).toMatchObject({ type: "path", fill: { r: 1, g: 0, b: 0 } });
+    expect(page?.items[0]).toMatchObject({
+      type: "shared",
+      items: [{ type: "path", fill: { r: 1, g: 0, b: 0 } }],
+    });
+  });
+
+  test("a drawing used many times is stored once in the file", async () => {
+    const markup = svg(
+      '<circle cx="100" cy="60" r="50" fill="currentColor" opacity="0.5"/>' +
+        '<path d="M10 10 C 40 0, 60 40, 90 30 S 150 80, 190 110" stroke="#0a7" fill="none"/>',
+    );
+    const make = (count: number, extra: object = {}) =>
+      render(
+        Document(
+          ...Array.from({ length: count }, (_, index) =>
+            Page(
+              { size: [300, 300], margin: 10 },
+              Svg({ src: markup, width: 100 + (index % 3) * 40, ...extra }),
+              // The same drawing in another colour is another piece of artwork.
+              index === 0 ? Stack({ color: "#ff0000" }, Svg({ src: markup, width: 50 })) : null,
+            ),
+          ),
+        ),
+        { deterministic: true, compress: false },
+      );
+    const text = (bytes: Uint8Array): string => new TextDecoder("latin1").decode(bytes);
+    const one = text(await make(1));
+    const many = text(await make(40));
+    // Two forms (one per colour), however many pages use them.
+    expect(one.match(/\/Subtype\/Form/g)).toHaveLength(2);
+    expect(many.match(/\/Subtype\/Form/g)).toHaveLength(2);
+    expect(many.match(/\/Fm1 Do/g)).toHaveLength(40);
+    // The curve is written once, not on every page.
+    expect(many.match(/ c\n/g)?.length).toBe(one.match(/ c\n/g)?.length);
+    // A form carries its own resources: here the graphics state for the opacity.
+    expect(many).toMatch(/\/Subtype\/Form[^>]*\/Resources<<\/ExtGState<<\/GS1 \d+ 0 R>>>>/);
+    // Each further page costs a few hundred bytes, not the artwork again.
+    expect((many.length - one.length) / 39).toBeLessThan(500);
+
+    // Every size shows the whole drawing at the right place.
+    const [small, , large] = await renderPdf("pdfium", await make(3), 1);
+    const inked = (page: RenderedPage | undefined): number => {
+      if (!page) return 0;
+      let count = 0;
+      for (let i = 0; i < page.pixels.length; i += 4) {
+        if ((page.pixels[i] as number) < 200 || (page.pixels[i + 1] as number) < 200) count++;
+      }
+      return count;
+    };
+    // The third page's drawing is 180 wide against 100: 3.24 times the area.
+    expect(inked(large) / inked(small)).toBeGreaterThan(2.2);
+    expect(inked(large) / inked(small)).toBeLessThan(3.6);
   });
 
   test("is drawn as shapes, not as an image, and accepts bytes", async () => {

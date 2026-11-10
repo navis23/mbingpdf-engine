@@ -190,4 +190,30 @@ describe("pages", () => {
     first.end();
     expect(latin1(doc.finish())).toContain(`/Kids[${first.ref.num} 0 R ${second.ref.num} 0 R]`);
   });
+  test("a form is written once and placed on any page", () => {
+    const doc = new PdfDocument(plain);
+    const form = doc.createForm([0, 0, 40, 20]);
+    form.content
+      .fillColor(rgb(1, 0, 0))
+      .rect(0, 0, 40, 20)
+      .fill()
+      .opacity(0.5);
+    const first = doc.addPage({ size: [100, 100] });
+    first.content.save().transform(2, 0, 0, 2, 10, 10).form(form).restore();
+    // A form may be placed before it is finished, and again after.
+    form.end();
+    form.end();
+    expect(() => form.content).toThrow(/already written/);
+    const second = doc.addPage({ size: [100, 100] });
+    second.content.form(form);
+    const out = latin1(doc.finish());
+    expect(out.match(/\/Subtype\/Form/g)).toHaveLength(1);
+    expect(out).toMatch(
+      /\/Type\/XObject\/Subtype\/Form\/BBox\[0 0 40 20\]\/Resources<<\/ExtGState<<\/GS1 \d+ 0 R>>>>/,
+    );
+    expect(out).toContain("q\n2 0 0 2 10 10 cm\n/Fm1 Do\nQ");
+    expect(out.match(/\/XObject<<\/Fm1 \d+ 0 R>>/g)).toHaveLength(2);
+    expect(() => doc.createForm([0, 0, 0, 10])).toThrow(RangeError);
+    expect(() => new ContentStream().form(form)).toThrow(/belongs to a page/);
+  });
 });

@@ -3,7 +3,7 @@ import type { Color } from "./color.ts";
 import type { FontProgram } from "./embedded-font.ts";
 import type { PositionedGlyph } from "./glyph-run.ts";
 import { orientationMatrix, type PdfImage } from "./image.ts";
-import { PdfName } from "./objects.ts";
+import { PdfName, type PdfRef } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 import type { StandardFont } from "./standard-font.ts";
 
@@ -39,6 +39,14 @@ export interface ContentResources {
   image(image: PdfImage): string;
   /** Registers a spot colour's colour space with the page and returns its resource name. */
   spotColor(color: Extract<Color, { space: "spot" }>): string;
+  /** Registers a form with the page and returns its resource name. */
+  form(form: FormResource): string;
+}
+
+/** A drawing kept as an object of its own in the file, to be placed any number of times. */
+export interface FormResource {
+  readonly name: string;
+  readonly ref: PdfRef;
 }
 
 /** A font that every viewer has built in, or a font program to embed. */
@@ -416,6 +424,16 @@ export class ContentStream {
     if (image.orientation !== undefined && image.orientation !== 1) this.transform(...orientation);
     this.#op("Do", this.#name(resourceName));
     return this.restore();
+  }
+
+  /**
+   * Draws a form made with `PdfDocument.createForm`: its lower-left corner lands on the
+   * origin, so move and scale with `transform()` first. Needs a page.
+   */
+  form(form: FormResource): this {
+    if (!this.#resources) throw new Error("form() needs a content stream that belongs to a page");
+    this.#noText("form()");
+    return this.#op("Do", this.#name(this.#resources.form(form)));
   }
 
   // ----- escape hatch and output -----

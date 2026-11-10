@@ -4,9 +4,10 @@ import { EmbeddedFont } from "./embedded-font.ts";
 import { writeGlyphRun } from "./glyph-run.ts";
 import { type PdfImage, writeImage } from "./image.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
-import { PdfPage, type PdfPageOptions } from "./page.ts";
+import { type PageHost, PdfForm, PdfPage, type PdfPageOptions } from "./page.ts";
 import { writeObject } from "./serialize.ts";
 import { StandardFont } from "./standard-font.ts";
+import type { Box } from "./units.ts";
 import { PdfWriter, type PdfWriterOptions } from "./writer.ts";
 
 /** Document information shown in a viewer's properties dialog. */
@@ -70,6 +71,7 @@ export class PdfDocument {
   #now: Date | undefined;
   readonly #pagesRef: PdfRef;
   readonly #pages: PdfPage[] = [];
+  readonly #forms: PdfForm[] = [];
   readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
   readonly #fonts: Map<AnyFont, FontBinding & { ref: PdfRef }> = new Map();
   readonly #embedded: { font: EmbeddedFont; ref: PdfRef }[] = [];
@@ -98,21 +100,33 @@ export class PdfDocument {
     return this.#pages.length;
   }
 
+  #host(): PageHost {
+    return {
+      writer: this.writer,
+      pagesRef: this.#pagesRef,
+      opacityState: (fill, stroke) => this.#opacityState(fill, stroke),
+      fontResource: (font) => this.#fontResource(font),
+      imageResource: (image) => this.#imageResource(image),
+      spotColorResource: (color) => this.#spotColor(color),
+    };
+  }
+
   /** Starts a new page. Draw on it through `page.content`. */
   addPage(options: PdfPageOptions): PdfPage {
-    const page = new PdfPage(
-      {
-        writer: this.writer,
-        pagesRef: this.#pagesRef,
-        opacityState: (fill, stroke) => this.#opacityState(fill, stroke),
-        fontResource: (font) => this.#fontResource(font),
-        imageResource: (image) => this.#imageResource(image),
-        spotColorResource: (color) => this.#spotColor(color),
-      },
-      options,
-    );
+    const page = new PdfPage(this.#host(), options);
     this.#pages.push(page);
     return page;
+  }
+
+  /**
+   * Starts a drawing that is stored once and can be placed on many pages with
+   * `page.content.form(form)`: a logo, a background pattern. `bbox` is the rectangle it
+   * occupies, as `[x1, y1, x2, y2]`. Draw on it through `form.content`.
+   */
+  createForm(bbox: Box): PdfForm {
+    const form = new PdfForm(this.#host(), `Fm${this.#forms.length + 1}`, bbox);
+    this.#forms.push(form);
+    return form;
   }
 
   /**
@@ -213,6 +227,7 @@ export class PdfDocument {
     const writer = this.writer;
     if (this.#pages.length === 0) throw new Error("A PDF needs at least one page");
     for (const page of this.#pages) page.end();
+    for (const form of this.#forms) form.end();
     for (const { font, ref } of this.#embedded) font.write(writer, ref);
     writer.set(
       this.#pagesRef,

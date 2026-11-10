@@ -87,8 +87,10 @@ export interface Box {
   };
   /** Vector artwork: shapes in the drawing's own units, scaled to fit the box. */
   vector?: {
-    items: (color: Color) => DisplayItem[];
-    color: Color;
+    items: readonly DisplayItem[];
+    /** The size of the artwork in its own units. */
+    width: number;
+    height: number;
     x: number;
     y: number;
     scale: number;
@@ -1362,8 +1364,9 @@ function layoutSvg(node: LayoutNode<"Svg">, context: TextContext, area: Area): L
     height: boxHeight + vertical,
     children: [],
     vector: {
-      items: (color) => drawing.items(color),
-      color: inherit(context, props).color,
+      items: drawing.items(inherit(context, props).color),
+      width: drawing.width,
+      height: drawing.height,
       x: decoration.inset.left + (boxWidth - drawing.width * scale) / 2,
       y: decoration.inset.top + (boxHeight - drawing.height * scale) / 2,
       scale,

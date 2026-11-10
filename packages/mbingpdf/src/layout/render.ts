@@ -457,6 +457,8 @@ function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): Disp
             return moved as unknown as (typeof item.commands)[number];
           }),
         };
+      case "shared":
+        return { ...item, x: item.x + dx, y: item.y + dy };
       case "group":
         return {
           ...item,

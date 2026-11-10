@@ -21,6 +21,7 @@ import {
   render,
   Span,
   Stack,
+  Svg,
   Text,
 } from "../src/index.ts";
 import { previewPages, renderSvg, safeUrl } from "../src/svg/index.ts";
@@ -162,6 +163,20 @@ describe("SVG backend", () => {
     expect(svg).toContain('clip-path="url(#c1)"');
     expect(svg).toMatch(/<g opacity="0\.2" transform="rotate\(-20 [\d.]+ [\d.]+\)">/);
     expect(svg).toContain('stroke-dasharray="4 2"');
+  });
+
+  test("artwork used twice on a page is defined once", () => {
+    const art =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 10"><circle cx="5" cy="5" r="4"/></svg>';
+    const [svg] = renderSvg(
+      Document(
+        Page({ size: [200, 200], margin: 10 }, Svg({ src: art, width: 40 }), Svg({ src: art })),
+      ),
+    );
+    expect(svg?.match(/<symbol /g)).toHaveLength(1);
+    expect(svg).toContain('<symbol id="s1" viewBox="0 0 20 10"><path ');
+    expect(svg).toContain('<use href="#s1" x="10" y="10" width="40" height="20"/>');
+    expect(svg).toContain('<use href="#s1" x="10" y="30" width="15" height="7.5"/>');
   });
 
   test("links that a browser would run as script are left out", () => {

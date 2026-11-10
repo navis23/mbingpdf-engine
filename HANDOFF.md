@@ -62,7 +62,9 @@ M1 has just started; see `docs/05-roadmap.md`.
     with redraw on save, outlines, warnings; `build <file>`), `loadDocument`, `startPreview`. Every example
     has a default export, so `pnpm --filter mbingpdf-examples dev invoice.ts` works after a
     build.
-18. M4 remaining: shared graphics; benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
+18. Also done in M4: shared graphics. An `Svg` becomes a Form XObject (`PdfDocument.createForm`,
+    `ContentStream.form`, the `shared` display item), stored once per file per source and colour.
+19. M4 remaining: benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
@@ -85,7 +87,7 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 451 tests, build, size). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 454 tests, build, size). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 

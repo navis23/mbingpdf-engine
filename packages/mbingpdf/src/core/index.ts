@@ -35,7 +35,7 @@ export {
   PdfString,
   str,
 } from "./objects.ts";
-export { PdfPage, type PdfPageOptions } from "./page.ts";
+export { PdfForm, PdfPage, type PdfPageOptions } from "./page.ts";
 export { formatNumber, writeObject } from "./serialize.ts";
 export { StandardFont } from "./standard-font.ts";
 export * as StandardFonts from "./standard-fonts.ts";

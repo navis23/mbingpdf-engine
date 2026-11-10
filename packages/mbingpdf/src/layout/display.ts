@@ -93,7 +93,26 @@ export type DisplayItem =
       /** Clockwise rotation in degrees about `(cx, cy)`. */
       readonly rotate?: { readonly degrees: number; readonly cx: number; readonly cy: number };
       readonly items: readonly DisplayItem[];
-    };
+    }
+  | SharedItem;
+
+/**
+ * Artwork that may appear many times in a document, such as a logo on every page. Its items
+ * are in the artwork's own coordinates, within `width` × `height`; it is drawn with its
+ * top-left corner at `(x, y)`, scaled by `scale`, and cut off at its edges.
+ *
+ * A backend may store the artwork once and refer to it at each place. Two shared items are
+ * the same artwork when they have the very same `items` array.
+ */
+export interface SharedItem {
+  readonly type: "shared";
+  readonly items: readonly DisplayItem[];
+  readonly width: number;
+  readonly height: number;
+  readonly x: number;
+  readonly y: number;
+  readonly scale: number;
+}
 
 export interface DisplayPage {
   /** The finished (trimmed) size of the page. Coordinates are measured from its corner. */

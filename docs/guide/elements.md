@@ -109,7 +109,7 @@ A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is f
 | Element | Notes |
 | --- | --- |
 | `Image({ src })` | JPEG or PNG bytes. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
-| `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks |
+| `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks. The same artwork used many times (a logo on every page) is stored once in the file |
 | `QrCode({ value })` | `size` (default 72), `level`: `"L"`, `"M"`, `"Q"`, `"H"`; `quiet` (default 4 modules); `color` |
 | `Canvas({ width, height, draw })` | `draw(g, { width, height })` with `g.rect`, `roundedRect`, `circle`, `ellipse`, `line`, `moveTo`, `lineTo`, `curveTo`, `closePath`, then `fill(color)`, `stroke({ color, width, dash, cap, join })` or `fillAndStroke(color, stroke)` |
 

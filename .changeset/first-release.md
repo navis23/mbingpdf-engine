@@ -12,6 +12,7 @@ First release.
 - Fonts: TrueType, OpenType/CFF and WOFF2 with subsetting, shaping (ligatures, kerning, accents), variable-font instancing and fallback; the 14 standard fonts.
 - Text: Unicode line breaking, hyphenation for English and Indonesian, justification, fit-to-width.
 - Themes with `defineTheme`; JSX through `mbingpdf/jsx-runtime`.
+- SVG artwork used many times (a logo on every page) is stored once in the file.
 - Print: CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
 - SVG preview with `renderSvg` and `previewPages` from `mbingpdf/svg`.
 - `@mbingpdf/react` and `@mbingpdf/vue`: a `PdfPreview` component and `usePdf` for each framework.

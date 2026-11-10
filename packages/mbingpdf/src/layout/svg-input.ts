@@ -469,8 +469,11 @@ export interface ParsedSvg {
   /** The size of the drawing in its own units. */
   readonly width: number;
   readonly height: number;
-  /** The shapes, with the drawing's top-left corner at the origin. */
-  items(currentColor: Color): DisplayItem[];
+  /**
+   * The shapes, with the drawing's top-left corner at the origin. The same colour gives the
+   * very same array each time, which is how a backend knows artwork it has drawn before.
+   */
+  items(currentColor: Color): readonly DisplayItem[];
 }
 
 const parsed: Map<string, ParsedSvg> = new Map();
@@ -505,157 +508,165 @@ export function parseSvg(source: string | Uint8Array): ParsedSvg {
   };
   index(svg);
 
+  const byColor = new Map<string, readonly DisplayItem[]>();
   const result: ParsedSvg = {
     width,
     height,
     items(currentColor) {
-      const resolve = (paint: Paint): Color | undefined =>
-        paint === "none" ? undefined : paint === "current" ? currentColor : paint;
-
-      const draw = (
-        element: Element,
-        inherited: DrawState,
-        matrix: Matrix,
-        into: DisplayItem[],
-        depth: number,
-      ): void => {
-        if (depth > 32) return;
-        const name = element.name;
-        if (
-          name === "defs" ||
-          name === "symbol" ||
-          name === "clipPath" ||
-          name === "mask" ||
-          name === "metadata" ||
-          name === "title" ||
-          name === "desc" ||
-          name === "style"
-        )
-          return;
-        // The style attribute overrides presentation attributes.
-        const a: Record<string, string> = { ...element.attributes };
-        for (const declaration of (element.attributes.style ?? "").split(";")) {
-          const colon = declaration.indexOf(":");
-          if (colon > 0)
-            a[declaration.slice(0, colon).trim()] = declaration.slice(colon + 1).trim();
-        }
-        if (a.display === "none" || a.visibility === "hidden") return;
-
-        const state: DrawState = { ...inherited };
-        if (a.fill !== undefined) state.fill = parsePaint(a.fill) ?? gray(0);
-        if (a.stroke !== undefined) state.stroke = parsePaint(a.stroke) ?? "none";
-        if (a["stroke-width"] !== undefined) state.strokeWidth = number(a["stroke-width"], 1);
-        if (
-          a["stroke-linecap"] === "butt" ||
-          a["stroke-linecap"] === "round" ||
-          a["stroke-linecap"] === "square"
-        )
-          state.cap = a["stroke-linecap"];
-        if (
-          a["stroke-linejoin"] === "miter" ||
-          a["stroke-linejoin"] === "round" ||
-          a["stroke-linejoin"] === "bevel"
-        )
-          state.join = a["stroke-linejoin"];
-        if (a["stroke-dasharray"] !== undefined) {
-          const dash = a["stroke-dasharray"]
-            .split(/[\s,]+/)
-            .filter(Boolean)
-            .map(Number);
-          state.dash =
-            dash.length > 0 && dash.every((value) => value >= 0) && dash.some((value) => value > 0)
-              ? dash
-              : undefined;
-        }
-        if (a["fill-rule"] !== undefined) state.evenOdd = a["fill-rule"] === "evenodd";
-        if (a["fill-opacity"] !== undefined)
-          state.fillOpacity = Math.min(1, Math.max(0, number(a["fill-opacity"], 1)));
-        if (a["stroke-opacity"] !== undefined)
-          state.strokeOpacity = Math.min(1, Math.max(0, number(a["stroke-opacity"], 1)));
-
-        let local = multiply(matrix, parseTransform(a.transform));
-        // Opacity applies to the element as a whole, so it gets a group of its own.
-        const opacity =
-          a.opacity !== undefined ? Math.min(1, Math.max(0, number(a.opacity, 1))) : 1;
-        let target = into;
-        if (opacity < 1) {
-          const group: DisplayItem[] = [];
-          into.push({ type: "group", opacity, items: group });
-          target = group;
-        }
-
-        if (name === "g" || name === "svg" || name === "a" || name === "switch") {
-          for (const child of element.children) draw(child, state, local, target, depth + 1);
-          return;
-        }
-        if (name === "use") {
-          const reference = ids.get((a.href ?? a["xlink:href"] ?? "").replace(/^#/, ""));
-          if (reference) {
-            local = multiply(local, [1, 0, 0, 1, number(a.x), number(a.y)]);
-            if (reference.name === "symbol")
-              for (const child of reference.children) draw(child, state, local, target, depth + 1);
-            else draw(reference, state, local, target, depth + 1);
-          }
-          return;
-        }
-
-        const path = shapePath(element);
-        if (path.length === 0) return;
-        const commands = transformPath(path, local);
-        const fill = resolve(state.fill);
-        const strokeColor = state.strokeWidth > 0 ? resolve(state.stroke) : undefined;
-        // A stroke is scaled with the drawing; under an uneven scale, by the geometric mean.
-        const scale = Math.sqrt(Math.abs(local[0] * local[3] - local[1] * local[2]));
-        const stroke: StrokeStyle | undefined = strokeColor
-          ? {
-              color: strokeColor,
-              width: state.strokeWidth * scale,
-              ...(state.cap ? { cap: state.cap } : {}),
-              ...(state.join ? { join: state.join } : {}),
-              ...(state.dash ? { dash: state.dash.map((value) => value * scale) } : {}),
-            }
-          : undefined;
-        const paint = (opacityOf: number, item: DisplayItem): void => {
-          if (opacityOf < 1) target.push({ type: "group", opacity: opacityOf, items: [item] });
-          else target.push(item);
-        };
-        if (fill && stroke && state.fillOpacity === 1 && state.strokeOpacity === 1) {
-          target.push({
-            type: "path",
-            commands,
-            fill,
-            stroke,
-            ...(state.evenOdd ? { evenOdd: true } : {}),
-          });
-          return;
-        }
-        if (fill && state.fillOpacity > 0) {
-          paint(state.fillOpacity, {
-            type: "path",
-            commands,
-            fill,
-            ...(state.evenOdd ? { evenOdd: true } : {}),
-          });
-        }
-        if (stroke && state.strokeOpacity > 0)
-          paint(state.strokeOpacity, { type: "path", commands, stroke });
-      };
-
-      const items: DisplayItem[] = [];
-      const initial: DrawState = {
-        fill: gray(0),
-        stroke: "none",
-        strokeWidth: 1,
-        cap: undefined,
-        join: undefined,
-        dash: undefined,
-        evenOdd: false,
-        fillOpacity: 1,
-        strokeOpacity: 1,
-      };
-      draw(svg, initial, [1, 0, 0, 1, -minX, -minY], items, 0);
-      return items;
+      const colorKey = JSON.stringify(currentColor);
+      let made = byColor.get(colorKey);
+      if (!made) {
+        made = itemsFor(currentColor);
+        byColor.set(colorKey, made);
+      }
+      return made;
     },
+  };
+  const itemsFor = (currentColor: Color): DisplayItem[] => {
+    const resolve = (paint: Paint): Color | undefined =>
+      paint === "none" ? undefined : paint === "current" ? currentColor : paint;
+
+    const draw = (
+      element: Element,
+      inherited: DrawState,
+      matrix: Matrix,
+      into: DisplayItem[],
+      depth: number,
+    ): void => {
+      if (depth > 32) return;
+      const name = element.name;
+      if (
+        name === "defs" ||
+        name === "symbol" ||
+        name === "clipPath" ||
+        name === "mask" ||
+        name === "metadata" ||
+        name === "title" ||
+        name === "desc" ||
+        name === "style"
+      )
+        return;
+      // The style attribute overrides presentation attributes.
+      const a: Record<string, string> = { ...element.attributes };
+      for (const declaration of (element.attributes.style ?? "").split(";")) {
+        const colon = declaration.indexOf(":");
+        if (colon > 0) a[declaration.slice(0, colon).trim()] = declaration.slice(colon + 1).trim();
+      }
+      if (a.display === "none" || a.visibility === "hidden") return;
+
+      const state: DrawState = { ...inherited };
+      if (a.fill !== undefined) state.fill = parsePaint(a.fill) ?? gray(0);
+      if (a.stroke !== undefined) state.stroke = parsePaint(a.stroke) ?? "none";
+      if (a["stroke-width"] !== undefined) state.strokeWidth = number(a["stroke-width"], 1);
+      if (
+        a["stroke-linecap"] === "butt" ||
+        a["stroke-linecap"] === "round" ||
+        a["stroke-linecap"] === "square"
+      )
+        state.cap = a["stroke-linecap"];
+      if (
+        a["stroke-linejoin"] === "miter" ||
+        a["stroke-linejoin"] === "round" ||
+        a["stroke-linejoin"] === "bevel"
+      )
+        state.join = a["stroke-linejoin"];
+      if (a["stroke-dasharray"] !== undefined) {
+        const dash = a["stroke-dasharray"]
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map(Number);
+        state.dash =
+          dash.length > 0 && dash.every((value) => value >= 0) && dash.some((value) => value > 0)
+            ? dash
+            : undefined;
+      }
+      if (a["fill-rule"] !== undefined) state.evenOdd = a["fill-rule"] === "evenodd";
+      if (a["fill-opacity"] !== undefined)
+        state.fillOpacity = Math.min(1, Math.max(0, number(a["fill-opacity"], 1)));
+      if (a["stroke-opacity"] !== undefined)
+        state.strokeOpacity = Math.min(1, Math.max(0, number(a["stroke-opacity"], 1)));
+
+      let local = multiply(matrix, parseTransform(a.transform));
+      // Opacity applies to the element as a whole, so it gets a group of its own.
+      const opacity = a.opacity !== undefined ? Math.min(1, Math.max(0, number(a.opacity, 1))) : 1;
+      let target = into;
+      if (opacity < 1) {
+        const group: DisplayItem[] = [];
+        into.push({ type: "group", opacity, items: group });
+        target = group;
+      }
+
+      if (name === "g" || name === "svg" || name === "a" || name === "switch") {
+        for (const child of element.children) draw(child, state, local, target, depth + 1);
+        return;
+      }
+      if (name === "use") {
+        const reference = ids.get((a.href ?? a["xlink:href"] ?? "").replace(/^#/, ""));
+        if (reference) {
+          local = multiply(local, [1, 0, 0, 1, number(a.x), number(a.y)]);
+          if (reference.name === "symbol")
+            for (const child of reference.children) draw(child, state, local, target, depth + 1);
+          else draw(reference, state, local, target, depth + 1);
+        }
+        return;
+      }
+
+      const path = shapePath(element);
+      if (path.length === 0) return;
+      const commands = transformPath(path, local);
+      const fill = resolve(state.fill);
+      const strokeColor = state.strokeWidth > 0 ? resolve(state.stroke) : undefined;
+      // A stroke is scaled with the drawing; under an uneven scale, by the geometric mean.
+      const scale = Math.sqrt(Math.abs(local[0] * local[3] - local[1] * local[2]));
+      const stroke: StrokeStyle | undefined = strokeColor
+        ? {
+            color: strokeColor,
+            width: state.strokeWidth * scale,
+            ...(state.cap ? { cap: state.cap } : {}),
+            ...(state.join ? { join: state.join } : {}),
+            ...(state.dash ? { dash: state.dash.map((value) => value * scale) } : {}),
+          }
+        : undefined;
+      const paint = (opacityOf: number, item: DisplayItem): void => {
+        if (opacityOf < 1) target.push({ type: "group", opacity: opacityOf, items: [item] });
+        else target.push(item);
+      };
+      if (fill && stroke && state.fillOpacity === 1 && state.strokeOpacity === 1) {
+        target.push({
+          type: "path",
+          commands,
+          fill,
+          stroke,
+          ...(state.evenOdd ? { evenOdd: true } : {}),
+        });
+        return;
+      }
+      if (fill && state.fillOpacity > 0) {
+        paint(state.fillOpacity, {
+          type: "path",
+          commands,
+          fill,
+          ...(state.evenOdd ? { evenOdd: true } : {}),
+        });
+      }
+      if (stroke && state.strokeOpacity > 0)
+        paint(state.strokeOpacity, { type: "path", commands, stroke });
+    };
+
+    const items: DisplayItem[] = [];
+    const initial: DrawState = {
+      fill: gray(0),
+      stroke: "none",
+      strokeWidth: 1,
+      cap: undefined,
+      join: undefined,
+      dash: undefined,
+      evenOdd: false,
+      fillOpacity: 1,
+      strokeOpacity: 1,
+    };
+    draw(svg, initial, [1, 0, 0, 1, -minX, -minY], items, 0);
+    return items;
   };
   if (parsed.size >= 64) parsed.clear();
   parsed.set(text, result);

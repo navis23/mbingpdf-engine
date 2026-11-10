@@ -1,6 +1,43 @@
 /** The PDF backend: writes a display list to a page of a PDF document. */
-import { type AnyFont, type ContentStream, cmyk, type PdfDocument } from "../core/index.ts";
-import type { DisplayItem, DisplayPage, PathCommand } from "./display.ts";
+import {
+  type AnyFont,
+  type ContentStream,
+  cmyk,
+  type PdfDocument,
+  type PdfForm,
+} from "../core/index.ts";
+import type { DisplayItem, DisplayPage, PathCommand, SharedItem } from "./display.ts";
+
+/** What links, anchors and headings turn into; they belong to a page, not to its drawing. */
+interface Hooks {
+  link(item: Extract<DisplayItem, { type: "link" }>): void;
+  anchor(item: Extract<DisplayItem, { type: "anchor" }>): void;
+  heading(item: Extract<DisplayItem, { type: "heading" }>): void;
+}
+
+const NO_HOOKS: Hooks = { link: () => {}, anchor: () => {}, heading: () => {} };
+
+/** The artwork already stored in each document, by its array of items. */
+const stored: WeakMap<PdfDocument, WeakMap<readonly DisplayItem[], PdfForm>> = new WeakMap();
+
+/** The stored form of a piece of shared artwork, drawing it the first time it is met. */
+function formFor(document: PdfDocument, item: SharedItem): PdfForm {
+  let forms = stored.get(document);
+  if (!forms) {
+    forms = new WeakMap();
+    stored.set(document, forms);
+  }
+  let form = forms.get(item.items);
+  if (!form) {
+    form = document.createForm([0, 0, item.width, item.height]);
+    // Display items measure down from the top; a form measures up from its bottom.
+    form.content.transform(1, 0, 0, -1, 0, item.height);
+    drawItems(document, form.content, item.items, NO_HOOKS);
+    form.end();
+    forms.set(item.items, form);
+  }
+  return form;
+}
 
 function tracePath(content: ContentStream, commands: readonly PathCommand[]): void {
   for (const command of commands) {
@@ -14,13 +51,10 @@ function tracePath(content: ContentStream, commands: readonly PathCommand[]): vo
 }
 
 function drawItems(
+  document: PdfDocument,
   content: ContentStream,
   items: readonly DisplayItem[],
-  hooks: {
-    link(item: Extract<DisplayItem, { type: "link" }>): void;
-    anchor(item: Extract<DisplayItem, { type: "anchor" }>): void;
-    heading(item: Extract<DisplayItem, { type: "heading" }>): void;
-  },
+  hooks: Hooks,
 ): void {
   for (const item of items) {
     switch (item.type) {
@@ -73,8 +107,17 @@ function drawItems(
         content.save();
         if (item.rotate) content.rotate(item.rotate.degrees, item.rotate.cx, item.rotate.cy);
         if (item.opacity !== undefined) content.opacity(item.opacity);
-        drawItems(content, item.items, hooks);
+        drawItems(document, content, item.items, hooks);
         content.restore();
+        break;
+      case "shared":
+        // Stored once in the file; here it is only placed. The form's origin is its bottom-left
+        // corner, which sits `height × scale` below the item's top-left corner.
+        content
+          .save()
+          .transform(item.scale, 0, 0, -item.scale, item.x, item.y + item.height * item.scale)
+          .form(formFor(document, item))
+          .restore();
         break;
     }
   }
@@ -122,7 +165,7 @@ export function writeDisplayPage(
   // the sheet's own, which measure up from its bottom-left corner.
   const sheetX = (x: number): number => x + offset;
   const sheetY = (y: number): number => offset + page.height - y;
-  drawItems(content, page.items, {
+  drawItems(document, content, page.items, {
     link: (item) => {
       const bottom = sheetY(item.y + item.height);
       if (item.url !== undefined)

@@ -2,7 +2,13 @@
  * The document level: elements, layout with pagination, and rendering.
  */
 export { CanvasContext, type CanvasStroke } from "./canvas.ts";
-export type { DisplayItem, DisplayPage, PathCommand, StrokeStyle } from "./display.ts";
+export type {
+  DisplayItem,
+  DisplayPage,
+  PathCommand,
+  SharedItem,
+  StrokeStyle,
+} from "./display.ts";
 export {
   Absolute,
   Box,

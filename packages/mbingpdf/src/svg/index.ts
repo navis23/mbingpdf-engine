@@ -104,6 +104,7 @@ class PageWriter {
   readonly defs: string[] = [];
   readonly #fontIds: Map<TextFont, number> = new Map();
   readonly #glyphs: Set<string> = new Set();
+  readonly #shared: Map<readonly DisplayItem[], string> = new Map();
   #clips = 0;
 
   /** The id of a glyph's shape in `<defs>`, defining it on first use. */
@@ -195,6 +196,20 @@ class PageWriter {
             ? ` transform="rotate(${n(item.rotate.degrees)} ${n(item.rotate.cx)} ${n(item.rotate.cy)})"`
             : "";
           out += `<g${opacity}${rotate}>${this.items(item.items)}</g>`;
+          break;
+        }
+        case "shared": {
+          // Drawn once per page in <defs>, however often the page uses it.
+          let id = this.#shared.get(item.items);
+          if (id === undefined) {
+            id = `s${this.#shared.size + 1}`;
+            this.#shared.set(item.items, id);
+            const body = this.items(item.items);
+            this.defs.push(
+              `<symbol id="${id}" viewBox="0 0 ${n(item.width)} ${n(item.height)}">${body}</symbol>`,
+            );
+          }
+          out += `<use href="#${id}" x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width * item.scale)}" height="${n(item.height * item.scale)}"/>`;
           break;
         }
       }
