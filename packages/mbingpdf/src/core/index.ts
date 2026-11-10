@@ -18,6 +18,7 @@ export {
 export { PdfDocument, type PdfDocumentOptions, type PdfInfo } from "./document.ts";
 export { EmbeddedFont, type FontProgram } from "./embedded-font.ts";
 export type { PositionedGlyph } from "./glyph-run.ts";
+export { orientationMatrix, orientedSize, type PdfImage } from "./image.ts";
 export {
   dict,
   name,

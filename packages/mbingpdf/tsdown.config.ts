@@ -5,6 +5,7 @@ const config: UserConfig = defineConfig({
     index: "src/index.ts",
     "core/index": "src/core/index.ts",
     "font/index": "src/font/index.ts",
+    "image/index": "src/image/index.ts",
     "text/index": "src/text/index.ts",
   },
   format: ["esm", "cjs"],

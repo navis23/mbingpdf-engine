@@ -1,5 +1,6 @@
 import { type AnyFont, ContentStream, type FontBinding } from "./content.ts";
-import { PdfDict, PdfName, type PdfRef, PdfStream } from "./objects.ts";
+import type { PdfImage } from "./image.ts";
+import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
 import type { Box, PageSize } from "./units.ts";
 import type { PdfWriter } from "./writer.ts";
 
@@ -18,6 +19,8 @@ export interface PageHost {
   readonly pagesRef: PdfRef;
   /** A shared graphics state with the given opacities. */
   opacityState(fill: number | undefined, stroke: number | undefined): { name: string; ref: PdfRef };
+  /** The document-wide XObject for an image. */
+  imageResource(image: PdfImage): { name: string; ref: PdfRef };
   /** The document-wide font object and encoder for a font. */
   fontResource(font: AnyFont): FontBinding & { ref: PdfRef };
 }
@@ -45,6 +48,7 @@ export class PdfPage {
   readonly #content: ContentStream;
   /** Resource category (`ExtGState`, `Font`, …) → resource name → object. */
   readonly #resources: Map<string, Map<string, PdfRef>> = new Map();
+  readonly #annotations: PdfObject[] = [];
   #ended = false;
 
   constructor(host: PageHost, options: PdfPageOptions) {
@@ -80,6 +84,11 @@ export class PdfPage {
         this.setResource("Font", resource.name, resource.ref);
         return resource;
       },
+      image: (image) => {
+        const resource = host.imageResource(image);
+        this.setResource("XObject", resource.name, resource.ref);
+        return resource.name;
+      },
     });
   }
 
@@ -98,6 +107,27 @@ export class PdfPage {
       this.#resources.set(category, entries);
     }
     entries.set(resourceName, ref);
+  }
+
+  /**
+   * Makes a rectangle of the page a link to a web address. The rectangle is in the page's own
+   * coordinates: lower-left corner, width and height.
+   */
+  addLink(x: number, y: number, width: number, height: number, url: string): void {
+    if (this.#ended) throw new Error("This page is already written");
+    this.#annotations.push(
+      new PdfDict({
+        Type: new PdfName("Annot"),
+        Subtype: new PdfName("Link"),
+        Rect: [x, y, x + width, y + height],
+        Border: [0, 0, 0],
+        A: new PdfDict({
+          Type: new PdfName("Action"),
+          S: new PdfName("URI"),
+          URI: PdfString.text(url),
+        }),
+      }),
+    );
   }
 
   /**
@@ -124,6 +154,10 @@ export class PdfPage {
         TrimBox: this.trimBox,
         Resources: resources,
         Contents: bytes.length > 0 ? writer.add(new PdfStream(bytes)) : undefined,
+        Annots:
+          this.#annotations.length > 0
+            ? this.#annotations.map((annotation) => writer.add(annotation))
+            : undefined,
       }),
     );
   }

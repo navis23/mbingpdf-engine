@@ -1,6 +1,7 @@
 import type { AnyFont, FontBinding } from "./content.ts";
 import { EmbeddedFont } from "./embedded-font.ts";
 import { writeGlyphRun } from "./glyph-run.ts";
+import { type PdfImage, writeImage } from "./image.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
 import { PdfPage, type PdfPageOptions } from "./page.ts";
 import { writeObject } from "./serialize.ts";
@@ -43,6 +44,7 @@ export class PdfDocument {
   readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
   readonly #fonts: Map<AnyFont, FontBinding & { ref: PdfRef }> = new Map();
   readonly #embedded: { font: EmbeddedFont; ref: PdfRef }[] = [];
+  readonly #images: Map<PdfImage, { name: string; ref: PdfRef }> = new Map();
 
   constructor(options: PdfDocumentOptions = {}) {
     this.writer = new PdfWriter(options);
@@ -63,6 +65,7 @@ export class PdfDocument {
         pagesRef: this.#pagesRef,
         opacityState: (fill, stroke) => this.#opacityState(fill, stroke),
         fontResource: (font) => this.#fontResource(font),
+        imageResource: (image) => this.#imageResource(image),
       },
       options,
     );
@@ -104,6 +107,16 @@ export class PdfDocument {
       this.#opacityStates.set(key, state);
     }
     return state;
+  }
+
+  /** One XObject per image, however many times and on however many pages it is drawn. */
+  #imageResource(image: PdfImage): { name: string; ref: PdfRef } {
+    let resource = this.#images.get(image);
+    if (!resource) {
+      resource = { name: `Im${this.#images.size + 1}`, ref: writeImage(this.writer, image) };
+      this.#images.set(image, resource);
+    }
+    return resource;
   }
 
   /** One font object per font, shared by every page that uses it. */

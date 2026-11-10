@@ -2,6 +2,7 @@ import { ByteWriter } from "./bytes.ts";
 import type { Color } from "./color.ts";
 import type { FontProgram } from "./embedded-font.ts";
 import type { PositionedGlyph } from "./glyph-run.ts";
+import { orientationMatrix, type PdfImage } from "./image.ts";
 import { PdfName } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
 import type { StandardFont } from "./standard-font.ts";
@@ -34,6 +35,8 @@ export interface ContentResources {
   opacity(fill: number | undefined, stroke: number | undefined): string;
   /** Registers a font with the page and returns how to refer to it and write text in it. */
   font(font: AnyFont): FontBinding;
+  /** Registers an image with the page and returns its resource name. */
+  image(image: PdfImage): string;
 }
 
 /** A font that every viewer has built in, or a font program to embed. */
@@ -393,6 +396,24 @@ export class ContentStream {
 
   textRenderingMode(mode: TextRenderingMode): this {
     return this.#op("Tr", String(TEXT_RENDERING_MODES[mode]));
+  }
+
+  // ----- images -----
+
+  /**
+   * Draws an image in the rectangle with its lower-left corner at `(x, y)`, stretched to
+   * `width` × `height`. A photo's EXIF orientation is applied, so it appears upright; use
+   * `orientedSize(image)` to get its proportions. Needs a page.
+   */
+  image(image: PdfImage, x: number, y: number, width: number, height: number): this {
+    if (!this.#resources) throw new Error("image() needs a content stream that belongs to a page");
+    this.#noText("image()");
+    const resourceName = this.#resources.image(image);
+    this.save().transform(width, 0, 0, height, x, y);
+    const orientation = orientationMatrix(image.orientation);
+    if (image.orientation !== undefined && image.orientation !== 1) this.transform(...orientation);
+    this.#op("Do", this.#name(resourceName));
+    return this.restore();
   }
 
   // ----- escape hatch and output -----

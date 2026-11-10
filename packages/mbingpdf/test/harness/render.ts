@@ -39,14 +39,14 @@ function openPdfjs(pdf: Uint8Array) {
   });
 }
 
-async function renderWithPdfjs(pdf: Uint8Array): Promise<RenderedPage[]> {
+async function renderWithPdfjs(pdf: Uint8Array, scale: number): Promise<RenderedPage[]> {
   const task = openPdfjs(pdf);
   const pages: RenderedPage[] = [];
   try {
     const doc = await task.promise;
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
-      const viewport = page.getViewport({ scale: RENDER_SCALE });
+      const viewport = page.getViewport({ scale });
       const width = Math.ceil(viewport.width);
       const height = Math.ceil(viewport.height);
       const canvas = createCanvas(width, height);
@@ -71,14 +71,14 @@ async function renderWithPdfjs(pdf: Uint8Array): Promise<RenderedPage[]> {
 
 let pdfium: Promise<PDFiumLibrary> | undefined;
 
-async function renderWithPdfium(pdf: Uint8Array): Promise<RenderedPage[]> {
+async function renderWithPdfium(pdf: Uint8Array, scale: number): Promise<RenderedPage[]> {
   pdfium ??= PDFiumLibrary.init();
   const library = await pdfium;
   const doc = await library.loadDocument(pdf);
   const pages: RenderedPage[] = [];
   try {
     for (const page of doc.pages()) {
-      const image = await page.render({ scale: RENDER_SCALE, render: "bitmap" });
+      const image = await page.render({ scale, render: "bitmap" });
       pages.push({
         width: image.width,
         height: image.height,
@@ -104,8 +104,12 @@ function flattenOnWhite(rgba: Uint8Array): Uint8Array {
   return out;
 }
 
-export function renderPdf(renderer: Renderer, pdf: Uint8Array): Promise<RenderedPage[]> {
-  return renderer === "pdfjs" ? renderWithPdfjs(pdf) : renderWithPdfium(pdf);
+export function renderPdf(
+  renderer: Renderer,
+  pdf: Uint8Array,
+  scale: number = RENDER_SCALE,
+): Promise<RenderedPage[]> {
+  return renderer === "pdfjs" ? renderWithPdfjs(pdf, scale) : renderWithPdfium(pdf, scale);
 }
 
 /** Extracts the text of each page with pdf.js, one string per run of text. */
