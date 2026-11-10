@@ -44,6 +44,9 @@ importers:
       harfbuzzjs:
         specifier: ^1.6.4
         version: 1.6.4
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
       pdfjs-dist:
         specifier: ^6.5.438
         version: 6.5.438
@@ -782,6 +785,9 @@ packages:
 
   jsonc-parser@3.3.1:
     resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
+
+  jsqr@1.4.0:
+    resolution: {integrity: sha512-dxLob7q65Xg2DvstYkRpkYtmKm2sPJ9oFhrhmudT1dZvNFFTlroai3AWSpLey/w5vMcLBXRgOJsbXpdN9HzU/A==}
 
   launch-editor@2.14.2:
     resolution: {integrity: sha512-NHJEb30MGBCkmZXLZwz25t37QR4aY03ZzPYUJXOJaOa92uWwExI9SBQUuIznBYc1xkD7cJNGX7oc3Nl3sq2kQQ==}
@@ -1668,6 +1674,8 @@ snapshots:
   jju@1.4.0: {}
 
   jsonc-parser@3.3.1: {}
+
+  jsqr@1.4.0: {}
 
   launch-editor@2.14.2:
     dependencies:

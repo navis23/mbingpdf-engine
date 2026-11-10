@@ -7,6 +7,7 @@
  */
 import { type Color, orientedSize, type PdfImage } from "../core/index.ts";
 import { decodeImage } from "../image/index.ts";
+import { qrCode } from "../qr/index.ts";
 import {
   type InlineSpan,
   layoutSpans,
@@ -36,6 +37,8 @@ import type {
   GridProps,
   ImageProps,
   LayoutNode,
+  ListProps,
+  QrCodeProps,
   RowProps,
   SpacerProps,
   StackProps,
@@ -241,6 +244,51 @@ function paragraphOf(
   });
 }
 
+/**
+ * Lays out a text on one line at the size that makes it fill `width`, within the limits its
+ * `fit` property gives. Returns the paragraph and where the line starts for its alignment.
+ */
+function fitParagraph(
+  node: LayoutNode<"Text">,
+  context: TextContext,
+  width: number,
+): { paragraph: ParagraphLayout; offset: number } | undefined {
+  const fit = node.props.fit;
+  const own = textContext(node, context);
+  const spans: InlineSpan[] = [];
+  collectSpans(node, own, undefined, spans);
+  if (spans.length === 0 || !fit) return undefined;
+  const base = own.size;
+  const limits = typeof fit === "object" ? fit : {};
+  const max = limits.max ?? base;
+  const min = Math.min(limits.min ?? max / 10, max);
+
+  /** The spans with every font size multiplied by `scale`, on one unwrapped line. */
+  const at = (scale: number, spacing: boolean): ParagraphLayout =>
+    layoutSpans(
+      spans.map((span) => ({
+        text: span.text.replace(/\s*\n\s*/g, " "),
+        style: {
+          ...span.style,
+          size: span.style.size * scale,
+          ...(spacing ? {} : { letterSpacing: 0, wordSpacing: 0 }),
+        },
+      })),
+    );
+  // Glyph widths grow with the size; letter and word spacing are fixed amounts.
+  const natural = at(max / base, true);
+  let paragraph = natural;
+  if (natural.width > width) {
+    const scalable = at(max / base, false).width;
+    const fixed = natural.width - scalable;
+    const scale = scalable > 0 ? ((width - fixed) / scalable) * (max / base) : max / base;
+    paragraph = at(Math.max(min / base, Math.min(max / base, scale)), true);
+  }
+  const slack = width - paragraph.width;
+  const offset = own.textAlign === "center" ? slack / 2 : own.textAlign === "right" ? slack : 0;
+  return { paragraph, offset };
+}
+
 /** The narrowest and the natural width of an element's border box. */
 export function measure(node: LayoutNode, context: TextContext): { min: number; max: number } {
   const props = boxProps(node);
@@ -293,6 +341,11 @@ export function measure(node: LayoutNode, context: TextContext): { min: number; 
       const size = measureTable(node as LayoutNode<"Table">, context);
       return size;
     }
+    case "List":
+      return measure(expandList(node as LayoutNode<"List">, context), context);
+    case "QrCode":
+      max = min = (node as LayoutNode<"QrCode">).props.size ?? 72;
+      break;
     case "Grid": {
       const grid = (node as LayoutNode<"Grid">).props;
       const gap = Array.isArray(grid.gap)
@@ -721,7 +774,8 @@ function layoutText(
   const width = widthIn(node, context, area);
   const innerWidth = Math.max(0, width - decoration.inset.left - decoration.inset.right);
 
-  const paragraph = state?.paragraph ?? paragraphOf(node, context, innerWidth);
+  const fitted = props.fit && !state ? fitParagraph(node, context, innerWidth) : undefined;
+  const paragraph = state?.paragraph ?? fitted?.paragraph ?? paragraphOf(node, context, innerWidth);
   const box: Box = { x: 0, y: 0, width, height: 0, children: [] };
   if (!paragraph) {
     box.height = decoration.inset.top + decoration.inset.bottom;
@@ -758,9 +812,8 @@ function layoutText(
   const textHeight = last ? last.top + last.height - origin : 0;
   const finished = from + count >= lines.length;
   box.height = top + textHeight + (finished ? decoration.inset.bottom : 0);
-  box.text = { lines: shown, x: decoration.inset.left, y: top - origin };
+  box.text = { lines: shown, x: decoration.inset.left + (fitted?.offset ?? 0), y: top - origin };
   decorate(box, node, decoration, { top: !first, bottom: !finished });
-  void props;
   return finished ? { box } : { box, state: { paragraph, line: from + count } satisfies TextState };
 }
 
@@ -907,6 +960,145 @@ function layoutCanvas(node: LayoutNode<"Canvas">, context: TextContext, area: Ar
   return { box };
 }
 
+const ROMAN: readonly (readonly [number, string])[] = [
+  [1000, "m"],
+  [900, "cm"],
+  [500, "d"],
+  [400, "cd"],
+  [100, "c"],
+  [90, "xc"],
+  [50, "l"],
+  [40, "xl"],
+  [10, "x"],
+  [9, "ix"],
+  [5, "v"],
+  [4, "iv"],
+  [1, "i"],
+];
+
+/** The marker of a list item, for the built-in numbering styles. */
+export function listMarker(style: string, number: number): string {
+  switch (style) {
+    case "disc":
+      return "\u2022";
+    case "dash":
+      return "\u2013";
+    case "decimal":
+      return `${number}.`;
+    case "lower-alpha":
+    case "upper-alpha": {
+      // a … z, aa, ab, …
+      let text = "";
+      for (let n = Math.max(1, number); n > 0; n = Math.floor((n - 1) / 26)) {
+        text = String.fromCharCode(97 + ((n - 1) % 26)) + text;
+      }
+      return `${style === "upper-alpha" ? text.toUpperCase() : text}.`;
+    }
+    case "lower-roman":
+    case "upper-roman": {
+      let text = "";
+      let rest = Math.max(1, Math.min(3999, number));
+      for (const [value, numeral] of ROMAN) {
+        while (rest >= value) {
+          text += numeral;
+          rest -= value;
+        }
+      }
+      return `${style === "upper-roman" ? text.toUpperCase() : text}.`;
+    }
+    default:
+      return style;
+  }
+}
+
+const expandedLists: WeakMap<LayoutNode, Map<TextContext, LayoutNode>> = new WeakMap();
+
+/** A list is a stack of rows: a right-aligned marker, then the item. */
+function expandList(node: LayoutNode<"List">, context: TextContext): LayoutNode {
+  let byContext = expandedLists.get(node);
+  if (!byContext) {
+    byContext = new Map();
+    expandedLists.set(node, byContext);
+  }
+  const cached = byContext.get(context);
+  if (cached) return cached;
+
+  const props = node.props as ListProps;
+  const own = inherit(context, props);
+  const { marker, start, gap, markerGap, markerWidth, splitItems, ...box } = props;
+  const items = normalize(node.children);
+  const markers = items.map((_item, i) => {
+    const number = (start ?? 1) + i;
+    return typeof marker === "function" ? marker(number) : listMarker(marker ?? "disc", number);
+  });
+  const markerNodes = markers.map(
+    (text): LayoutNode => ({ type: "Text", props: { align: "right" }, children: [text] }),
+  );
+  const width =
+    markerWidth ?? Math.max(0, ...markerNodes.map((markerNode) => measure(markerNode, own).max));
+  const expanded: LayoutNode = {
+    type: "Stack",
+    props: { ...box, ...(gap !== undefined ? { gap } : {}) },
+    children: items.map(
+      (item, i): LayoutNode => ({
+        type: "Row",
+        props: {
+          gap: markerGap ?? own.size / 2,
+          align: "start",
+          ...(splitItems ? {} : { keepTogether: true }),
+        },
+        children: [
+          { ...(markerNodes[i] as LayoutNode), props: { align: "right", width, shrink: 0 } },
+          { type: "Stack", props: { grow: 1, basis: 0 }, children: [item] },
+        ],
+      }),
+    ),
+  };
+  byContext.set(context, expanded);
+  return expanded;
+}
+
+function layoutQrCode(node: LayoutNode<"QrCode">, context: TextContext, area: Area): LayoutResult {
+  const props = node.props as QrCodeProps;
+  const decoration = decorationOf(node, context);
+  const size = props.size ?? 72;
+  const height = size + decoration.inset.top + decoration.inset.bottom;
+  if (height > area.height + 1e-6 && !area.fresh) return { state: RETRY };
+  const code = qrCode(props.value, props.level ? { level: props.level } : {});
+  const quiet = Math.max(0, props.quiet ?? 4);
+  const module = size / (code.size + quiet * 2);
+  const box: Box = {
+    x: 0,
+    y: 0,
+    width: size + decoration.inset.left + decoration.inset.right,
+    height,
+    children: [],
+    canvas: {
+      // All dark modules go into one path: runs along each row become rectangles.
+      draw: (g) => {
+        for (let y = 0; y < code.size; y++) {
+          const row = code.modules[y] as readonly boolean[];
+          for (let x = 0; x < code.size; x++) {
+            if (!row[x]) continue;
+            let end = x;
+            while (end + 1 < code.size && row[end + 1]) end++;
+            g.rect((quiet + x) * module, (quiet + y) * module, (end - x + 1) * module, module);
+            x = end;
+          }
+        }
+        g.fill();
+      },
+      color: props.color === undefined ? inherit(context, props).color : toColor(props.color),
+      x: decoration.inset.left,
+      y: decoration.inset.top,
+      width: size,
+      height: size,
+    },
+  };
+  decorate(box, node, decoration, { top: false, bottom: false });
+  return { box };
+}
+
 /**
  * Lays out one element in an area.
  *
@@ -953,6 +1145,16 @@ export function layout(
       return layoutCanvas(node as LayoutNode<"Canvas">, context, area);
     case "Table":
       return layoutTable(node as LayoutNode<"Table">, context, area, resume as never, sink);
+    case "List":
+      return layoutStack(
+        expandList(node as LayoutNode<"List">, context),
+        context,
+        area,
+        resume as StackState | undefined,
+        sink,
+      );
+    case "QrCode":
+      return layoutQrCode(node as LayoutNode<"QrCode">, context, area);
     case "TableRow":
     case "Cell":
       throw new LayoutError(`${node.type} belongs inside a Table`);

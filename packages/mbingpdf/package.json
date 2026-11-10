@@ -44,6 +44,10 @@
       "import": "./dist/image/index.js",
       "require": "./dist/image/index.cjs"
     },
+    "./qr": {
+      "import": "./dist/qr/index.js",
+      "require": "./dist/qr/index.cjs"
+    },
     "./svg": {
       "import": "./dist/svg/index.js",
       "require": "./dist/svg/index.cjs"
@@ -68,6 +72,7 @@
     "@types/pngjs": "^6.0.5",
     "fflate": "0.8.3",
     "harfbuzzjs": "^1.6.4",
+    "jsqr": "^1.4.0",
     "pdfjs-dist": "^6.5.438",
     "pixelmatch": "^8.0.0",
     "playwright": "^1.65.0",

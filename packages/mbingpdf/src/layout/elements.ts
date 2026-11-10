@@ -12,8 +12,10 @@ import type {
   GridProps,
   ImageProps,
   LayoutNode,
+  ListProps,
   NodeType,
   PageProps,
+  QrCodeProps,
   RowProps,
   SpacerProps,
   SpanProps,
@@ -138,4 +140,17 @@ export function TableRow(...args: Args<TableRowProps>): LayoutNode<"TableRow"> {
 /** A table cell with properties of its own: a column span, padding, background, alignment. */
 export function Cell(...args: Args<CellProps>): LayoutNode<"Cell"> {
   return element("Cell", args);
+}
+
+/**
+ * A bulleted or numbered list. Each child is an item: a string, or any element (including
+ * another `List`).
+ */
+export function List(...args: Args<ListProps>): LayoutNode<"List"> {
+  return element("List", args);
+}
+
+/** A QR code, drawn as vector shapes so that it prints sharply at any size. */
+export function QrCode(props: QrCodeProps): LayoutNode<"QrCode"> {
+  return element("QrCode", [props]);
 }

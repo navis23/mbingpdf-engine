@@ -130,6 +130,55 @@ export interface RowProps extends BoxProps {
 export interface TextElementProps extends BoxProps {
   /** Alignment of the text in its box. */
   align?: TextAlign;
+  /**
+   * Keeps the text on one line and sizes it to fill the width of its box, between `min` and
+   * `max` points: a name on a certificate, a number on a bib. `true` shrinks from the current
+   * size only when needed. Text that is still too wide at `min` overflows.
+   */
+  fit?: boolean | { readonly min?: number; readonly max?: number };
+}
+
+export type ListMarker =
+  | "disc"
+  | "dash"
+  | "decimal"
+  | "lower-alpha"
+  | "upper-alpha"
+  | "lower-roman"
+  | "upper-roman";
+
+export interface ListProps extends BoxProps {
+  /**
+   * What goes in front of each item: a bullet (`"disc"`, default), a numbering style, any
+   * string, or a function of the item's number.
+   */
+  marker?: ListMarker | (string & {}) | ((number: number) => string);
+  /** The number of the first item. Default 1. */
+  start?: number;
+  /** Space between items. */
+  gap?: number;
+  /** Space between a marker and its item. Default: half the font size. */
+  markerGap?: number;
+  /** Width set aside for markers. Default: the width of the widest marker. */
+  markerWidth?: number;
+  /** Allow an item to be split across pages. By default each item stays whole. */
+  splitItems?: boolean;
+}
+
+export interface QrCodeProps extends BoxProps {
+  /** The text to encode, usually a web address. */
+  value: string;
+  /** Width and height of the code in points, including its quiet zone. Default 72. */
+  size?: number;
+  /** Error correction, from `"L"` (least) to `"H"` (most). Default `"M"`. */
+  level?: "L" | "M" | "Q" | "H";
+  /**
+   * Width of the empty border scanners need around a code, in modules. Default 4, as the
+   * standard requires; set 0 when the layout already leaves that much white around it.
+   */
+  quiet?: number;
+  /** Colour of the dark modules. Default: the text colour. Keep it dark on a light ground. */
+  color?: ColorInput;
 }
 
 /** Properties of a stretch of text inside a `Text`. */
@@ -328,6 +377,8 @@ interface PropsByType {
   Table: TableProps;
   TableRow: TableRowProps;
   Cell: CellProps;
+  List: ListProps;
+  QrCode: QrCodeProps;
   PageBreak: Record<string, never>;
 }
 
