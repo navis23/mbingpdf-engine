@@ -736,6 +736,233 @@ const certificate: Sample = {
   },
 };
 
+const TERMS: readonly (readonly [string, string])[] = [
+  [
+    "Masa sewa",
+    "Masa sewa dimulai pada tanggal dan jam serah terima dan berakhir pada tanggal dan jam pengembalian yang tertulis di halaman ini. Keterlambatan pengembalian dikenai biaya tambahan per jam sesuai tarif yang berlaku.",
+  ],
+  [
+    "Pembayaran",
+    "Penyewa membayar uang muka saat pemesanan dan melunasi sisanya sebelum serah terima. Uang jaminan dikembalikan setelah kendaraan diperiksa dan dinyatakan tidak ada kerusakan baru.",
+  ],
+  [
+    "Penggunaan kendaraan",
+    "Kendaraan hanya boleh dikemudikan oleh pengemudi yang terdaftar dan memiliki surat izin mengemudi yang masih berlaku. Kendaraan tidak boleh dipakai untuk balapan, menarik kendaraan lain, atau mengangkut barang berbahaya.",
+  ],
+  [
+    "Bahan bakar",
+    "Kendaraan diserahkan dengan tangki penuh dan dikembalikan dengan tangki penuh. Kekurangan bahan bakar ditagihkan sesuai harga pasar ditambah biaya layanan.",
+  ],
+  [
+    "Kerusakan dan kehilangan",
+    "Penyewa bertanggung jawab atas kerusakan yang terjadi selama masa sewa, kecuali yang tercatat dalam laporan pemeriksaan saat serah terima. Kehilangan kunci, surat kendaraan atau perlengkapan diganti sesuai biaya penggantian.",
+  ],
+  [
+    "Asuransi",
+    "Kendaraan dilindungi asuransi sesuai polis pemilik. Risiko sendiri untuk setiap kejadian menjadi tanggungan penyewa.",
+  ],
+  [
+    "Pelanggaran lalu lintas",
+    "Denda tilang, biaya parkir dan biaya tol selama masa sewa menjadi tanggungan penyewa, termasuk yang baru diketahui setelah kendaraan dikembalikan.",
+  ],
+  [
+    "Pembatalan",
+    "Pembatalan lebih dari tiga hari sebelum serah terima mendapat pengembalian uang muka penuh. Pembatalan kurang dari tiga hari dikenai potongan sebesar satu hari sewa.",
+  ],
+  [
+    "Perpanjangan",
+    "Perpanjangan masa sewa harus disetujui pemilik sebelum masa sewa berakhir dan dicatat sebagai tambahan pada perjanjian ini.",
+  ],
+  [
+    "Penyelesaian perselisihan",
+    "Perselisihan diselesaikan dengan musyawarah. Bila tidak tercapai mufakat, para pihak memilih domisili hukum di pengadilan negeri setempat.",
+  ],
+];
+
+/** A hand-drawn signature, as SVG. */
+const SIGNATURE = (seed: number): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 50"><path d="M6 ${34 + seed} C 22 ${4 + seed}, 30 ${46 - seed}, 44 24 S 62 ${8 + seed}, 74 30 S 96 44, 108 ${18 + seed} S 132 ${40 - seed}, 154 22" fill="none" stroke="#1e3a8a" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+/** A plan view of a car with numbered damage marks. */
+const DAMAGE_DIAGRAM =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 110">' +
+  '<rect x="20" y="20" width="200" height="70" rx="28" fill="#f3f4f6" stroke="#374151" stroke-width="1.5"/>' +
+  '<rect x="62" y="30" width="46" height="50" rx="8" fill="#dbeafe" stroke="#374151"/>' +
+  '<rect x="132" y="30" width="40" height="50" rx="8" fill="#dbeafe" stroke="#374151"/>' +
+  '<g fill="#111827"><rect x="40" y="10" width="34" height="12" rx="4"/><rect x="166" y="10" width="34" height="12" rx="4"/>' +
+  '<rect x="40" y="88" width="34" height="12" rx="4"/><rect x="166" y="88" width="34" height="12" rx="4"/></g>' +
+  '<g fill="#dc2626" stroke="#ffffff" stroke-width="1.5"><circle cx="34" cy="40" r="7"/><circle cx="196" cy="84" r="7"/><circle cx="120" cy="22" r="7"/></g>' +
+  "</svg>";
+
+/**
+ * A rental agreement with its inspection report: long numbered terms that never split, a
+ * signature block that stays together, a field grid, a two-column section, a vector diagram,
+ * a photo grid and a rotated stamp.
+ */
+const agreement: Sample = {
+  text: [
+    ["PERJANJIAN SEWA KENDARAAN", "Nomor PSK-2026-0412", "Masa sewa", "Halaman 1 dari 3"],
+    ["Penyelesaian perselisihan", "Pihak Pertama", "Pihak Kedua", "Halaman 2 dari 3"],
+    ["LAPORAN PEMERIKSAAN", "Lecet pada bumper depan kiri", "Halaman 3 dari 3"],
+  ],
+  build(env) {
+    const d = env.doc;
+    const inter = new d.Font(env.fonts["Inter-Variable"]);
+    const mono = new d.Font(env.fonts["JetBrainsMono-Variable"]);
+    const theme = d.defineTheme({
+      fonts: { body: { variable: inter }, mono: { variable: mono } },
+      colors: {
+        text: "#111827",
+        muted: "#6B7280",
+        line: "#D1D5DB",
+        brand: "#1E3A8A",
+        danger: "#B91C1C",
+      },
+      text: {
+        body: { font: "body", size: 9.5, leading: 14, color: "text" },
+        h1: { font: "body", weight: 700, size: 15, leading: 20, color: "brand" },
+        h2: { font: "body", weight: 600, size: 11, leading: 16 },
+        label: { font: "body", size: 7.5, leading: 10, color: "muted" },
+        value: { font: "body", weight: 500, size: 9.5, leading: 13 },
+      },
+    });
+    const field = (label: string, value: string) =>
+      d.Stack(
+        { gap: 1 },
+        d.Text({ style: "label", transform: "uppercase", letterSpacing: 0.4 }, label),
+        d.Text({ style: "value" }, value),
+      );
+    const signature = (role: string, name: string, seed: number) =>
+      d.Stack(
+        { grow: 1, basis: 0, gap: 2 },
+        d.Text({ style: "label" }, role),
+        d.Svg({ src: SIGNATURE(seed), height: 36 }),
+        d.Box(
+          { border: { top: { width: 0.5, color: "line" } }, padding: [3, 0, 0, 0] },
+          d.Text({ weight: 600 }, name),
+        ),
+      );
+    const document = d.Document(
+      { title: "Perjanjian Sewa Kendaraan", lang: "id", theme },
+      d.Page(
+        {
+          size: "A4",
+          margin: d.mm(14),
+          gap: 10,
+          header: d.Row(
+            {
+              align: "center",
+              padding: [0, 0, 6, 0],
+              border: { bottom: { width: 0.75, color: "brand" } },
+            },
+            d.Image({ src: env.photo, height: 22 }),
+            d.Spacer(),
+            d.Stack(
+              { align: "end" },
+              d.Text({ weight: 700, color: "brand" }, "Rental Contoh"),
+              d.Text({ style: "label" }, "Jl. Merdeka No. 17, Bandung"),
+            ),
+          ),
+          footer: ({ page, pages }) =>
+            d.Row(
+              { padding: [6, 0, 0, 0] },
+              d.Text({ style: "label" }, "PSK-2026-0412"),
+              d.Spacer(),
+              d.Text({ style: "label" }, `Halaman ${page} dari ${pages}`),
+            ),
+          // A status stamp across every page.
+          background: d.Absolute(
+            { anchor: "page", top: 330, left: 150, rotate: -24, opacity: 0.16 },
+            d.Box(
+              { border: { width: 4, color: "danger" }, padding: [6, 22], radius: 6 },
+              d.Text(
+                { font: "body", weight: 800, size: 46, color: "danger", letterSpacing: 4 },
+                "SALINAN",
+              ),
+            ),
+          ),
+        },
+        d.Stack(
+          { gap: 2, margin: { top: 4 } },
+          d.Heading({ level: 1 }, "PERJANJIAN SEWA KENDARAAN"),
+          d.Text({ color: "muted" }, "Nomor PSK-2026-0412"),
+        ),
+        d.Box(
+          { background: "#F9FAFB", border: { width: 0.5, color: "line" }, radius: 4, padding: 10 },
+          d.Grid(
+            { columns: 3, cell: { height: 26 }, gap: [6, 12] },
+            field("Penyewa", "Budi Santoso"),
+            field("Kendaraan", "Minibus 7 kursi"),
+            field("Nomor polisi", "D 1234 XYZ"),
+            field("Serah terima", "12 Nov 2026, 08.00"),
+            field("Pengembalian", "15 Nov 2026, 08.00"),
+            field("Tarif per hari", "Rp 450.000"),
+          ),
+        ),
+        d.Heading({ level: 2 }, "Ketentuan"),
+        d.List(
+          { marker: "decimal", gap: 7 },
+          TERMS.map(([title, text]) =>
+            d.Stack(
+              { gap: 1 },
+              d.Text({ weight: 600 }, title),
+              d.Text({ align: "justify", hyphenate: d.hyphenateIndonesian }, `${text} ${text}`),
+            ),
+          ),
+        ),
+        d.Stack(
+          { keepTogether: true, gap: 10, margin: { top: 6 } },
+          d.Text(
+            "Perjanjian ini dibuat rangkap dua dan ditandatangani oleh kedua pihak dalam keadaan sadar tanpa paksaan.",
+          ),
+          d.Row(
+            { gap: 30 },
+            signature("Pihak Pertama", "Siti Rahma", 0),
+            signature("Pihak Kedua", "Budi Santoso", 6),
+          ),
+        ),
+        d.PageBreak(),
+        d.Heading({ level: 1 }, "LAPORAN PEMERIKSAAN"),
+        d.Columns(
+          { count: 2, gap: 18, rule: { width: 0.5, color: "line" }, rowGap: 8 },
+          d.Heading({ level: 2 }, "Kondisi saat serah terima"),
+          d.Table({
+            columns: [{ width: "1fr" }, { width: "auto", align: "end", font: "mono", size: 8.5 }],
+            rows: [
+              ["Kilometer", "48.215"],
+              ["Bahan bakar", "8/8"],
+              ["Ban cadangan", "Ada"],
+              ["Dongkrak dan kunci roda", "Ada"],
+              ["Surat kendaraan", "Lengkap"],
+            ],
+            cellPadding: [3, 0],
+          }),
+          d.Heading({ level: 2 }, "Catatan kerusakan"),
+          d.Svg({ src: DAMAGE_DIAGRAM, width: "100%" }),
+          d.List(
+            { marker: "decimal", gap: 3 },
+            "Lecet pada bumper depan kiri",
+            "Penyok kecil pada pintu belakang kanan",
+            "Retak rambut pada kaca depan",
+          ),
+        ),
+        d.Heading({ level: 2 }, "Foto"),
+        d.Grid(
+          { columns: 4, cell: { height: 78 }, gap: 6 },
+          ["Depan", "Belakang", "Kiri", "Kanan"].map((side) =>
+            d.Stack(
+              { gap: 2 },
+              d.Image({ src: env.photo, width: "100%", height: 62, fit: "cover" }),
+              d.Text({ style: "label", align: "center" }, side),
+            ),
+          ),
+        ),
+      ),
+    );
+    return d.render.sync(document, { deterministic: true });
+  },
+};
+
 /** The invoice from the API design. */
 const invoice: Sample = {
   text: [["Invoice", "INV-0042", "Sewa bus pariwisata", "Total Rp 4.850.000", "Page 1 of 1"]],
@@ -811,6 +1038,7 @@ export const samples: Readonly<Record<string, Sample>> = {
   tour,
   invoice,
   certificate,
+  agreement,
   shapes,
   text,
   report,

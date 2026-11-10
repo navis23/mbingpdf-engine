@@ -65,7 +65,7 @@ _Status: done 2026-11-10, with one item moved and two manual checks open. All th
 
 ## M4 — Developer experience and first public release
 
-_Status: in progress — done: the JSX runtime (`mbingpdf/jsx-runtime`), `inspect()`, warnings with element paths, strict mode, and the debug overlay. Still to do: the third acceptance document, starter templates, the quick-start guide, a bundle-size budget in CI, release preparation, the React and Vue preview components, the preview server, shared graphics, and benchmarks against other libraries. Publishing to npm and switching the two apps need the owner_
+_Status: in progress — done: the JSX runtime (`mbingpdf/jsx-runtime`), `inspect()`, warnings with element paths, strict mode, and the debug overlay. The third acceptance document (rental agreement with inspection report) is built as a sample. Still to do: starter templates, the quick-start guide, a bundle-size budget in CI, release preparation, the React and Vue preview components, the preview server, shared graphics, and benchmarks against other libraries. Publishing to npm and switching the two apps need the owner_
 
 - JSX runtime.
 - `@mbingpdf/react` and `@mbingpdf/vue` preview components.

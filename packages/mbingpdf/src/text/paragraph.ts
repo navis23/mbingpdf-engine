@@ -295,8 +295,17 @@ export function layoutSpans(
   const prefix = new Float64Array(text.length + 1);
   for (let i = 0; i < text.length; i++)
     prefix[i + 1] = (prefix[i] as number) + (advances[i] as number);
-  const widthOf = (start: number, end: number): number =>
+  const rawWidthOf = (start: number, end: number): number =>
     (prefix[end] as number) - (prefix[start] as number);
+  /**
+   * Width of a stretch of text as it would be set on a line of its own. Letter spacing follows
+   * every character except the last of a line, so the trailing gap is taken off.
+   */
+  const widthOf = (start: number, end: number): number => {
+    if (end <= start) return 0;
+    const trailing = styleAt(end - 1).letterSpacing ?? 0;
+    return rawWidthOf(start, end) - trailing;
+  };
 
   // Where lines may end: the Unicode rules, plus hyphenation points inside words.
   const opportunities: Opportunity[] = lineBreaks(text).map(({ offset, mandatory }) => ({

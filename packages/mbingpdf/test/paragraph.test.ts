@@ -237,6 +237,22 @@ describe("layoutParagraph", () => {
     expect(spaced.width).toBeCloseTo(unligated + 5 * 2);
   });
 
+  test("letter-spaced text fits in exactly its own width", () => {
+    // The gap after the last letter is not part of the line, so the width a paragraph reports
+    // must be enough to lay the same paragraph out again without it wrapping.
+    for (const text of ["SALINAN", "DUA KATA", "A"]) {
+      const natural = layoutParagraph(text, { font: barlow, size: 20, letterSpacing: 4 });
+      const again = layoutParagraph(text, {
+        font: barlow,
+        size: 20,
+        letterSpacing: 4,
+        width: natural.width,
+      });
+      expect(again.lines.map((line) => line.text)).toEqual([text]);
+      expect(natural.minContentWidth).toBeLessThanOrEqual(natural.width + 1e-9);
+    }
+  });
+
   test("word spacing applies to spaces only", () => {
     const plain = layoutParagraph("a b c", { font: Helvetica, size: 10 });
     const spaced = layoutParagraph("a b c", { font: Helvetica, size: 10, wordSpacing: 4 });

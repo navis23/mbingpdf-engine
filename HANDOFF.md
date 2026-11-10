@@ -48,8 +48,7 @@ M1 has just started; see `docs/05-roadmap.md`.
     M3 is closed; deferred to M4:
     shared graphics (Form XObjects; less urgent now that batches are fast and small).
 13. M4 done so far: JSX runtime (`src/jsx-runtime.ts`), `inspect()`, warning paths, `strict`, `debug`.
-14. M4 remaining, in this order: third acceptance document (rental agreement with inspection report, generic
-    content) as a sample; starter templates under `examples/`; quick-start guide; bundle-size budget in CI;
+14. The third acceptance document is the `agreement` sample. M4 remaining, in this order: starter templates under `examples/`; quick-start guide; bundle-size budget in CI;
     release preparation (package metadata, changeset, release workflow — do not publish); `@mbingpdf/react`
     and `@mbingpdf/vue` preview components; preview server; shared graphics; benchmarks against PDFKit,
     pdfmake and @react-pdf/renderer.
@@ -73,7 +72,7 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 409 tests, build). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 414 tests, build). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 
