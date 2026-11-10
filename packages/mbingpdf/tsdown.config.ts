@@ -16,7 +16,8 @@ const config: UserConfig = defineConfig({
   platform: "neutral",
   target: "es2023",
   dts: true,
-  sourcemap: true,
+  // No source maps: the sources are not shipped, so the maps would point at nothing.
+  sourcemap: false,
   clean: true,
   // fflate is compiled into the output, so the published package has no runtime dependencies.
   deps: { onlyBundle: ["fflate"] },

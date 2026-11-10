@@ -58,8 +58,9 @@
 | 55 | Undefined properties | Any element property may be passed as `undefined` and is dropped when the element is built, so conditional properties need no spreading and an undefined value never overrides a default | 2026-11-10 |
 | 56 | Bundle budget | `pnpm size` measures the gzip size of each entry point with everything it imports, untree-shaken, and fails CI when one exceeds `size-budget.json` (current size plus 10%). The whole document API is about 130 kB gzip; `mbingpdf/core` alone 31 kB | 2026-11-10 |
 | 57 | Examples | Starter templates live in `examples/` as a private workspace package that imports `mbingpdf` by name; each exports a function from data to a document, plus sample data | 2026-11-10 |
+| 58 | Release | Publishing is a manual step: the `Release` workflow is started by hand, defaults to a dry run, and needs the `NPM_TOKEN` secret. Packages are published with npm provenance. No source maps are shipped. Subpath imports need `moduleResolution` `node16` or `bundler` | 2026-11-10 |
 
-Decisions 8–10 and 16–57 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–58 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

@@ -35,7 +35,9 @@ function closure(entry) {
 const sizes = {};
 for (const [name, target] of Object.entries(manifest.exports)) {
   if (typeof target !== "object" || !target.import) continue;
-  const files = closure(join(root, target.import));
+  // An export condition is a path, or an object with the path under "default".
+  const entry = typeof target.import === "string" ? target.import : target.import.default;
+  const files = closure(join(root, entry));
   let raw = 0;
   let gzip = 0;
   for (const file of files) {

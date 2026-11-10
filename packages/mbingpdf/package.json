@@ -14,7 +14,12 @@
     "pdf-generation",
     "typescript",
     "layout",
-    "print"
+    "print",
+    "invoice",
+    "report",
+    "pdf-x",
+    "svg",
+    "qr-code"
   ],
   "type": "module",
   "sideEffects": false,
@@ -22,47 +27,103 @@
     "node": ">=22"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./core": {
-      "import": "./dist/core/index.js",
-      "require": "./dist/core/index.cjs"
+      "import": {
+        "types": "./dist/core/index.d.ts",
+        "default": "./dist/core/index.js"
+      },
+      "require": {
+        "types": "./dist/core/index.d.cts",
+        "default": "./dist/core/index.cjs"
+      }
     },
     "./font": {
-      "import": "./dist/font/index.js",
-      "require": "./dist/font/index.cjs"
+      "import": {
+        "types": "./dist/font/index.d.ts",
+        "default": "./dist/font/index.js"
+      },
+      "require": {
+        "types": "./dist/font/index.d.cts",
+        "default": "./dist/font/index.cjs"
+      }
     },
     "./image": {
-      "import": "./dist/image/index.js",
-      "require": "./dist/image/index.cjs"
+      "import": {
+        "types": "./dist/image/index.d.ts",
+        "default": "./dist/image/index.js"
+      },
+      "require": {
+        "types": "./dist/image/index.d.cts",
+        "default": "./dist/image/index.cjs"
+      }
     },
     "./qr": {
-      "import": "./dist/qr/index.js",
-      "require": "./dist/qr/index.cjs"
+      "import": {
+        "types": "./dist/qr/index.d.ts",
+        "default": "./dist/qr/index.js"
+      },
+      "require": {
+        "types": "./dist/qr/index.d.cts",
+        "default": "./dist/qr/index.cjs"
+      }
     },
     "./svg": {
-      "import": "./dist/svg/index.js",
-      "require": "./dist/svg/index.cjs"
+      "import": {
+        "types": "./dist/svg/index.d.ts",
+        "default": "./dist/svg/index.js"
+      },
+      "require": {
+        "types": "./dist/svg/index.d.cts",
+        "default": "./dist/svg/index.cjs"
+      }
     },
     "./text": {
-      "import": "./dist/text/index.js",
-      "require": "./dist/text/index.cjs"
+      "import": {
+        "types": "./dist/text/index.d.ts",
+        "default": "./dist/text/index.js"
+      },
+      "require": {
+        "types": "./dist/text/index.d.cts",
+        "default": "./dist/text/index.cjs"
+      }
     },
     "./jsx-runtime": {
-      "import": "./dist/jsx-runtime.js",
-      "require": "./dist/jsx-runtime.cjs"
+      "import": {
+        "types": "./dist/jsx-runtime.d.ts",
+        "default": "./dist/jsx-runtime.js"
+      },
+      "require": {
+        "types": "./dist/jsx-runtime.d.cts",
+        "default": "./dist/jsx-runtime.cjs"
+      }
     },
     "./jsx-dev-runtime": {
-      "import": "./dist/jsx-dev-runtime.js",
-      "require": "./dist/jsx-dev-runtime.cjs"
+      "import": {
+        "types": "./dist/jsx-dev-runtime.d.ts",
+        "default": "./dist/jsx-dev-runtime.js"
+      },
+      "require": {
+        "types": "./dist/jsx-dev-runtime.d.cts",
+        "default": "./dist/jsx-dev-runtime.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -86,5 +147,13 @@
     "pixelmatch": "^8.0.0",
     "playwright": "^1.65.0",
     "pngjs": "^7.0.0"
+  },
+  "homepage": "https://github.com/navis23/mbingpdf-engine#readme",
+  "bugs": {
+    "url": "https://github.com/navis23/mbingpdf-engine/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

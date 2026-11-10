@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 18:50 WIB · Session 2 · Milestone: M0–M3 done; M4 in progress · Branch: main_
+_Updated: 2026-11-10 19:15 WIB · Session 2 · Milestone: M0–M3 done; M4 in progress, release prepared · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -51,14 +51,18 @@ M1 has just started; see `docs/05-roadmap.md`.
 14. Also done in M4: the `agreement` sample (third acceptance document); starter templates in `examples/`
     with a test; `docs/guide/quick-start.md` and `docs/guide/elements.md`; `pnpm size` with
     `size-budget.json`, run in CI.
-15. M4 remaining, in this order: release preparation (package README and licence, changeset, release
-    workflow with provenance — do not publish); `@mbingpdf/react` and `@mbingpdf/vue` preview components;
-    preview server; shared graphics; benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
+15. Release preparation is done: `packages/mbingpdf/README.md` and `LICENSE`, package metadata with
+    `types` conditions and provenance, `.changeset/first-release.md`, `.github/workflows/release.yml`
+    (manual, dry run by default). To release: `pnpm changeset version`, commit, then run the workflow with
+    dry-run off. Nothing has been published.
+16. M4 remaining: `@mbingpdf/react` and `@mbingpdf/vue` preview components; preview server; shared
+    graphics; benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
 things do need them, all part of the M4 exit:
-- publishing `0.1.0` to npm (their account and their decision);
+- publishing `0.1.0` to npm: add the `NPM_TOKEN` secret, run `pnpm changeset version`, commit, then start
+  the Release workflow with dry-run off (their account and their decision);
 - switching one document type in each of the two private apps to mbingpdf;
 - the manual checks: Acrobat PDF/X-4 preflight of the certificate, copying text out of Acrobat, and comparing
   the acceptance documents with the current printed versions.
