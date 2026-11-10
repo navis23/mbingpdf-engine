@@ -17,7 +17,7 @@ Repository, toolchain and a valid PDF.
 
 ## M1 — Fonts and text
 
-- TrueType and OpenType/CFF parsing, WOFF2 decoding.
+- TrueType and OpenType/CFF parsing, WOFF2 decoding, variable-font instancing.
 - Glyph subsetting, CID font embedding, `ToUnicode` maps.
 - Simple-script shaping: kerning, ligatures, mark positioning, OpenType feature toggles.
 - Line breaking (UAX #14), grapheme segmentation, alignment, justification, letter and word spacing, case transforms.

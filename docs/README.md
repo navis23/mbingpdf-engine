@@ -12,7 +12,7 @@ These documents are the plan we agree on before writing code. Nothing here is bu
 | [04-api-design.md](./04-api-design.md) | What using the library looks like |
 | [05-roadmap.md](./05-roadmap.md) | Milestones, in order, each with a testable exit condition |
 | [06-quality.md](./06-quality.md) | How we prove the output is correct and precise |
-| [07-open-decisions.md](./07-open-decisions.md) | What is decided, what is assumed, what is still open |
+| [07-open-decisions.md](./07-open-decisions.md) | What is decided, what is assumed |
 | [08-target-documents.md](./08-target-documents.md) | The real documents the library is designed against |
 
 ## The plan in one paragraph
