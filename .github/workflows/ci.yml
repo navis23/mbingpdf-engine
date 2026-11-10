@@ -32,6 +32,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      # Built before the tests: the command-line tests run the built packages.
+      - run: pnpm build
       - run: pnpm test
       - name: Upload image diffs
         if: failure()
@@ -41,7 +43,6 @@ jobs:
           path: packages/mbingpdf/test/.artifacts
           if-no-files-found: ignore
           include-hidden-files: true
-      - run: pnpm build
       - name: Bundle size is within budget
         run: pnpm size
 

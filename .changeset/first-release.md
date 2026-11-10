@@ -2,6 +2,7 @@
 "mbingpdf": minor
 "@mbingpdf/react": minor
 "@mbingpdf/vue": minor
+"@mbingpdf/dev": minor
 ---
 
 First release.
@@ -15,3 +16,4 @@ First release.
 - SVG preview with `renderSvg` and `previewPages` from `mbingpdf/svg`.
 - `@mbingpdf/react` and `@mbingpdf/vue`: a `PdfPreview` component and `usePdf` for each framework.
 - Lower layers on their own: `mbingpdf/core`, `mbingpdf/font`, `mbingpdf/text`, `mbingpdf/image`, `mbingpdf/qr`.
+- `@mbingpdf/dev`: the `mbingpdf` command. `mbingpdf dev file.tsx` shows a document in the browser and redraws it on every save; `mbingpdf build file.tsx` writes the PDF.

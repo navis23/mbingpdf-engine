@@ -91,3 +91,6 @@ export function letter(data: LetterData = sampleLetter) {
     ),
   );
 }
+
+/** For `mbingpdf dev examples/letter.ts`: the template with its sample data. */
+export default letter;

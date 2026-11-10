@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "isolatedDeclarations": false,
+    "declaration": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "mbingpdf",
+    "paths": {
+      "mbingpdf": ["../mbingpdf/src/index.ts"],
+      "mbingpdf/svg": ["../mbingpdf/src/svg/index.ts"],
+      "mbingpdf/jsx-runtime": ["../mbingpdf/src/jsx-runtime.ts"]
+    }
+  },
+  "include": ["src", "test", "tsdown.config.ts"]
+}

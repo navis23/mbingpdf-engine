@@ -161,3 +161,6 @@ export function invoice(data: InvoiceData = sampleInvoice) {
     ),
   );
 }
+
+/** For `mbingpdf dev examples/invoice.ts`: the template with its sample data. */
+export default invoice;

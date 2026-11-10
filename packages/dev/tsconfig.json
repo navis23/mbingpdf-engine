@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "mbingpdf": ["../mbingpdf/src/index.ts"],
+      "mbingpdf/svg": ["../mbingpdf/src/svg/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

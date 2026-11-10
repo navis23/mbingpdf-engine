@@ -5,6 +5,7 @@
   "description": "Starter templates for mbingpdf. Each file builds one kind of document.",
   "scripts": {
     "build": "node build.ts",
+    "dev": "node ../packages/dev/dist/cli.mjs dev",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

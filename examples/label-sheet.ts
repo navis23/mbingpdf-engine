@@ -51,3 +51,6 @@ export function labelSheet(
     ),
   );
 }
+
+/** For `mbingpdf dev examples/label-sheet.ts`: the template with its sample data. */
+export default labelSheet;

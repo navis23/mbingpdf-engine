@@ -185,6 +185,18 @@ import { PdfPreview, usePdf } from "@mbingpdf/react";   // or "@mbingpdf/vue"
 
 `usePdf(document)` makes the file itself and gives `{ bytes, url, loading, error, download }`. See the README of [`@mbingpdf/react`](../../packages/react/README.md) or [`@mbingpdf/vue`](../../packages/vue/README.md).
 
+## See it while you write
+
+`@mbingpdf/dev` adds the `mbingpdf` command. Give it a file whose default export is a document, or a function that returns one:
+
+```sh
+npm install -D @mbingpdf/dev
+npx mbingpdf dev invoice.tsx       # opens a preview that redraws on every save
+npx mbingpdf build invoice.tsx     # writes invoice.pdf
+```
+
+The preview has a switch that outlines every element's box, lists warnings, and links to the PDF itself. TypeScript and JSX files work as they are.
+
 ## For a print shop
 
 ```ts

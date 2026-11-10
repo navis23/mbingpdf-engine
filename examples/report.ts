@@ -132,3 +132,6 @@ export function report(data: ReportData = sampleReport) {
     ),
   );
 }
+
+/** For `mbingpdf dev examples/report.ts`: the template with its sample data. */
+export default report;

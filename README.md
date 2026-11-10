@@ -30,7 +30,7 @@ What works today:
 - **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
 - **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
 
-A preview server and the first npm release come next.
+[`@mbingpdf/dev`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/dev) adds a preview server that redraws a document on every save. The first npm release comes next.
 
 ## Documentation
 

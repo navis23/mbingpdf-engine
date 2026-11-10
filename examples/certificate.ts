@@ -128,3 +128,6 @@ export function certificate(
     ),
   );
 }
+
+/** For `mbingpdf dev examples/certificate.ts`: the template with its sample data. */
+export default certificate;
