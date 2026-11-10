@@ -513,14 +513,20 @@ export class TrueTypeFont {
           else if (flags & WE_HAVE_A_TWO_BY_TWO) at += 8;
         } while (flags & MORE_COMPONENTS);
       }
-      glyf.bytes(data).align(4);
+      // Glyphs start on even offsets, which the compact form of `loca` requires.
+      glyf.bytes(data).align(2);
     }
     offsets.push(glyf.length);
     const count = order.length;
     if (count > 0xffff) throw new Error("A subset cannot hold more than 65535 glyphs");
 
+    // `loca` stores half-offsets in 16 bits when the glyph data is small enough.
+    const shortLoca = glyf.length <= 0x1fffe;
     const loca = new BinaryWriter();
-    for (const offset of offsets) loca.u32(offset);
+    for (const offset of offsets) {
+      if (shortLoca) loca.u16(offset / 2);
+      else loca.u32(offset);
+    }
 
     const hmtx = new BinaryWriter();
     for (const glyph of order) {
@@ -533,7 +539,7 @@ export class TrueTypeFont {
     const head = required(this.#tables, "head").slice();
     const headView = new DataView(head.buffer);
     headView.setUint32(8, 0); // checkSumAdjustment, filled in by buildSfnt
-    headView.setInt16(50, 1); // indexToLocFormat: long offsets
+    headView.setInt16(50, shortLoca ? 0 : 1); // indexToLocFormat
 
     const hhea = required(this.#tables, "hhea").slice();
     new DataView(hhea.buffer).setUint16(34, count);

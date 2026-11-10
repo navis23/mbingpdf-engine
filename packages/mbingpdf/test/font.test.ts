@@ -5,6 +5,7 @@ import { PdfDocument } from "../src/core/index.ts";
 import { TrueTypeFont } from "../src/font/index.ts";
 import { parseSfnt } from "../src/font/sfnt.ts";
 import { readFont } from "./harness/env.ts";
+import { harfbuzzSubset } from "./harness/hb-subset.ts";
 import { extractText } from "./harness/render.ts";
 import { FONT_FILES, type FontFile } from "./harness/samples.ts";
 
@@ -128,7 +129,9 @@ describe("subsetting", () => {
     };
     expect(view("maxp").getUint16(4)).toBe(5);
     expect(view("hhea").getUint16(34)).toBe(5);
-    expect(view("loca").byteLength).toBe(6 * 4);
+    // Small subsets use the compact form of loca: 16-bit half-offsets.
+    expect(view("head").getInt16(50)).toBe(0);
+    expect(view("loca").byteLength).toBe(6 * 2);
     expect(view("hmtx").byteLength).toBe(5 * 4);
     subset.glyphs.forEach((glyph, i) => {
       expect(view("hmtx").getUint16(i * 4)).toBe(font.advanceWidth(glyph));
@@ -153,6 +156,39 @@ describe("subsetting", () => {
           original.glyphToPath(glyph),
         );
       });
+    }
+  });
+
+  test("subsets are no more than 10% larger than HarfBuzz's", () => {
+    const text =
+      "Dengan ini menerangkan bahwa pembayaran untuk keberangkatan rombongan telah diterima " +
+      "sepenuhnya. The quick brown fox jumps over the lazy dog — “Rp 1.250.000” é ü ŵ ß " +
+      "0123456789 (fi) [x] AVATAR!?";
+    for (const file of FONT_FILES) {
+      const bytes = readFont(file);
+      const font = new TrueTypeFont(bytes);
+      const used = new Set(font.shape(text).map((glyph) => glyph.id));
+      used.delete(0);
+      const subset = font.subset([0, ...used]);
+      const reference = harfbuzzSubset(bytes, subset.glyphs);
+      expect(subset.data.length / reference.length, file).toBeLessThanOrEqual(1.1);
+      // Far smaller than the font itself.
+      expect(subset.data.length).toBeLessThan(bytes.length / 5);
+    }
+  });
+
+  test("large subsets switch to long glyph offsets", () => {
+    const font = load("Inter-Variable");
+    const all = Array.from({ length: font.numGlyphs }, (_, i) => i);
+    const data = font.subset(all).data;
+    const tables = parseSfnt(data).tables;
+    const head = tables.get("head") as Uint8Array;
+    expect(new DataView(head.buffer, head.byteOffset).getInt16(50)).toBe(1);
+    expect((tables.get("loca") as Uint8Array).length).toBe((font.numGlyphs + 1) * 4);
+    const rebuilt = new hb.Font(new hb.Face(new hb.Blob(data.slice().buffer)));
+    const original = harfbuzzFont("Inter-Variable");
+    for (const glyph of [0, 100, 1500, font.numGlyphs - 1]) {
+      expect(rebuilt.glyphToPath(glyph)).toBe(original.glyphToPath(glyph));
     }
   });
 
