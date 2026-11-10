@@ -27,6 +27,8 @@ export type DisplayItem =
       readonly type: "path";
       readonly commands: readonly PathCommand[];
       readonly fill?: Color;
+      /** Fill by the even-odd rule instead of non-zero winding (holes in overlapping shapes). */
+      readonly evenOdd?: boolean;
       readonly stroke?: StrokeStyle;
     }
   | {

@@ -119,6 +119,7 @@ class PageWriter {
         case "path": {
           const fill = item.fill ? css(item.fill) : "none";
           let attributes = ` fill="${fill}"`;
+          if (item.evenOdd) attributes += ' fill-rule="evenodd"';
           if (item.stroke) {
             attributes += ` stroke="${css(item.stroke.color)}" stroke-width="${n(item.stroke.width)}"`;
             if (item.stroke.dash?.length)

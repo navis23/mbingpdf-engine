@@ -15,6 +15,7 @@ import {
   type TextLine,
 } from "../text/index.ts";
 import type { CanvasContext } from "./canvas.ts";
+import type { DisplayItem } from "./display.ts";
 import {
   borderWidths,
   inherit,
@@ -28,6 +29,7 @@ import {
   toPoints,
   toSides,
 } from "./style.ts";
+import { parseSvg } from "./svg-input.ts";
 import { layoutTable, measureTable } from "./table.ts";
 import type {
   AbsoluteProps,
@@ -45,6 +47,7 @@ import type {
   RowProps,
   SpacerProps,
   StackProps,
+  SvgProps,
   TableOfContentsProps,
   TextElementProps,
 } from "./types.ts";
@@ -81,6 +84,14 @@ export interface Box {
     y: number;
     width: number;
     height: number;
+  };
+  /** Vector artwork: shapes in the drawing's own units, scaled to fit the box. */
+  vector?: {
+    items: (color: Color) => DisplayItem[];
+    color: Color;
+    x: number;
+    y: number;
+    scale: number;
   };
   /** The name links use to point at this box. */
   id?: string;
@@ -372,6 +383,12 @@ export function measure(node: LayoutNode, context: TextContext): { min: number; 
     case "QrCode":
       max = min = (node as LayoutNode<"QrCode">).props.size ?? 72;
       break;
+    case "Svg": {
+      const drawing = parseSvg((node as LayoutNode<"Svg">).props.src);
+      const height = typeof props.height === "number" ? props.height : undefined;
+      max = height !== undefined ? (height * drawing.width) / drawing.height : drawing.width * PX;
+      break;
+    }
     case "Heading":
       return measure(headingText(node as LayoutNode<"Heading">, context), context);
     case "Grid": {
@@ -1296,6 +1313,51 @@ function expandList(node: LayoutNode<"List">, context: TextContext): LayoutNode 
   return expanded;
 }
 
+function layoutSvg(node: LayoutNode<"Svg">, context: TextContext, area: Area): LayoutResult {
+  const props = node.props as SvgProps;
+  const decoration = decorationOf(node, context);
+  const drawing = parseSvg(props.src);
+  const horizontal = decoration.inset.left + decoration.inset.right;
+  const vertical = decoration.inset.top + decoration.inset.bottom;
+  const ratio = drawing.width / drawing.height;
+  let width = toPoints(props.width, area.width);
+  let height = toPoints(props.height, Number.isFinite(area.height) ? area.height : 0);
+  if (width !== undefined) width = Math.max(0, width - horizontal);
+  if (height !== undefined) height = Math.max(0, height - vertical);
+  if (width === undefined && height === undefined) {
+    // No size given: the drawing's own, as CSS pixels, shrunk to the space there is.
+    width = Math.min(drawing.width * PX, Math.max(0, area.width - horizontal));
+    height = width / ratio;
+  } else if (width === undefined) width = (height as number) * ratio;
+  else if (height === undefined) height = width / ratio;
+  let boxWidth = width as number;
+  let boxHeight = height as number;
+  if (boxHeight + vertical > area.height + 1e-6) {
+    if (!area.fresh) return { state: RETRY };
+    const shrink = Math.max(0, area.height - vertical) / boxHeight;
+    boxHeight *= shrink;
+    boxWidth *= shrink;
+  }
+  // The drawing keeps its proportions and is centred in the box.
+  const scale = Math.min(boxWidth / drawing.width, boxHeight / drawing.height);
+  const box: Box = {
+    x: 0,
+    y: 0,
+    width: boxWidth + horizontal,
+    height: boxHeight + vertical,
+    children: [],
+    vector: {
+      items: (color) => drawing.items(color),
+      color: inherit(context, props).color,
+      x: decoration.inset.left + (boxWidth - drawing.width * scale) / 2,
+      y: decoration.inset.top + (boxHeight - drawing.height * scale) / 2,
+      scale,
+    },
+  };
+  decorate(box, node, decoration, { top: false, bottom: false });
+  return { box };
+}
+
 function layoutQrCode(node: LayoutNode<"QrCode">, context: TextContext, area: Area): LayoutResult {
   const props = node.props as QrCodeProps;
   const decoration = decorationOf(node, context);
@@ -1393,6 +1455,8 @@ export function layout(
       );
     case "QrCode":
       return layoutQrCode(node as LayoutNode<"QrCode">, context, area);
+    case "Svg":
+      return layoutSvg(node as LayoutNode<"Svg">, context, area);
     case "Heading":
       return layoutHeading(
         node as LayoutNode<"Heading">,

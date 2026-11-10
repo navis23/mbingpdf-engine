@@ -48,7 +48,7 @@ _Status: done 2026-11-10. The exit test passes: a 53-page report with headings, 
 
 ## M3 — Tables, vector art and print
 
-_Status: nearly done — all three exit tests pass: a 1,000-row table with repeated headers; the invoice and finisher-certificate acceptance documents as samples (the certificate with bleed, marks, a spot colour and PDF/X-4); and 5,000 bibs in one file in about 10 s and 6.4 MB. Built: tables, lists, `fit` text, QR codes, print output, headings with bookmarks, internal links, table of contents, columns. Themes are done. Still to do: SVG input, and sharing repeated graphics between pages. Open manual checks: an Acrobat PDF/X-4 preflight, and comparing the two acceptance documents with their current printed versions_
+_Status: done 2026-11-10, with one item moved and two manual checks open. All three exit tests pass: a 1,000-row table with repeated headers; the invoice and finisher-certificate acceptance documents as samples (the certificate with bleed, marks, a spot colour and PDF/X-4); and 5,000 bibs in one file in about 10 s. Built: tables, lists, multi-column sections, headings with bookmarks, links within the document, table of contents, SVG input, QR codes, `fit` text, themes, and print output. Moved to M4: sharing repeated graphics between pages (Form XObjects) — fonts and images are already shared, and batches are fast and small without it. Open manual checks: an Acrobat PDF/X-4 preflight of the certificate, and comparing the two acceptance documents with their current printed versions. Not supported: table row spans; SVG gradients, text, clipping and masks_
 
 - Tables: column sizing, spans, borders, zebra rows, repeated headers and footers, split and non-split rows, group subtotals.
 - Lists, multi-column sections, per-section page size and orientation.
@@ -65,7 +65,7 @@ _Status: nearly done — all three exit tests pass: a 1,000-row table with repea
 
 ## M4 — Developer experience and first public release
 
-_Status: not started_
+_Status: next_
 
 - JSX runtime.
 - `@mbingpdf/react` and `@mbingpdf/vue` preview components.

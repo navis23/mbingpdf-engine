@@ -21,14 +21,16 @@ const pdf = await render(
 
 What works today:
 
-- **Documents** (`mbingpdf`) — elements laid out with flexbox-style rows and stacks, text with mixed styles and links, images, grids, absolute positioning and free drawing; content flows over pages with forced breaks, keep-together, keep-with-next and widow/orphan control; headers and footers know the page number and total.
+- **Documents** (`mbingpdf`) — rows and stacks with flexbox-style sizing, tables with repeated headers, lists, multi-column sections, grids, text with mixed styles and links, images, SVG artwork and QR codes as vectors, absolute positioning and free drawing. Content flows over pages with forced breaks, keep-together, keep-with-next and widow/orphan control; headers and footers know the page number and total; headings become bookmarks and a table of contents.
+- **Themes** — fonts with weights, colours and text styles defined once with `defineTheme` and used by name.
+- **Print** — CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
 - **Text** (`mbingpdf/text`) — Unicode line breaking, hyphenation for English and Indonesian, justification, font fallback and fit-to-width.
 - **Fonts** (`mbingpdf/font`) — TrueType, OpenType/CFF and WOFF2: subsetting, variable-font instancing, and shaping (ligatures, kerning, accents) that matches HarfBuzz for Latin, Greek and Cyrillic.
 - **Preview** (`mbingpdf/svg`) — the same pages as SVG, for showing a document on screen.
 - **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
 - **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
 
-Tables, lists, themes and print output (crop marks, PDF/X-4) come next. The design is in [`docs/`](./docs/README.md).
+Documentation, starter templates, a preview server and the first npm release come next. The design is in [`docs/`](./docs/README.md).
 
 ## Development
 

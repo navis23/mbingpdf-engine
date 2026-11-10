@@ -22,6 +22,7 @@ import type {
   SpacerProps,
   SpanProps,
   StackProps,
+  SvgProps,
   TableOfContentsProps,
   TableProps,
   TableRowProps,
@@ -177,4 +178,12 @@ export function List(...args: Args<ListProps>): LayoutNode<"List"> {
 /** A QR code, drawn as vector shapes so that it prints sharply at any size. */
 export function QrCode(props: QrCodeProps): LayoutNode<"QrCode"> {
   return element("QrCode", [props]);
+}
+
+/**
+ * Vector artwork from an SVG file, drawn as shapes so that it stays sharp in print. It is
+ * sized like an image: give a width or a height and the other follows.
+ */
+export function Svg(props: SvgProps): LayoutNode<"Svg"> {
+  return element("Svg", [props]);
 }

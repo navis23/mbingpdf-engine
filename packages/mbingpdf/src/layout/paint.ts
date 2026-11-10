@@ -41,6 +41,48 @@ function translate(items: DisplayItem[], dx: number, dy: number): DisplayItem[] 
   });
 }
 
+/** Scales vector artwork and moves it to where its box is. */
+function scaleItems(
+  items: readonly DisplayItem[],
+  scale: number,
+  dx: number,
+  dy: number,
+): DisplayItem[] {
+  return items.map((item): DisplayItem => {
+    if (item.type === "group") return { ...item, items: scaleItems(item.items, scale, dx, dy) };
+    if (item.type !== "path") return item;
+    return {
+      ...item,
+      commands: item.commands.map((command): PathCommand => {
+        if (command[0] === "Z") return command;
+        if (command[0] === "R") {
+          return [
+            "R",
+            command[1] * scale + dx,
+            command[2] * scale + dy,
+            command[3] * scale,
+            command[4] * scale,
+          ];
+        }
+        const moved: (string | number)[] = [command[0]];
+        for (let i = 1; i < command.length; i += 2) {
+          moved.push((command[i] as number) * scale + dx, (command[i + 1] as number) * scale + dy);
+        }
+        return moved as unknown as PathCommand;
+      }),
+      ...(item.stroke
+        ? {
+            stroke: {
+              ...item.stroke,
+              width: item.stroke.width * scale,
+              ...(item.stroke.dash ? { dash: item.stroke.dash.map((value) => value * scale) } : {}),
+            },
+          }
+        : {}),
+    };
+  });
+}
+
 /**
  * Adds everything a box and its children draw to `items`.
  *
@@ -209,6 +251,13 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
       height: canvas.height,
     });
     target.push(...translate(drawn, x + canvas.x, y + canvas.y));
+  }
+
+  if (box.vector) {
+    const vector = box.vector;
+    target.push(
+      ...scaleItems(vector.items(vector.color), vector.scale, x + vector.x, y + vector.y),
+    );
   }
 
   for (const child of box.children) paintBox(child, x, y, target);

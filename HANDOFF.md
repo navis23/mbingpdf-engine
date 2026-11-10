@@ -1,8 +1,8 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 16:50 WIB · Session 2 · Milestone: M0–M2 done; M3 exit tests pass, three features left · Branch: main_
+_Updated: 2026-11-10 17:30 WIB · Session 2 · Milestone: M0–M3 done; M4 (developer experience and first release) next · Branch: main_
 
 ## Where we are
-M0, M1 and M2 are finished. The root `mbingpdf` entry now has
+M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
 the document API: `Document`, `Page`, `Stack`, `Row`, `Box`, `Text`, `Span`, `Link`, `Image`, `Grid`,
 `Spacer`, `Absolute`, `Canvas`, `PageBreak` and `render()`. Underneath are `mbingpdf/core` (PDF writer),
 `mbingpdf/font` (TrueType, CFF, WOFF2, shaping, variable fonts), `mbingpdf/text` (line breaking, hyphenation,
@@ -44,7 +44,8 @@ M1 has just started; see `docs/05-roadmap.md`.
     (bleed, marks, spot colours, output intent, PDF/X-4, XMP, DPI warnings). Samples `invoice` and
     `certificate` are the two M3 acceptance documents.
 12. Also done in M3: `Heading` with bookmarks, `id` + `Link({ to })`, `TableOfContents`, `Columns`, and the
-    5,000-bib benchmark (now a test). Themes are done (`src/layout/theme.ts`). M3 remaining: SVG input (`Svg` element),
+    5,000-bib benchmark (now a test). Themes (`src/layout/theme.ts`) and SVG input (`src/layout/svg-input.ts`, the `Svg` element) are done.
+    M3 is closed; deferred to M4:
     shared graphics (Form XObjects; less urgent now that batches are fast and small).
 13. Then M4 (developer experience and first release): see the roadmap.
 
@@ -62,7 +63,7 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 385 tests, build). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 398 tests, build). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 

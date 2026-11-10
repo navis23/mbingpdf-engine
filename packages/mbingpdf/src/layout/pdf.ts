@@ -34,9 +34,10 @@ function drawItems(
         }
         if (item.fill) content.fillColor(item.fill);
         tracePath(content, item.commands);
-        if (item.fill && stroke) content.fillAndStroke();
+        const rule = item.evenOdd ? "evenodd" : "nonzero";
+        if (item.fill && stroke) content.fillAndStroke(rule);
         else if (stroke) content.stroke();
-        else if (item.fill) content.fill();
+        else if (item.fill) content.fill(rule);
         else content.endPath();
         if (stroke) content.restore();
         break;

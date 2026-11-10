@@ -249,6 +249,11 @@ export interface ImageProps extends BoxProps {
   fit?: "contain" | "cover" | "fill";
 }
 
+export interface SvgProps extends BoxProps {
+  /** The SVG document: its markup, or the bytes of an `.svg` file. */
+  src: string | Uint8Array;
+}
+
 export interface SpacerProps {
   /** The gap in points. Without it, a spacer in a `Row` takes all spare width. */
   size?: number;
@@ -440,6 +445,7 @@ interface PropsByType {
   Cell: CellProps;
   List: ListProps;
   QrCode: QrCodeProps;
+  Svg: SvgProps;
   Heading: HeadingProps;
   TableOfContents: TableOfContentsProps;
   Columns: ColumnsProps;
