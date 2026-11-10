@@ -238,6 +238,18 @@ describe("quick start guide", () => {
     expect(await structureOutline(archived)).toEqual([[]]);
   });
 
+  test("a password", async () => {
+    const document = Document({ font: inter }, Page(Text("rahasia perusahaan")));
+    const pdf = await render(document, {
+      encryption: {
+        userPassword: "rahasia",
+        permissions: { print: "low", copy: false },
+      },
+    });
+    await expect(extractText(pdf)).rejects.toThrow(/password/i);
+    expect(await extractText(pdf, "rahasia")).toEqual([["rahasia perusahaan"]]);
+  });
+
   test("preview, print, and diagnostics", async () => {
     const document = Document(
       { font: inter },

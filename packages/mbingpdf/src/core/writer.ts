@@ -1,5 +1,6 @@
 import { zlibSync } from "fflate";
 import { ByteWriter, concatBytes } from "./bytes.ts";
+import type { PdfEncryptor } from "./encryption.ts";
 import { Hash128 } from "./hash.ts";
 import { PdfDict, PdfName, type PdfObject, PdfRef, PdfStream, PdfString } from "./objects.ts";
 import { writeObject } from "./serialize.ts";
@@ -15,6 +16,8 @@ export interface PdfWriterOptions {
    * very old consumers and for reading the file by eye.
    */
   xref?: "stream" | "table";
+  /** Encrypts every string and stream; see `createEncryptor`. */
+  encryptor?: PdfEncryptor;
 }
 
 export interface PdfTrailer {
@@ -44,6 +47,9 @@ const OBJECT_STREAM_SIZE = 100;
 export class PdfWriter {
   readonly #compress: boolean;
   readonly #packed: boolean;
+  readonly #encryptor: PdfEncryptor | undefined;
+  /** Encrypts a string that is written outside an object stream. */
+  readonly #seal: ((value: PdfString) => PdfString) | undefined;
   readonly #chunks: Uint8Array[] = [];
   readonly #hash: Hash128 = new Hash128();
   /** Indexed by object number. Slot 0 is the head of the free list. */
@@ -55,6 +61,11 @@ export class PdfWriter {
   constructor(options: PdfWriterOptions = {}) {
     this.#compress = options.compress ?? true;
     this.#packed = (options.xref ?? "stream") === "stream";
+    const encryptor = options.encryptor;
+    this.#encryptor = encryptor;
+    this.#seal = encryptor
+      ? (value) => new PdfString(encryptor.encrypt(value.bytes), true)
+      : undefined;
     const header = new ByteWriter();
     header.ascii(`%PDF-${options.version ?? "1.7"}\n%`);
     // Four bytes above 127 tell transfer tools that the file is binary.
@@ -94,6 +105,7 @@ export class PdfWriter {
       return;
     }
     if (this.#packed) {
+      // Strings in an object stream are not encrypted one by one: the whole stream is.
       const body = new ByteWriter();
       writeObject(body, value);
       this.#queue.push({ num, bytes: body.toBytes() });
@@ -103,7 +115,7 @@ export class PdfWriter {
     }
     const out = new ByteWriter();
     out.ascii(`${num} 0 obj\n`);
-    writeObject(out, value);
+    writeObject(out, value, this.#seal);
     out.ascii("\nendobj\n");
     this.#entries[num] = { kind: "direct", offset: this.#offset };
     this.#emit(out.toBytes());
@@ -113,6 +125,17 @@ export class PdfWriter {
   finish(trailer: PdfTrailer): Uint8Array {
     this.#assertOpen();
     this.#flushQueue();
+    let encrypt: PdfRef | undefined;
+    if (this.#encryptor) {
+      // The encryption dictionary is the one object written in the clear and on its own.
+      encrypt = this.allocate();
+      const out = new ByteWriter();
+      out.ascii(`${encrypt.num} 0 obj\n`);
+      writeObject(out, this.#encryptor.dict);
+      out.ascii("\nendobj\n");
+      this.#entries[encrypt.num] = { kind: "direct", offset: this.#offset };
+      this.#emit(out.toBytes());
+    }
     for (let num = 1; num < this.#entries.length; num++) {
       if (this.#entries[num] === undefined) {
         throw new Error(`Object ${num} was allocated but never written`);
@@ -120,7 +143,7 @@ export class PdfWriter {
     }
     // The identifier covers every byte before the cross-reference section.
     const id = new PdfString(this.#hash.digest(), true);
-    const shared = { Root: trailer.root, Info: trailer.info, ID: [id, id] };
+    const shared = { Root: trailer.root, Info: trailer.info, ID: [id, id], Encrypt: encrypt };
 
     let xrefOffset: number;
     if (this.#packed) {
@@ -151,6 +174,9 @@ export class PdfWriter {
         self.num,
         new PdfDict({ Type: new PdfName("XRef"), Size: size, W: [1, width, 2], ...shared }),
         data,
+        true,
+        // The cross-reference stream is needed to find the key, so it stays readable.
+        false,
       );
     } else {
       xrefOffset = this.#offset;
@@ -186,7 +212,13 @@ export class PdfWriter {
     this.#offset += bytes.length;
   }
 
-  #writeStream(num: number, sourceDict: PdfDict, source: Uint8Array, compress = true): void {
+  #writeStream(
+    num: number,
+    sourceDict: PdfDict,
+    source: Uint8Array,
+    compress = true,
+    encrypt = true,
+  ): void {
     const dict = sourceDict.clone();
     let data = source;
     if (this.#compress && compress && !dict.has("Filter") && data.length > 0) {
@@ -196,11 +228,13 @@ export class PdfWriter {
         dict.set("Filter", new PdfName("FlateDecode"));
       }
     }
+    const sealed = encrypt && this.#encryptor !== undefined;
+    if (sealed) data = (this.#encryptor as PdfEncryptor).encrypt(data);
     dict.set("Length", data.length);
 
     const head = new ByteWriter();
     head.ascii(`${num} 0 obj\n`);
-    writeObject(head, dict);
+    writeObject(head, dict, sealed ? this.#seal : undefined);
     head.ascii("\nstream\n");
     const tail = new ByteWriter();
     tail.ascii("\nendstream\nendobj\n");

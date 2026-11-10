@@ -1042,9 +1042,18 @@ const invoice: Sample = {
   },
 };
 
+/** The invoice again, archived and accessible: tagged, PDF/A-2a and PDF/UA-1. */
+const accessible: Sample = {
+  text: invoice.text,
+  build(env, options) {
+    return invoice.build(env, { conformance: ["PDF/A-2a", "PDF/UA-1"], ...options });
+  },
+};
+
 export const samples: Readonly<Record<string, Sample>> = {
   tour,
   invoice,
+  accessible,
   certificate,
   agreement,
   shapes,

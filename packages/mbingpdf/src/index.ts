@@ -18,6 +18,7 @@ export {
   type OutputIntent,
   PageSizes,
   type PdfAttachment,
+  type PdfEncryptionOptions,
   type PdfImage,
   type PdfMetadata,
   rgb,

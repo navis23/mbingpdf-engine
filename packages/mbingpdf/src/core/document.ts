@@ -1,6 +1,7 @@
 import type { Color } from "./color.ts";
 import type { AnyFont, FontBinding } from "./content.ts";
 import { EmbeddedFont } from "./embedded-font.ts";
+import { createEncryptor, type PdfEncryptionOptions } from "./encryption.ts";
 import { writeGlyphRun } from "./glyph-run.ts";
 import { type PdfImage, writeImage } from "./image.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
@@ -110,6 +111,11 @@ export interface PdfDocumentOptions extends PdfWriterOptions {
   /** Extra metadata properties, such as those an e-invoice standard asks for. */
   metadata?: readonly PdfMetadata[];
   /**
+   * Protect the file with a password, and say what may be done with it once open. AES-256,
+   * readable by Acrobat X and every current viewer. Not allowed in PDF/A or PDF/X files.
+   */
+  encryption?: PdfEncryptionOptions;
+  /**
    * The standard the file must meet, or several: `["PDF/X-4", "PDF/A-2b"]`. The file is
    * checked against them as it is written, and what cannot be met is an error.
    */
@@ -153,6 +159,7 @@ export class PdfDocument {
   /** The parent tree: for each key, the elements of a page's content or of an annotation. */
   readonly #parents: PdfObject[] = [];
   readonly #metadata: readonly PdfMetadata[];
+  readonly #encrypted: boolean;
   /** Attached files by name, each with its file specification. */
   readonly #attachments: Map<string, PdfRef> = new Map();
   readonly #outputIntent: OutputIntent | undefined;
@@ -172,7 +179,21 @@ export class PdfDocument {
   readonly #images: Map<PdfImage, { name: string; ref: PdfRef }> = new Map();
 
   constructor(options: PdfDocumentOptions = {}) {
-    this.writer = new PdfWriter(options);
+    if (options.encryption && options.conformance !== undefined) {
+      const standards =
+        typeof options.conformance === "string" ? [options.conformance] : options.conformance;
+      const open = standards.find((standard) => standard !== "PDF/UA-1");
+      if (open) throw new Error(`${open} does not allow a file to be encrypted`);
+    }
+    this.#encrypted = options.encryption !== undefined;
+    this.writer = new PdfWriter(
+      options.encryption
+        ? {
+            ...options,
+            encryptor: createEncryptor(options.encryption, options.deterministic ?? false),
+          }
+        : options,
+    );
     this.#info = options.info ?? {};
     this.#metadata = options.metadata ?? [];
     this.#deterministic = options.deterministic ?? false;
@@ -526,6 +547,12 @@ export class PdfDocument {
         // The files that belong to the document as a whole.
         AF: attached.length > 0 ? attached.map(([, ref]) => ref) : undefined,
         MarkInfo: structTree ? new PdfDict({ Marked: true }) : undefined,
+        // AES-256 came after PDF 1.7; this tells a reader which additions the file uses.
+        Extensions: this.#encrypted
+          ? new PdfDict({
+              ADBE: new PdfDict({ BaseVersion: new PdfName("1.7"), ExtensionLevel: 8 }),
+            })
+          : undefined,
         StructTreeRoot: structTree,
         // A reader announces the title rather than the file name.
         ViewerPreferences:

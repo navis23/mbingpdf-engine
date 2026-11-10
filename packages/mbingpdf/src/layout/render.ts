@@ -1,5 +1,11 @@
 /** From a document tree to pages, and from pages to a PDF file. */
-import { type Conformance, type OutputIntent, orientedSize, PdfDocument } from "../core/index.ts";
+import {
+  type Conformance,
+  type OutputIntent,
+  orientedSize,
+  PdfDocument,
+  type PdfEncryptionOptions,
+} from "../core/index.ts";
 import type { DisplayItem, DisplayPage } from "./display.ts";
 import {
   type Box,
@@ -59,6 +65,11 @@ export interface RenderOptions {
    * Give pictures an `alt`. Implied by `"PDF/UA-1"` and the `a` levels of PDF/A.
    */
   tagged?: boolean;
+  /**
+   * Protect the file with a password (AES-256), and say what may be done with it once open:
+   * `{ userPassword: "…", permissions: { print: false, copy: false } }`.
+   */
+  encryption?: PdfEncryptionOptions;
   /** Treat warnings as errors: the first one stops the render. */
   strict?: boolean;
   /** Outline every element's box, to see how a layout is put together. */
@@ -569,6 +580,7 @@ function renderSync(document: LayoutNode, options: RenderOptions = {}): Uint8Arr
       ...(options.outputIntent ? { outputIntent: options.outputIntent } : {}),
       ...(tagged ? { tagged: true } : {}),
       ...(props.metadata ? { metadata: props.metadata } : {}),
+      ...(options.encryption ? { encryption: options.encryption } : {}),
     });
     for (const file of props.attachments ?? []) pdf.attach(file);
     const result = layoutPass(document, layoutOptions, toc, (page) =>

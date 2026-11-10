@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 19:15 WIB · Session 2 · Milestone: M0–M3 done; M4 done except the owner's steps · Branch: main_
+_Updated: 2026-11-11 04:40 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -67,8 +67,20 @@ M1 has just started; see `docs/05-roadmap.md`.
 19. Also done in M4: benchmarks (`benchmarks/run.mjs`, results in `docs/benchmarks.md`). mbingpdf is
     fastest on the invoice and smallest everywhere; pdfmake is about twice as fast on a 2,000-row table and
     PDFKit on plain paragraphs. Speeding up long tables is the open follow-up.
-20. M4 has nothing left that can be done without the owner (see below). Next after that: M5 in
-    `docs/05-roadmap.md` (tagged PDF, PDF/UA, PDF/A, encryption).
+20. M4 has nothing left that can be done without the owner (see below).
+21. M5 is done except Acrobat's accessibility checker by hand:
+    - `conformance` takes a list; PDF/A-2b/2u/2a and 3b/3u/3a (`src/core/document.ts`, built-in sRGB in
+      `src/core/srgb.ts`);
+    - tagged PDF (`tagged: true`) and PDF/UA-1: `src/core/structure.ts`, tags set in `layout/engine.ts`
+      (`tagOf`) and `layout/table.ts`, wrapped in `layout/paint.ts`, written in `layout/pdf.ts` (`Marker`);
+      new element properties `alt`, `decorative`, `role`;
+    - attachments and `facturX()` (`Document({ attachments, metadata })`, `src/layout/factur-x.ts`);
+    - AES-256 encryption (`render(doc, { encryption })`; `src/core/crypto.ts`, `src/core/encryption.ts`);
+    - veraPDF validates the samples at every level in `test/conformance.test.ts` (Docker image
+      `verapdf/cli` or a local `verapdf`; required on the Node 24 CI job).
+22. Next: M6 in `docs/05-roadmap.md`, ordered by demand. Open follow-ups: long-table speed; a hyphen added
+    by hyphenation is read as a real hyphen in tagged files; tagged output and encryption are not in the
+    benchmarks.
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
@@ -77,8 +89,9 @@ things do need them, all part of the M4 exit:
   `NPM_TOKEN` secret, run `pnpm changeset version`, commit, then start
   the Release workflow with dry-run off (their account and their decision);
 - switching one document type in each of the two private apps to mbingpdf;
-- the manual checks: Acrobat PDF/X-4 preflight of the certificate, copying text out of Acrobat, and comparing
-  the acceptance documents with the current printed versions.
+- the manual checks: Acrobat PDF/X-4 preflight of the certificate, copying text out of Acrobat, comparing
+  the acceptance documents with the current printed versions, and (M5) Acrobat's accessibility checker on a
+  file rendered with `conformance: "PDF/UA-1"`.
 
 ## Decisions this session
 - Row 14: fflate, pinned and compiled into the build; zero runtime dependencies.
@@ -91,8 +104,10 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 454 tests, build, size). Runtime digests match on Node, Deno, Chromium
-  and in a Web Worker.
+- Checks: lint, typecheck, build, size and 491 tests green, except that the two speed assertions (5,000
+  bibs under 60 s, 1,000 rows under 5 s) failed on this laptop while another project was loading it; old and
+  new code timed the same side by side, and CI passes them. Runtime digests match on Node, Deno, Chromium
+  and in a Web Worker (10 samples).
 - Published: not published.
 
 ## Gotchas / don't redo
@@ -111,6 +126,12 @@ things do need them, all part of the M4 exit:
 - Run checks as their own step and commit only when they pass; do not chain a commit after a piped check
   (a failing test was pushed once that way and fixed in the next commit).
 - After an intended output change: review `test/.artifacts/`, then `pnpm test:update`.
+- `UPDATE_GOLDEN=1` rewrites a few unrelated PNGs (certificate, tour) with invisible differences; restore
+  them with `git checkout` and keep only the files you meant to change.
+- veraPDF through Docker takes about 10 s per run; `validate(files, "auto")` checks every PDF/A level in one
+  run by letting each file's own metadata pick the level.
+- pdf.js drops the spaces at line ends when asked for the text of a tagged element; poppler
+  (`pdfinfo -struct-text`) shows them.
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 
 ## Resume checklist

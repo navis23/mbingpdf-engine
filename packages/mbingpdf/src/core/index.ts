@@ -26,6 +26,12 @@ export {
   type PdfMetadata,
 } from "./document.ts";
 export { EmbeddedFont, type FontProgram } from "./embedded-font.ts";
+export {
+  createEncryptor,
+  type PdfEncryptionOptions,
+  type PdfEncryptor,
+  type PdfPermissions,
+} from "./encryption.ts";
 export type { PositionedGlyph } from "./glyph-run.ts";
 export { orientationMatrix, orientedSize, type PdfImage } from "./image.ts";
 export {

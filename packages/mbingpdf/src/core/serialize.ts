@@ -96,8 +96,16 @@ function writeWord(out: ByteWriter, word: string): void {
   out.ascii(word);
 }
 
-/** Writes one object in compact PDF syntax. Streams are rejected: they must be indirect. */
-export function writeObject(out: ByteWriter, value: PdfObject): void {
+/**
+ * Writes one object in compact PDF syntax. Streams are rejected: they must be indirect.
+ *
+ * @param seal applied to every string before it is written, for encrypted files
+ */
+export function writeObject(
+  out: ByteWriter,
+  value: PdfObject,
+  seal?: (value: PdfString) => PdfString,
+): void {
   if (value === null) {
     writeWord(out, "null");
   } else if (typeof value === "boolean") {
@@ -107,14 +115,14 @@ export function writeObject(out: ByteWriter, value: PdfObject): void {
   } else if (value instanceof PdfName) {
     writeName(out, value.value);
   } else if (value instanceof PdfString) {
-    writeString(out, value);
+    writeString(out, seal ? seal(value) : value);
   } else if (value instanceof PdfRef) {
     writeWord(out, `${value.num} 0 R`);
   } else if (value instanceof PdfDict) {
     out.ascii("<<");
     for (const [key, entry] of value.entries()) {
       writeName(out, key);
-      writeObject(out, entry);
+      writeObject(out, entry, seal);
     }
     out.ascii(">>");
   } else if (value instanceof PdfStream) {
@@ -123,7 +131,7 @@ export function writeObject(out: ByteWriter, value: PdfObject): void {
     );
   } else if (Array.isArray(value)) {
     out.byte(0x5b);
-    for (const item of value as readonly PdfObject[]) writeObject(out, item);
+    for (const item of value as readonly PdfObject[]) writeObject(out, item, seal);
     out.byte(0x5d);
   } else {
     throw new TypeError(`Not a PDF object: ${String(value)}`);

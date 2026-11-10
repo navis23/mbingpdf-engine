@@ -79,7 +79,7 @@ _Status: in progress — done: the JSX runtime (`mbingpdf/jsx-runtime`), `inspec
 
 ## M5 — Archival and accessibility standards
 
-_Status: in progress. Done: PDF/A-2b, 2u, 2a and PDF/A-3b, 3u, 3a; tagged PDF from element semantics; PDF/UA-1; attached files and Factur-X metadata; veraPDF over the sample suite in the tests and in CI. Still to do: encryption, and the Acrobat accessibility check by hand._
+_Status: done except the manual check. PDF/A-2b, 2u, 2a and PDF/A-3b, 3u, 3a; tagged PDF from element semantics; PDF/UA-1; attached files and Factur-X metadata; AES-256 encryption and permissions; veraPDF over the sample suite in the tests and in CI. Open: Acrobat's accessibility checker, by hand, which needs the owner._
 
 - Tagged PDF generated from element semantics; alt text, language, reading order, table header associations.
 - PDF/UA-1 and PDF/A-2b, A-2u, A-3b (A-3 enables embedded e-invoice XML such as Factur-X and ZUGFeRD).

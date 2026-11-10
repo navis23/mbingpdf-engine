@@ -28,3 +28,8 @@ Append-only. One short entry per working session; newest at the bottom.
   graphics (an `Svg` is stored once per file), and benchmarks (`docs/benchmarks.md`). Decisions: rows 55–65.
 - Next: the owner publishes 0.1.0 (needs the `@mbingpdf` npm organisation and `NPM_TOKEN`) and switches one
   document in each app; then M5.
+- 2026-11-11, same session: M5 done apart from the manual Acrobat check. PDF/A-2 and PDF/A-3 at levels b, u
+  and a; tagged PDF built from the elements and PDF/UA-1; attached files and Factur-X metadata; AES-256
+  encryption with permissions. veraPDF validates the samples in the tests and on one CI job. Decisions:
+  rows 66–74.
+- Next: M6, by demand; the owner's steps for M4 and the Acrobat checks are unchanged.

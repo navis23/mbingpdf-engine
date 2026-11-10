@@ -14,6 +14,9 @@ First release.
 - Themes with `defineTheme`; JSX through `mbingpdf/jsx-runtime`.
 - SVG artwork used many times (a logo on every page) is stored once in the file.
 - Print: CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
+- Standards: PDF/A-2 and PDF/A-3 (levels b, u, a) and PDF/UA-1 through `conformance`; tagged PDF with `tagged: true`, with `alt`, `decorative` and `role` on elements.
+- Attached files with `Document({ attachments })`, and `facturX()` for Factur-X e-invoices.
+- Password protection with AES-256 and permissions through `encryption`.
 - SVG preview with `renderSvg` and `previewPages` from `mbingpdf/svg`.
 - `@mbingpdf/react` and `@mbingpdf/vue`: a `PdfPreview` component and `usePdf` for each framework.
 - Lower layers on their own: `mbingpdf/core`, `mbingpdf/font`, `mbingpdf/text`, `mbingpdf/image`, `mbingpdf/qr`.

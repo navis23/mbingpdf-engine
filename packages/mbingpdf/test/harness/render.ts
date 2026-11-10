@@ -26,8 +26,9 @@ const pdfjsRoot = dirname(require.resolve("pdfjs-dist/package.json"));
 // In Node, pdf.js reads this with the file system, so it must be a path, not a file: URL.
 const standardFontDataUrl = `${join(pdfjsRoot, "standard_fonts")}/`;
 
-function openPdfjs(pdf: Uint8Array) {
+function openPdfjs(pdf: Uint8Array, password?: string) {
   return getDocument({
+    ...(password !== undefined ? { password } : {}),
     // pdf.js takes ownership of the buffer and rejects Node Buffers, so hand it a plain copy.
     data: Uint8Array.from(pdf),
     standardFontDataUrl,
@@ -39,8 +40,12 @@ function openPdfjs(pdf: Uint8Array) {
   });
 }
 
-async function renderWithPdfjs(pdf: Uint8Array, scale: number): Promise<RenderedPage[]> {
-  const task = openPdfjs(pdf);
+async function renderWithPdfjs(
+  pdf: Uint8Array,
+  scale: number,
+  password?: string,
+): Promise<RenderedPage[]> {
+  const task = openPdfjs(pdf, password);
   const pages: RenderedPage[] = [];
   try {
     const doc = await task.promise;
@@ -71,10 +76,14 @@ async function renderWithPdfjs(pdf: Uint8Array, scale: number): Promise<Rendered
 
 let pdfium: Promise<PDFiumLibrary> | undefined;
 
-async function renderWithPdfium(pdf: Uint8Array, scale: number): Promise<RenderedPage[]> {
+async function renderWithPdfium(
+  pdf: Uint8Array,
+  scale: number,
+  password?: string,
+): Promise<RenderedPage[]> {
   pdfium ??= PDFiumLibrary.init();
   const library = await pdfium;
-  const doc = await library.loadDocument(pdf);
+  const doc = await library.loadDocument(pdf, password);
   const pages: RenderedPage[] = [];
   try {
     for (const page of doc.pages()) {
@@ -108,13 +117,16 @@ export function renderPdf(
   renderer: Renderer,
   pdf: Uint8Array,
   scale: number = RENDER_SCALE,
+  password?: string,
 ): Promise<RenderedPage[]> {
-  return renderer === "pdfjs" ? renderWithPdfjs(pdf, scale) : renderWithPdfium(pdf, scale);
+  return renderer === "pdfjs"
+    ? renderWithPdfjs(pdf, scale, password)
+    : renderWithPdfium(pdf, scale, password);
 }
 
 /** Extracts the text of each page with pdf.js, one string per run of text. */
-export async function extractText(pdf: Uint8Array): Promise<string[][]> {
-  const task = openPdfjs(pdf);
+export async function extractText(pdf: Uint8Array, password?: string): Promise<string[][]> {
+  const task = openPdfjs(pdf, password);
   const pages: string[][] = [];
   try {
     const doc = await task.promise;

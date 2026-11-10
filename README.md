@@ -25,6 +25,7 @@ What works today:
 - **Themes** — fonts with weights, colours and text styles defined once with `defineTheme` and used by name.
 - **Print** — CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
 - **Standards** — PDF/A-2 and PDF/A-3 for archiving, and tagged PDF with PDF/UA-1 for accessibility: headings, lists, tables and figures become the file's structure. Checked with veraPDF in the tests.
+- **Protection** — password encryption with AES-256 and permissions; files attached inside the PDF, including Factur-X e-invoices.
 - **Text** (`mbingpdf/text`) — Unicode line breaking, hyphenation for English and Indonesian, justification, font fallback and fit-to-width.
 - **Fonts** (`mbingpdf/font`) — TrueType, OpenType/CFF and WOFF2: subsetting, variable-font instancing, and shaping (ligatures, kerning, accents) that matches HarfBuzz for Latin, Greek and Cyrillic.
 - **Preview** (`mbingpdf/svg`) — the same pages as SVG, for showing a document on screen. [`@mbingpdf/react`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/react) and [`@mbingpdf/vue`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/vue) wrap it in a `PdfPreview` component.

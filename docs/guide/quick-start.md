@@ -254,6 +254,21 @@ const document = Document({ title: "Invoice 42", font: inter, ...facturX({ xml, 
 await render(document, { conformance: "PDF/A-3b" });   // PDF/A-3 is the archival level that allows attachments
 ```
 
+## A password
+
+```ts
+await render(document, {
+  encryption: {
+    userPassword: "rahasia",                        // needed to open the file
+    permissions: { print: "low", copy: false },     // what is allowed once it is open
+  },
+});
+```
+
+The file is encrypted with AES-256, which every current viewer reads. `ownerPassword` is a second password that opens the file with the restrictions lifted; leave it out and nobody can lift them. Without a `userPassword` the file opens for anyone and only the restrictions apply.
+
+The password is what protects the content. Permissions are a request that viewers honour, not a lock: someone who can open the file can, with other software, do what they like with it. Archival and print files (PDF/A, PDF/X) cannot be encrypted.
+
 ## JSX
 
 The same documents can be written as JSX; no React is involved. Set `"jsx": "react-jsx"` and `"jsxImportSource": "mbingpdf"` in `tsconfig.json`.
