@@ -1,5 +1,6 @@
 /** Glyph positioning (the GPOS table). */
-import type { BinaryReader } from "../reader.ts";
+
+import { roundDelta } from "../variations.ts";
 import type { BufferGlyph, ShapingBuffer } from "./buffer.ts";
 import { classOf, coverageIndex, IGNORE_MARKS, type LayoutTable, type Lookup } from "./common.ts";
 import { applyContext } from "./context.ts";
@@ -11,28 +12,70 @@ function valueSize(format: number): number {
   return size;
 }
 
-/** Adds a ValueRecord to a glyph. Device and variation tables are not applied. */
-function applyValue(r: BinaryReader, at: number, format: number, glyph: BufferGlyph): void {
+/**
+ * Adds a ValueRecord to a glyph. `base` is the table that the record's device offsets are
+ * measured from.
+ */
+function applyValue(
+  table: LayoutTable,
+  base: number,
+  at: number,
+  format: number,
+  glyph: BufferGlyph,
+): void {
+  const r = table.r;
   let offset = at;
+  let xPlacement = 0;
+  let yPlacement = 0;
+  let xAdvance = 0;
+  let yAdvance = 0;
   if (format & 0x0001) {
-    glyph.xOffset += r.i16At(offset);
+    xPlacement = r.i16At(offset);
     offset += 2;
   }
   if (format & 0x0002) {
-    glyph.yOffset += r.i16At(offset);
+    yPlacement = r.i16At(offset);
     offset += 2;
   }
   if (format & 0x0004) {
-    glyph.xAdvance += r.i16At(offset);
+    xAdvance = r.i16At(offset);
     offset += 2;
   }
-  if (format & 0x0008) glyph.yAdvance += r.i16At(offset);
+  if (format & 0x0008) {
+    yAdvance = r.i16At(offset);
+    offset += 2;
+  }
+  if (format & 0x0010) {
+    xPlacement += table.deviceDelta(base, r.u16At(offset));
+    offset += 2;
+  }
+  if (format & 0x0020) {
+    yPlacement += table.deviceDelta(base, r.u16At(offset));
+    offset += 2;
+  }
+  if (format & 0x0040) {
+    xAdvance += table.deviceDelta(base, r.u16At(offset));
+    offset += 2;
+  }
+  if (format & 0x0080) yAdvance += table.deviceDelta(base, r.u16At(offset));
+  glyph.xOffset += roundDelta(xPlacement);
+  glyph.yOffset += roundDelta(yPlacement);
+  glyph.xAdvance += roundDelta(xAdvance);
+  glyph.yAdvance += roundDelta(yAdvance);
 }
 
 /** Reads an Anchor table; undefined for a null offset. */
-function anchor(r: BinaryReader, base: number, offset: number): [number, number] | undefined {
+function anchor(table: LayoutTable, base: number, offset: number): [number, number] | undefined {
   if (offset === 0) return undefined;
-  return [r.i16At(base + offset + 2), r.i16At(base + offset + 4)];
+  const r = table.r;
+  const at = base + offset;
+  let x = r.i16At(at + 2);
+  let y = r.i16At(at + 4);
+  if (r.u16At(at) === 3) {
+    x += table.deviceDelta(at, r.u16At(at + 6));
+    y += table.deviceDelta(at, r.u16At(at + 8));
+  }
+  return [x, y];
 }
 
 /** Places `mark` so that its anchor sits on the anchor of the glyph at `target`. */
@@ -44,20 +87,22 @@ function attach(
   targetAnchor: [number, number],
 ): void {
   const mark = buffer.glyphs[markIndex] as BufferGlyph;
-  mark.xOffset = targetAnchor[0] - markAnchor[0];
-  mark.yOffset = targetAnchor[1] - markAnchor[1];
+  // Anchors keep their fractional variation deltas; only the difference is rounded.
+  mark.xOffset = roundDelta(targetAnchor[0] - markAnchor[0]);
+  mark.yOffset = roundDelta(targetAnchor[1] - markAnchor[1]);
   mark.attachedTo = target;
 }
 
 /** Looks up a mark in a MarkArray: its class and anchor. */
 function markRecord(
-  r: BinaryReader,
+  table: LayoutTable,
   markArray: number,
   index: number,
 ): { markClass: number; anchor: [number, number] } | undefined {
+  const r = table.r;
   if (index >= r.u16At(markArray)) return undefined;
   const record = markArray + 2 + index * 4;
-  const point = anchor(r, markArray, r.u16At(record + 2));
+  const point = anchor(table, markArray, r.u16At(record + 2));
   return point ? { markClass: r.u16At(record), anchor: point } : undefined;
 }
 
@@ -73,9 +118,15 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
         const coverage = coverageIndex(r, subtable + r.u16At(subtable + 2), glyph.id);
         if (coverage < 0) break;
         const valueFormat = r.u16At(subtable + 4);
-        if (format === 1) applyValue(r, subtable + 6, valueFormat, glyph);
+        if (format === 1) applyValue(table, subtable, subtable + 6, valueFormat, glyph);
         else if (coverage < r.u16At(subtable + 6)) {
-          applyValue(r, subtable + 8 + coverage * valueSize(valueFormat), valueFormat, glyph);
+          applyValue(
+            table,
+            subtable,
+            subtable + 8 + coverage * valueSize(valueFormat),
+            valueFormat,
+            glyph,
+          );
         } else break;
         return index + 1;
       }
@@ -91,6 +142,8 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
         const size1 = valueSize(format1);
         const size2 = valueSize(format2);
         let values = -1;
+        // Device offsets in a pair set are measured from the set, otherwise from the subtable.
+        let valueBase = subtable;
         if (format === 1) {
           if (coverage >= r.u16At(subtable + 8)) break;
           const set = subtable + r.u16At(subtable + 10 + coverage * 2);
@@ -102,6 +155,7 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
             const candidate = r.u16At(set + 2 + mid * recordSize);
             if (candidate === other.id) {
               values = set + 2 + mid * recordSize + 2;
+              valueBase = set;
               break;
             }
             if (candidate < other.id) low = mid + 1;
@@ -117,8 +171,8 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
           }
         }
         if (values < 0) break;
-        applyValue(r, values, format1, glyph);
-        applyValue(r, values + size1, format2, other);
+        applyValue(table, valueBase, values, format1, glyph);
+        applyValue(table, valueBase, values + size1, format2, other);
         // The second glyph can start the next pair unless this pair adjusted it.
         return format2 !== 0 ? second + 1 : second;
       }
@@ -136,11 +190,11 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
         );
         if (baseIndex < 0) break;
         const classCount = r.u16At(subtable + 6);
-        const mark = markRecord(r, subtable + r.u16At(subtable + 8), markIndex);
+        const mark = markRecord(table, subtable + r.u16At(subtable + 8), markIndex);
         const baseArray = subtable + r.u16At(subtable + 10);
         if (!mark || mark.markClass >= classCount || baseIndex >= r.u16At(baseArray)) break;
         const point = anchor(
-          r,
+          table,
           baseArray,
           r.u16At(baseArray + 2 + (baseIndex * classCount + mark.markClass) * 2),
         );
@@ -159,7 +213,7 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
         const ligatureIndex = coverageIndex(r, subtable + r.u16At(subtable + 4), ligature.id);
         if (ligatureIndex < 0) break;
         const classCount = r.u16At(subtable + 6);
-        const mark = markRecord(r, subtable + r.u16At(subtable + 8), markIndex);
+        const mark = markRecord(table, subtable + r.u16At(subtable + 8), markIndex);
         const ligatureArray = subtable + r.u16At(subtable + 10);
         if (!mark || mark.markClass >= classCount || ligatureIndex >= r.u16At(ligatureArray)) break;
         const attachTable = ligatureArray + r.u16At(ligatureArray + 2 + ligatureIndex * 2);
@@ -173,7 +227,7 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
           ? Math.min(glyph.ligatureComponent, componentCount) - 1
           : componentCount - 1;
         const point = anchor(
-          r,
+          table,
           attachTable,
           r.u16At(attachTable + 2 + (component * classCount + mark.markClass) * 2),
         );
@@ -200,11 +254,11 @@ function applyAt(table: LayoutTable, buffer: ShapingBuffer, lookup: Lookup, inde
         const mark2Index = coverageIndex(r, subtable + r.u16At(subtable + 4), target.id);
         if (mark2Index < 0) break;
         const classCount = r.u16At(subtable + 6);
-        const mark = markRecord(r, subtable + r.u16At(subtable + 8), markIndex);
+        const mark = markRecord(table, subtable + r.u16At(subtable + 8), markIndex);
         const mark2Array = subtable + r.u16At(subtable + 10);
         if (!mark || mark.markClass >= classCount || mark2Index >= r.u16At(mark2Array)) break;
         const point = anchor(
-          r,
+          table,
           mark2Array,
           r.u16At(mark2Array + 2 + (mark2Index * classCount + mark.markClass) * 2),
         );

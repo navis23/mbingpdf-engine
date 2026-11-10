@@ -1,6 +1,26 @@
+import {
+  ARG_1_AND_2_ARE_WORDS,
+  decodeGlyph,
+  encodeCompositeGlyph,
+  encodeSimpleGlyph,
+  MORE_COMPONENTS,
+  WE_HAVE_A_SCALE,
+  WE_HAVE_A_TWO_BY_TWO,
+  WE_HAVE_AN_X_AND_Y_SCALE,
+} from "./glyf.ts";
+import { applyDeltas, GlyphVariations } from "./gvar.ts";
 import { BinaryReader, BinaryWriter } from "./reader.ts";
 import { buildSfnt, parseSfnt } from "./sfnt.ts";
 import { openTypeShaper, type ShapedGlyph, type ShapeOptions, type Shaper } from "./shaper.ts";
+import {
+  AdvanceVariations,
+  metricDeltas,
+  type NamedInstance,
+  normalizeCoordinates,
+  parseFvar,
+  roundDelta,
+  type VariationAxis,
+} from "./variations.ts";
 
 /** The result of {@link TrueTypeFont.subset}. */
 export interface FontSubset {
@@ -126,13 +146,6 @@ function parseCmap(table: Uint8Array): Map<number, number> {
   return map;
 }
 
-// Composite glyph flags (OpenType spec, glyf table).
-const ARG_1_AND_2_ARE_WORDS = 0x0001;
-const WE_HAVE_A_SCALE = 0x0008;
-const MORE_COMPONENTS = 0x0020;
-const WE_HAVE_AN_X_AND_Y_SCALE = 0x0040;
-const WE_HAVE_A_TWO_BY_TWO = 0x0080;
-
 /**
  * A font with TrueType outlines (`.ttf`, or `.otf` with a `glyf` table).
  *
@@ -166,7 +179,20 @@ export class TrueTypeFont {
    * the built-in one does not cover.
    */
   shaper: Shaper = openTypeShaper;
+  /** The design axes of a variable font; empty for a static font. */
+  readonly axes: readonly VariationAxis[];
+  /** The styles the designer named, such as "Bold" or "Light Condensed". */
+  readonly namedInstances: readonly NamedInstance[];
+  /**
+   * Normalised axis coordinates of this instance, for shapers. Undefined for a static font and
+   * for a variable font at its default position.
+   */
+  readonly variationCoords: readonly number[] | undefined;
 
+  readonly #data: Uint8Array;
+  readonly #advances: AdvanceVariations | undefined;
+  readonly #outlines: GlyphVariations | undefined;
+  readonly #instanced: Map<number, { data: Uint8Array; xMin: number; advance: number }> = new Map();
   readonly #tables: ReadonlyMap<string, Uint8Array>;
   readonly #cmap: Map<number, number>;
   readonly #hmtx: BinaryReader;
@@ -175,7 +201,13 @@ export class TrueTypeFont {
   readonly #longLoca: boolean;
   readonly #glyf: Uint8Array;
 
-  constructor(data: Uint8Array) {
+  /**
+   * @param data the font file
+   * @param variation for a variable font, axis values such as `{ wght: 700 }`; prefer
+   *   {@link TrueTypeFont.instance}, which also accepts a named style
+   */
+  constructor(data: Uint8Array, variation?: Readonly<Record<string, number>>) {
+    this.#data = data;
     const sfnt = parseSfnt(data);
     if (sfnt.flavor !== "truetype") {
       throw new Error("Fonts with CFF outlines (most .otf files) are not supported yet");
@@ -225,6 +257,42 @@ export class TrueTypeFont {
         capHeight = os2.i16At(88);
       }
     }
+    const names = parseNames(tables.get("name"));
+    const fvar = parseFvar(tables.get("fvar"), names);
+    this.axes = fvar.axes;
+    this.namedInstances = fvar.instances;
+    let coords: number[] | undefined;
+    if (variation && fvar.axes.length > 0) {
+      for (const tag of Object.keys(variation)) {
+        if (!fvar.axes.some((axis) => axis.tag === tag)) {
+          const known = fvar.axes.map((axis) => axis.tag).join(", ");
+          throw new RangeError(`Font has no "${tag}" axis; it has ${known}`);
+        }
+      }
+      coords = normalizeCoordinates(fvar.axes, tables.get("avar"), variation);
+      if (coords.every((value) => value === 0)) coords = undefined;
+    } else if (variation && Object.keys(variation).length > 0) {
+      throw new RangeError("This is not a variable font, so it has no axes to set");
+    }
+    this.variationCoords = coords;
+    let underlineOffsetDelta = 0;
+    let underlineSizeDelta = 0;
+    if (coords) {
+      const hvar = tables.get("HVAR");
+      const gvar = tables.get("gvar");
+      this.#advances = hvar && hvar.length >= 12 ? new AdvanceVariations(hvar, coords) : undefined;
+      this.#outlines = gvar && gvar.length >= 20 ? new GlyphVariations(gvar, coords) : undefined;
+      const metrics = metricDeltas(tables.get("MVAR"), coords);
+      ascender += roundDelta(metrics.get("hasc") ?? 0);
+      descender += roundDelta(metrics.get("hdsc") ?? 0);
+      lineGap += roundDelta(metrics.get("hlgp") ?? 0);
+      if (capHeight) capHeight += roundDelta(metrics.get("cpht") ?? 0);
+      if (xHeight) xHeight += roundDelta(metrics.get("xhgt") ?? 0);
+      underlineOffsetDelta = roundDelta(metrics.get("undo") ?? 0);
+      underlineSizeDelta = roundDelta(metrics.get("unds") ?? 0);
+      const weight = variation?.wght;
+      if (weight !== undefined) weightClass = Math.round(Math.min(Math.max(weight, 1), 1000));
+    }
     this.ascender = ascender;
     this.descender = descender;
     this.lineGap = lineGap;
@@ -237,16 +305,55 @@ export class TrueTypeFont {
     const postTable = tables.get("post");
     const post = postTable && postTable.length >= 16 ? new BinaryReader(postTable) : undefined;
     this.italicAngle = post ? post.seek(4).fixed() : 0;
-    this.underlinePosition = post ? post.i16At(8) : Math.round(-this.unitsPerEm * 0.1);
-    this.underlineThickness = post ? post.i16At(10) : Math.round(this.unitsPerEm * 0.05);
+    this.underlinePosition =
+      (post ? post.i16At(8) : Math.round(-this.unitsPerEm * 0.1)) + underlineOffsetDelta;
+    this.underlineThickness =
+      (post ? post.i16At(10) : Math.round(this.unitsPerEm * 0.05)) + underlineSizeDelta;
     this.isFixedPitch = post ? post.u32At(12) !== 0 : false;
 
-    const names = parseNames(tables.get("name"));
     this.familyName = names.get(16) ?? names.get(1) ?? "Unknown";
-    this.subfamilyName = names.get(17) ?? names.get(2) ?? "Regular";
-    const fallback = `${this.familyName}-${this.subfamilyName}`;
+    let subfamily = names.get(17) ?? names.get(2) ?? "Regular";
+    let postScriptName = names.get(6) ?? `${this.familyName}-${subfamily}`;
+    if (coords && variation) {
+      // Name the instance after the designer's style when the coordinates match one.
+      const full: Record<string, number> = {};
+      for (const axis of fvar.axes) full[axis.tag] = variation[axis.tag] ?? axis.default;
+      const named = fvar.instances.find((instance) =>
+        fvar.axes.every((axis) => instance.coordinates[axis.tag] === full[axis.tag]),
+      );
+      const prefix = (names.get(25) ?? this.familyName).replace(/\s+/g, "");
+      if (named) {
+        subfamily = named.name;
+        postScriptName = named.postScriptName ?? `${prefix}-${named.name}`;
+      } else {
+        const values = fvar.axes
+          .filter((axis) => full[axis.tag] !== axis.default)
+          .map((axis) => `${axis.tag}${Math.round((full[axis.tag] as number) * 100) / 100}`);
+        subfamily = values.join(" ");
+        postScriptName = `${prefix}-${values.join("")}`;
+      }
+    }
+    this.subfamilyName = subfamily;
     // A PostScript name may not contain spaces or PDF delimiters.
-    this.postScriptName = (names.get(6) ?? fallback).replace(/[^\x21-\x7e]|[()<>[\]{}/%]/g, "");
+    this.postScriptName = postScriptName.replace(/[^\x21-\x7e]|[()<>[\]{}/%]/g, "");
+  }
+
+  /**
+   * A fixed style of a variable font: either axis values (`{ wght: 700 }`, unlisted axes stay
+   * at their default) or the name of one of {@link namedInstances} (`"Bold"`). The result
+   * behaves like a static font and embeds as one.
+   */
+  instance(style: Readonly<Record<string, number>> | string): TrueTypeFont {
+    if (this.axes.length === 0) throw new RangeError("This is not a variable font");
+    if (typeof style !== "string") return new TrueTypeFont(this.#data, style);
+    const named = this.namedInstances.find(
+      (instance) => instance.name.toLowerCase() === style.toLowerCase(),
+    );
+    if (!named) {
+      const known = this.namedInstances.map((instance) => instance.name).join(", ");
+      throw new RangeError(`Font has no style named "${style}"; it has ${known}`);
+    }
+    return new TrueTypeFont(this.#data, named.coordinates);
   }
 
   /** The raw bytes of a font table, such as `GSUB` or `kern`. */
@@ -270,7 +377,11 @@ export class TrueTypeFont {
   /** The advance width of a glyph in font units. */
   advanceWidth(glyph: number): number {
     if (glyph < 0 || glyph >= this.numGlyphs) return 0;
-    return this.#hmtx.u16At(Math.min(glyph, this.#numberOfHMetrics - 1) * 4);
+    const advance = this.#hmtx.u16At(Math.min(glyph, this.#numberOfHMetrics - 1) * 4);
+    if (!this.variationCoords) return advance;
+    if (this.#advances) return advance + roundDelta(this.#advances.delta(glyph));
+    // Without HVAR the advance comes from the outline's phantom points.
+    return this.#instancedGlyph(glyph).advance;
   }
 
   /**
@@ -313,17 +424,62 @@ export class TrueTypeFont {
     return this.#glyf.subarray(start, end);
   }
 
+  /** A glyph's outline, left edge and advance at this instance's axis coordinates. */
+  #instancedGlyph(glyph: number): { data: Uint8Array; xMin: number; advance: number } {
+    let result = this.#instanced.get(glyph);
+    if (result) return result;
+    const source = this.#glyphData(glyph);
+    const defaultAdvance = this.#hmtx.u16At(Math.min(glyph, this.#numberOfHMetrics - 1) * 4);
+    result = {
+      data: source,
+      xMin: source.length >= 10 ? new BinaryReader(source).i16At(2) : 0,
+      advance: defaultAdvance,
+    };
+    const decoded = decodeGlyph(source);
+    // An empty glyph (a space) still has phantom points, so its advance can vary.
+    const shape = decoded ?? {
+      kind: "simple" as const,
+      endPoints: [],
+      x: [],
+      y: [],
+      onCurve: [],
+      overlap: false,
+    };
+    const deltas = this.#outlines?.deltas(glyph, shape);
+    if (deltas) {
+      const points = shape.kind === "simple" ? shape.x.length : shape.components.length;
+      const advance =
+        defaultAdvance +
+        roundDelta((deltas.x[points + 1] as number) - (deltas.x[points] as number));
+      applyDeltas(shape, deltas);
+      if (shape.kind === "simple") {
+        const data = encodeSimpleGlyph(shape);
+        result = { data, xMin: shape.x.length > 0 ? Math.min(...shape.x) : 0, advance };
+      } else {
+        result = { data: encodeCompositeGlyph(shape), xMin: result.xMin, advance };
+      }
+    } else if (decoded) {
+      // Re-encode anyway: instances are written without hinting instructions.
+      const data =
+        decoded.kind === "simple" ? encodeSimpleGlyph(decoded) : encodeCompositeGlyph(decoded);
+      result = { data, xMin: result.xMin, advance: defaultAdvance };
+    }
+    this.#instanced.set(glyph, result);
+    return result;
+  }
+
   /**
    * Builds a font containing only the given glyphs, renumbered in the order given. Glyph 0
-   * must come first. Glyphs that the requested ones are composed of are added at the end.
+   * must come first, and a glyph may be repeated. Glyphs that the requested ones are composed
+   * of are added at the end.
    */
   subset(glyphs: readonly number[]): FontSubset {
     if (glyphs[0] !== 0) throw new Error("A subset must start with glyph 0");
     const order = [...glyphs];
     const newId = new Map<number, number>();
+    // A glyph may be listed more than once; composites then refer to its first copy.
     order.forEach((glyph, i) => {
-      if (newId.has(glyph)) throw new Error(`Glyph ${glyph} is listed twice`);
-      newId.set(glyph, i);
+      if (!newId.has(glyph)) newId.set(glyph, i);
     });
 
     const glyf = new BinaryWriter();
@@ -331,7 +487,9 @@ export class TrueTypeFont {
     // `order` grows while we walk it, as composite glyphs pull in their parts.
     for (let i = 0; i < order.length; i++) {
       offsets.push(glyf.length);
-      const source = this.#glyphData(order[i] as number);
+      const source = this.variationCoords
+        ? this.#instancedGlyph(order[i] as number).data
+        : this.#glyphData(order[i] as number);
       if (source.length === 0) continue;
       const data = source.slice();
       const reader = new BinaryReader(data);
@@ -365,7 +523,12 @@ export class TrueTypeFont {
     for (const offset of offsets) loca.u32(offset);
 
     const hmtx = new BinaryWriter();
-    for (const glyph of order) hmtx.u16(this.advanceWidth(glyph)).i16(this.#leftSideBearing(glyph));
+    for (const glyph of order) {
+      const bearing = this.variationCoords
+        ? this.#instancedGlyph(glyph).xMin
+        : this.#leftSideBearing(glyph);
+      hmtx.u16(this.advanceWidth(glyph)).i16(bearing);
+    }
 
     const head = required(this.#tables, "head").slice();
     const headView = new DataView(head.buffer);
@@ -386,10 +549,13 @@ export class TrueTypeFont {
       ["loca", loca.toBytes()],
       ["maxp", maxp],
     ]);
-    // Hinting programs: instructions inside glyphs refer to them.
-    for (const tag of ["cvt ", "fpgm", "prep"]) {
-      const table = this.#tables.get(tag);
-      if (table) tables.set(tag, table);
+    // Hinting programs: instructions inside glyphs refer to them. An instance of a variable
+    // font is written unhinted, because its hinting would need the `cvar` deltas applied.
+    if (!this.variationCoords) {
+      for (const tag of ["cvt ", "fpgm", "prep"]) {
+        const table = this.#tables.get(tag);
+        if (table) tables.set(tag, table);
+      }
     }
     return { data: buildSfnt(tables), glyphs: order };
   }

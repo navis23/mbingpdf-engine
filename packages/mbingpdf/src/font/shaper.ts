@@ -43,6 +43,8 @@ export interface ShapableFont {
   table(tag: string): Uint8Array | undefined;
   glyphForCodePoint(codePoint: number): number;
   advanceWidth(glyph: number): number;
+  /** Normalised axis coordinates, when the font is an instance of a variable font. */
+  readonly variationCoords?: readonly number[] | undefined;
 }
 
 export interface Shaper {
@@ -68,10 +70,13 @@ function layoutData(font: ShapableFont): LayoutData {
     const gdef = font.table("GDEF");
     const gsub = font.table("GSUB");
     const gpos = font.table("GPOS");
+    const coords = font.variationCoords;
+    const parsedGdef = gdef && gdef.length >= 12 ? new Gdef(gdef, coords) : undefined;
+    const variations = parsedGdef?.variations;
     data = {
-      gdef: gdef && gdef.length >= 12 ? new Gdef(gdef) : undefined,
-      gsub: gsub && gsub.length >= 10 ? new LayoutTable(gsub, 7) : undefined,
-      gpos: gpos && gpos.length >= 10 ? new LayoutTable(gpos, 9) : undefined,
+      gdef: parsedGdef,
+      gsub: gsub && gsub.length >= 10 ? new LayoutTable(gsub, 7, coords, variations) : undefined,
+      gpos: gpos && gpos.length >= 10 ? new LayoutTable(gpos, 9, coords, variations) : undefined,
       kern: null,
     };
     layoutCache.set(font, data);

@@ -25,7 +25,8 @@ M1 has just started; see `docs/05-roadmap.md`.
 3. OpenType/CFF embedding and subsetting.
 4. ~~Shaping for simple scripts~~ done (`src/font/shaper.ts`, `src/font/layout/`); output equals HarfBuzz on the
    test corpus. Not covered: GSUB type 8, GPOS cursive, device/variation deltas, fallback mark placement.
-5. Variable-font instancing (two of the four test fonts need it).
+5. ~~Variable-font instancing~~ done (`font.instance({ wght: 700 })` or `font.instance("Bold")`;
+   `src/font/variations.ts`, `gvar.ts`, `glyf.ts`). Instances are written unhinted (no `cvar` support).
 6. WOFF2 decoding (needs a Brotli decoder; decide how before starting).
 7. Line breaking (UAX #14), justification, fit-to-width, hyphenation for English and Indonesian, fallback.
 

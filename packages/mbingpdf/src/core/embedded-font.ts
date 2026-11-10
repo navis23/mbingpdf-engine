@@ -68,7 +68,8 @@ export class EmbeddedFont {
   readonly font: FontProgram;
   /** Original glyph ID of each subset glyph; index is the ID used in content streams. */
   readonly #glyphs: number[] = [0];
-  readonly #subsetId: Map<number, number> = new Map([[0, 0]]);
+  /** Subset ID by glyph and the text it stands for. */
+  readonly #subsetId: Map<string, number> = new Map();
   /** The text each subset glyph stands for, for copy and search. */
   readonly #unicode: Map<number, string> = new Map();
 
@@ -79,16 +80,25 @@ export class EmbeddedFont {
     this.font = font;
   }
 
-  /** The ID to use in content streams for one of the font's glyphs. */
+  /**
+   * The ID to use in content streams for one of the font's glyphs.
+   *
+   * A PDF maps each glyph ID to one piece of text. When the same glyph stands for different
+   * text in different places (a programming ligature's spacer, an accent that is sometimes
+   * part of a larger cluster), it gets one ID per text, so copy and search stay correct.
+   *
+   * @param text what the glyph stands for; omit for a glyph that adds no text of its own
+   */
   use(glyph: number, text?: string): number {
-    let id = this.#subsetId.get(glyph);
+    const key = text === undefined ? `${glyph}` : `${glyph}:${text}`;
+    let id = this.#subsetId.get(key);
     if (id === undefined) {
       id = this.#glyphs.length;
       if (id > 0xffff) throw new Error("A document can use at most 65535 glyphs of one font");
       this.#glyphs.push(glyph);
-      this.#subsetId.set(glyph, id);
+      this.#subsetId.set(key, id);
+      if (text !== undefined) this.#unicode.set(id, text);
     }
-    if (text !== undefined && !this.#unicode.has(id)) this.#unicode.set(id, text);
     return id;
   }
 

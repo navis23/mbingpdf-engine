@@ -168,7 +168,8 @@ describe("subsetting", () => {
   test("validates its input", () => {
     const font = load("BarlowCondensed-Regular");
     expect(() => font.subset([5, 6])).toThrow(/start with glyph 0/);
-    expect(() => font.subset([0, 5, 5])).toThrow(/listed twice/);
+    // A repeated glyph is simply stored twice.
+    expect(font.subset([0, 5, 5]).glyphs.slice(0, 3)).toEqual([0, 5, 5]);
   });
 });
 
@@ -262,11 +263,26 @@ describe("embedding", () => {
       .text("a\u0301b", 0, 0);
     const out = latin1(doc.finish());
     expect(out).toContain(
-      "3 Ts\nBT\n0 0 Td\n<0001> Tj\n8 Ts\n[100<0002>-100] TJ\n3 Ts\n[<0001>20] TJ\nET\n",
+      "3 Ts\nBT\n0 0 Td\n<0001> Tj\n8 Ts\n[100<0002>-100] TJ\n3 Ts\n[<0003>20] TJ\nET\n",
     );
-    // Only the first glyph of a cluster carries its text.
+    // Only the first glyph of a cluster carries its text. The same glyph standing for "b"
+    // gets an ID of its own.
     expect(out).toContain("<0001> <00610301>\n");
     expect(out).not.toContain("<0002> <");
+    expect(out).toContain("<0003> <0062>\n");
+  });
+
+  test("a glyph that stands for different text in different places stays searchable", async () => {
+    // JetBrains Mono draws "!=" and "=>" with ligature glyphs plus a shared invisible spacer.
+    const mono = load("JetBrainsMono-Variable");
+    const doc = new PdfDocument(plain);
+    doc
+      .addPage({ size: [300, 100] })
+      .content.font(mono, 12)
+      .text("if (a != b) => {}", 10, 40);
+    // pdf.js reports the text in several runs; whitespace-only runs are dropped by the helper.
+    const runs = (await extractText(doc.finish()))[0] ?? [];
+    expect(runs.join(" ").replace(/\s+/g, " ")).toBe("if (a != b) => {}");
   });
 
   test("maps characters outside the Basic Multilingual Plane back to text", () => {

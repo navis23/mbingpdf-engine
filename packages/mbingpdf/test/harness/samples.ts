@@ -267,6 +267,12 @@ const fonts: Sample = {
       "Sertifikat Penghargaan",
       "Åsa Ørsted — Zoë Müller — Đặng",
       "Helvetica next to embedded fonts",
+      "Inter Thin — AVATAR Tokyo 0123",
+      "Inter Bold — AVATAR Tokyo 0123",
+      "Inter Black Display — AVATAR",
+      "Jakarta ExtraLight — Wawasan",
+      "Jakarta ExtraBold — Wawasan",
+      "Mono ExtraBold: if (a != b) => {}",
     ],
   ],
   build(env) {
@@ -308,6 +314,33 @@ const fonts: Sample = {
     c.font(StandardFonts.Helvetica, 11).text("Helvetica next to embedded fonts", 30, y - 90);
     // The same font used again must reuse its subset.
     c.font(inter, 9).text("Inter again, smaller: 0123456789", 30, y - 110);
+
+    // Styles cut from the variable fonts.
+    y -= 150;
+    const styles: [Font.TrueTypeFont, string][] = [
+      [inter.instance({ wght: 100 }), "Inter Thin — AVATAR Tokyo 0123"],
+      [inter.instance("Bold"), "Inter Bold — AVATAR Tokyo 0123"],
+      [inter.instance({ wght: 900, opsz: 32 }), "Inter Black Display — AVATAR"],
+      [jakarta.instance("ExtraLight"), "Jakarta ExtraLight — Wawasan"],
+      [jakarta.instance("ExtraBold"), "Jakarta ExtraBold — Wawasan"],
+      [
+        (loaded[1] as Font.TrueTypeFont).instance({ wght: 800 }),
+        "Mono ExtraBold: if (a != b) => {}",
+      ],
+    ];
+    for (const [font, line] of styles) {
+      c.fillColor(gray(0)).font(font, 15).text(line, 30, y);
+      c.strokeColor(rgb(1, 0, 0))
+        .lineWidth(0.3)
+        .rect(
+          30,
+          y - font.descent(15),
+          font.widthOfText(line, 15),
+          font.ascent(15) + font.descent(15),
+        )
+        .stroke();
+      y -= 26;
+    }
     return doc.finish();
   },
 };

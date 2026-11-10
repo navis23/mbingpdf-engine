@@ -10,3 +10,4 @@ export {
   type Shaper,
 } from "./shaper.ts";
 export { type FontSubset, TrueTypeFont } from "./truetype.ts";
+export type { NamedInstance, VariationAxis } from "./variations.ts";

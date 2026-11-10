@@ -3,6 +3,7 @@
  * Layout Common Table Formats"). Everything is read straight from the table bytes on demand.
  */
 import { BinaryReader } from "../reader.ts";
+import { ItemVariationStore } from "../variations.ts";
 
 /** Index of a glyph in a Coverage table, or -1 when it is not covered. */
 export function coverageIndex(r: BinaryReader, offset: number, glyph: number): number {
@@ -71,14 +72,19 @@ export class Gdef {
   readonly #classDef: number;
   readonly #markAttachClassDef: number;
   readonly #markGlyphSets: number;
+  /** Deltas for positioning values at the font's axis coordinates, if it is an instance. */
+  readonly variations: ItemVariationStore | undefined;
 
-  constructor(table: Uint8Array) {
+  constructor(table: Uint8Array, coords?: readonly number[]) {
     const r = new BinaryReader(table);
     this.#r = r;
     const minor = r.u16At(2);
     this.#classDef = r.u16At(4);
     this.#markAttachClassDef = r.u16At(10);
     this.#markGlyphSets = minor >= 2 ? r.u16At(12) : 0;
+    const store = minor >= 3 && table.length >= 18 ? r.u32At(14) : 0;
+    this.variations =
+      coords && store !== 0 ? new ItemVariationStore(table, store, coords) : undefined;
   }
 
   glyphClass(glyph: number): number {
@@ -118,14 +124,71 @@ export class LayoutTable {
   readonly #lookupList: number;
   readonly #extensionType: number;
   readonly #lookups: Map<number, Lookup> = new Map();
+  readonly #variations: ItemVariationStore | undefined;
+  /** Feature index → offset of the feature table that replaces it at these coordinates. */
+  readonly #substitutedFeatures: Map<number, number> = new Map();
 
-  /** @param extensionType the lookup type that wraps another lookup: 7 in GSUB, 9 in GPOS */
-  constructor(table: Uint8Array, extensionType: number) {
-    this.r = new BinaryReader(table);
-    this.#scriptList = this.r.u16At(4);
-    this.#featureList = this.r.u16At(6);
-    this.#lookupList = this.r.u16At(8);
+  /**
+   * @param extensionType the lookup type that wraps another lookup: 7 in GSUB, 9 in GPOS
+   * @param coords normalised axis coordinates, for an instance of a variable font
+   * @param variations the delta store from GDEF, for an instance of a variable font
+   */
+  constructor(
+    table: Uint8Array,
+    extensionType: number,
+    coords?: readonly number[],
+    variations?: ItemVariationStore,
+  ) {
+    const r = new BinaryReader(table);
+    this.r = r;
+    this.#scriptList = r.u16At(4);
+    this.#featureList = r.u16At(6);
+    this.#lookupList = r.u16At(8);
     this.#extensionType = extensionType;
+    this.#variations = variations;
+
+    // FeatureVariations: some features use different lookups in part of the design space
+    // (for instance a simpler dollar sign in bold weights).
+    const featureVariations = r.u16At(2) >= 1 && table.length >= 14 ? r.u32At(10) : 0;
+    if (coords && featureVariations !== 0) {
+      const count = r.u32At(featureVariations + 4);
+      for (let i = 0; i < count; i++) {
+        const record = featureVariations + 8 + i * 8;
+        const conditionSet = r.u32At(record);
+        let matches = true;
+        if (conditionSet !== 0) {
+          const set = featureVariations + conditionSet;
+          for (let c = 0; c < r.u16At(set) && matches; c++) {
+            const condition = set + r.u32At(set + 2 + c * 4);
+            if (r.u16At(condition) !== 1) {
+              matches = false;
+              break;
+            }
+            const value = coords[r.u16At(condition + 2)] ?? 0;
+            matches =
+              value >= r.i16At(condition + 4) / 16384 && value <= r.i16At(condition + 6) / 16384;
+          }
+        }
+        if (!matches) continue;
+        const substitution = featureVariations + r.u32At(record + 4);
+        for (let s = 0; s < r.u16At(substitution + 4); s++) {
+          const entry = substitution + 6 + s * 6;
+          this.#substitutedFeatures.set(r.u16At(entry), substitution + r.u32At(entry + 2));
+        }
+        break;
+      }
+    }
+  }
+
+  /**
+   * The adjustment a Device table adds to a positioning value. Only variation deltas are
+   * applied; pixel-size hinting deltas are meaningless in a PDF. The result is not rounded.
+   */
+  deviceDelta(base: number, offset: number): number {
+    if (offset === 0 || !this.#variations) return 0;
+    const at = base + offset;
+    if (this.r.u16At(at + 4) !== 0x8000) return 0;
+    return this.#variations.delta(this.r.u16At(at), this.r.u16At(at + 2));
   }
 
   /** Offset of the language system to use, or 0 when the table has no usable script. */
@@ -168,7 +231,9 @@ export class LayoutTable {
     if (langSys === 0) return [];
     const selected = new Map<number, number>();
     const addFeature = (featureIndex: number, value: number): void => {
-      const feature = this.#featureList + r.u16At(this.#featureList + 2 + featureIndex * 6 + 4);
+      const feature =
+        this.#substitutedFeatures.get(featureIndex) ??
+        this.#featureList + r.u16At(this.#featureList + 2 + featureIndex * 6 + 4);
       const count = r.u16At(feature + 2);
       for (let i = 0; i < count; i++) {
         const lookup = r.u16At(feature + 4 + i * 2);
