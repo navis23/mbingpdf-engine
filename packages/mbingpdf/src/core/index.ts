@@ -11,6 +11,7 @@ export {
   type LineCap,
   type LineJoin,
   type Opacity,
+  type TextRenderingMode,
 } from "./content.ts";
 export { PdfDocument, type PdfDocumentOptions, type PdfInfo } from "./document.ts";
 export {
@@ -26,6 +27,8 @@ export {
 } from "./objects.ts";
 export { PdfPage, type PdfPageOptions } from "./page.ts";
 export { formatNumber, writeObject } from "./serialize.ts";
+export { StandardFont } from "./standard-font.ts";
+export * as StandardFonts from "./standard-fonts.ts";
 export {
   type Box,
   cm,

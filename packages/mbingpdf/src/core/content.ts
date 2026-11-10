@@ -1,11 +1,23 @@
 import { ByteWriter } from "./bytes.ts";
 import type { Color } from "./color.ts";
-import { PdfName } from "./objects.ts";
+import { PdfName, PdfString } from "./objects.ts";
 import { formatNumber, writeObject } from "./serialize.ts";
+import type { StandardFont } from "./standard-font.ts";
 
 export type FillRule = "nonzero" | "evenodd";
 export type LineCap = "butt" | "round" | "square";
 export type LineJoin = "miter" | "round" | "bevel";
+
+/** How glyphs are painted (ISO 32000-1, table 106). */
+export type TextRenderingMode =
+  | "fill"
+  | "stroke"
+  | "fillStroke"
+  | "invisible"
+  | "fillClip"
+  | "strokeClip"
+  | "fillStrokeClip"
+  | "clip";
 
 export interface Opacity {
   /** Opacity of fills, 0–1. */
@@ -18,7 +30,20 @@ export interface Opacity {
 export interface ContentResources {
   /** Returns the resource name of a graphics state with these opacities. */
   opacity(fill: number | undefined, stroke: number | undefined): string;
+  /** Returns the resource name of a font. */
+  font(font: StandardFont): string;
 }
+
+const TEXT_RENDERING_MODES: Record<TextRenderingMode, number> = {
+  fill: 0,
+  stroke: 1,
+  fillStroke: 2,
+  invisible: 3,
+  fillClip: 4,
+  strokeClip: 5,
+  fillStrokeClip: 6,
+  clip: 7,
+};
 
 const LINE_CAPS: Record<LineCap, number> = { butt: 0, round: 1, square: 2 };
 const LINE_JOINS: Record<LineJoin, number> = { miter: 0, round: 1, bevel: 2 };
@@ -39,7 +64,9 @@ const factor = (value: number): string => formatNumber(value, 6);
 export class ContentStream {
   readonly #out: ByteWriter = new ByteWriter();
   readonly #resources: ContentResources | undefined;
-  #depth = 0;
+  /** The font in effect at each save() level; the last entry is the current one. */
+  readonly #fonts: (StandardFont | undefined)[] = [undefined];
+  #inText = false;
 
   constructor(resources?: ContentResources) {
     this.#resources = resources;
@@ -49,14 +76,16 @@ export class ContentStream {
 
   /** Saves the graphics state (`q`). Every save needs a matching {@link restore}. */
   save(): this {
-    this.#depth++;
+    this.#noText("save()");
+    this.#fonts.push(this.#fonts.at(-1));
     return this.#op("q");
   }
 
   /** Restores the most recently saved graphics state (`Q`). */
   restore(): this {
-    if (this.#depth === 0) throw new Error("restore() without a matching save()");
-    this.#depth--;
+    this.#noText("restore()");
+    if (this.#fonts.length === 1) throw new Error("restore() without a matching save()");
+    this.#fonts.pop();
     return this.#op("Q");
   }
 
@@ -251,6 +280,75 @@ export class ContentStream {
     return this.#op("n");
   }
 
+  // ----- text -----
+
+  /** Selects the font and size for the text that follows (`Tf`). Needs a page. */
+  font(font: StandardFont, size: number): this {
+    if (!(size > 0)) throw new RangeError("Font size must be positive");
+    if (!this.#resources) throw new Error("font() needs a content stream that belongs to a page");
+    this.#fonts[this.#fonts.length - 1] = font;
+    return this.#op("Tf", this.#name(this.#resources.font(font)), n(size));
+  }
+
+  /** Begins a text object (`BT`). Text can only be shown between this and {@link endText}. */
+  beginText(): this {
+    this.#noText("beginText()");
+    this.#inText = true;
+    return this.#op("BT");
+  }
+
+  endText(): this {
+    this.#needText("endText()");
+    this.#inText = false;
+    return this.#op("ET");
+  }
+
+  /** Moves to the start of a new line, offset from the start of the current one (`Td`). */
+  moveText(dx: number, dy: number): this {
+    this.#needText("moveText()");
+    return this.#op("Td", n(dx), n(dy));
+  }
+
+  /** Sets the text matrix, placing and transforming the text that follows (`Tm`). */
+  textMatrix(a: number, b: number, c: number, d: number, e: number, f: number): this {
+    this.#needText("textMatrix()");
+    return this.#op("Tm", factor(a), factor(b), factor(c), factor(d), n(e), n(f));
+  }
+
+  /** Shows text at the current position in the current font (`Tj`). */
+  showText(text: string): this {
+    this.#needText("showText()");
+    const font = this.#fonts.at(-1);
+    if (!font) throw new Error("Select a font with font() before showing text");
+    writeObject(this.#out, new PdfString(font.encode(text)));
+    this.#out.ascii(" Tj\n");
+    return this;
+  }
+
+  /** Draws one line of text with its baseline starting at `(x, y)`. */
+  text(text: string, x: number, y: number): this {
+    return this.beginText().moveText(x, y).showText(text).endText();
+  }
+
+  /** Extra space after every glyph, in points (`Tc`). */
+  characterSpacing(spacing: number): this {
+    return this.#op("Tc", n(spacing));
+  }
+
+  /** Extra space after every space character, in points (`Tw`). */
+  wordSpacing(spacing: number): this {
+    return this.#op("Tw", n(spacing));
+  }
+
+  /** Raises (or, when negative, lowers) the baseline, for superscripts and subscripts (`Ts`). */
+  textRise(rise: number): this {
+    return this.#op("Ts", n(rise));
+  }
+
+  textRenderingMode(mode: TextRenderingMode): this {
+    return this.#op("Tr", String(TEXT_RENDERING_MODES[mode]));
+  }
+
   // ----- escape hatch and output -----
 
   /** Appends operators verbatim. */
@@ -262,8 +360,9 @@ export class ContentStream {
 
   /** The finished stream. Throws if a save() was never restored. */
   toBytes(): Uint8Array {
-    if (this.#depth !== 0) {
-      throw new Error(`${this.#depth} save() call(s) without a matching restore()`);
+    if (this.#inText) throw new Error("beginText() without a matching endText()");
+    if (this.#fonts.length !== 1) {
+      throw new Error(`${this.#fonts.length - 1} save() call(s) without a matching restore()`);
     }
     return this.#out.toBytes();
   }
@@ -277,6 +376,14 @@ export class ContentStream {
       case "cmyk":
         return this.#op(stroking ? "K" : "k", n(color.c), n(color.m), n(color.y), n(color.k));
     }
+  }
+
+  #noText(what: string): void {
+    if (this.#inText) throw new Error(`${what} is not allowed inside a text object`);
+  }
+
+  #needText(what: string): void {
+    if (!this.#inText) throw new Error(`${what} is only allowed between beginText() and endText()`);
   }
 
   #name(value: string): string {

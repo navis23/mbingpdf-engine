@@ -4,7 +4,7 @@ Milestones are ordered by dependency. Each ends with something a user can run an
 
 ## M0 — Foundations
 
-_Status: in progress — toolchain, CI on Node, the PDF writer, and pages with vector drawing, colour and print boxes are done; standard-font text and the render-comparison harness remain_
+_Status: in progress — toolchain, CI on Node, the PDF writer, and pages with vector drawing, colour and print boxes, and text in the 14 standard fonts are done; the render-comparison harness and the Bun, Deno and browser runs remain_
 
 Repository, toolchain and a valid PDF.
 

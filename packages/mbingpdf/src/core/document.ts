@@ -1,5 +1,6 @@
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
 import { PdfPage, type PdfPageOptions } from "./page.ts";
+import type { StandardFont } from "./standard-font.ts";
 import { PdfWriter, type PdfWriterOptions } from "./writer.ts";
 
 /** Document information shown in a viewer's properties dialog. */
@@ -36,6 +37,7 @@ export class PdfDocument {
   readonly #pagesRef: PdfRef;
   readonly #pages: PdfPage[] = [];
   readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
+  readonly #fonts: Map<StandardFont, { name: string; ref: PdfRef }> = new Map();
 
   constructor(options: PdfDocumentOptions = {}) {
     this.writer = new PdfWriter(options);
@@ -55,6 +57,7 @@ export class PdfDocument {
         writer: this.writer,
         pagesRef: this.#pagesRef,
         opacityState: (fill, stroke) => this.#opacityState(fill, stroke),
+        fontResource: (font) => this.#fontResource(font),
       },
       options,
     );
@@ -95,6 +98,25 @@ export class PdfDocument {
       this.#opacityStates.set(key, state);
     }
     return state;
+  }
+
+  /** One font object per standard font, shared by every page that uses it. */
+  #fontResource(font: StandardFont): { name: string; ref: PdfRef } {
+    let resource = this.#fonts.get(font);
+    if (!resource) {
+      const ref = this.writer.add(
+        new PdfDict({
+          Type: new PdfName("Font"),
+          Subtype: new PdfName("Type1"),
+          BaseFont: new PdfName(font.name),
+          // Symbol and ZapfDingbats keep their built-in encoding.
+          Encoding: font.symbolic ? undefined : new PdfName("WinAnsiEncoding"),
+        }),
+      );
+      resource = { name: `F${this.#fonts.size + 1}`, ref };
+      this.#fonts.set(font, resource);
+    }
+    return resource;
   }
 
   #infoDict(): PdfDict {
