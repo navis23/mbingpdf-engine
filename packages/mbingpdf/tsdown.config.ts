@@ -11,6 +11,8 @@ const config: UserConfig = defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
+  // fflate is compiled into the output, so the published package has no runtime dependencies.
+  deps: { onlyBundle: ["fflate"] },
 });
 
 export default config;

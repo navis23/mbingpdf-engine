@@ -4,7 +4,7 @@ Milestones are ordered by dependency. Each ends with something a user can run an
 
 ## M0 — Foundations
 
-_Status: not started_
+_Status: in progress — toolchain, CI on Node and the PDF writer (objects, serialiser, xref streams, deflate, metadata) are done_
 
 Repository, toolchain and a valid PDF.
 

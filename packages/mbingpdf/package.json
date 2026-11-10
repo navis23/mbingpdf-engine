@@ -40,6 +40,9 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.test.json"
+  },
+  "devDependencies": {
+    "fflate": "0.8.3"
   }
 }

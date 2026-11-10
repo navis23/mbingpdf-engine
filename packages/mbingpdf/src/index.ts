@@ -1,5 +1,7 @@
 /**
  * `mbingpdf` — public API: element factories, themes and `render()`.
+ *
+ * Nothing is exported yet; the writer lives in `mbingpdf/core`.
  */
 
-export { PDF_VERSION } from "./core/index.ts";
+export {};

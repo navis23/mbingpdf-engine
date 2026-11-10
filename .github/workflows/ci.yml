@@ -27,6 +27,8 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
+      - name: Install qpdf (structural PDF checks)
+        run: sudo apt-get update && sudo apt-get install -y qpdf
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
