@@ -29,10 +29,12 @@ export interface FontProgram {
    * font does not provide this, each character is drawn with its own glyph at its plain width.
    */
   shape?(text: string): readonly PositionedGlyph[];
-  /** A font file with only these glyphs, renumbered in order; see `TrueTypeFont.subset`. */
+  /** A font file with only these glyphs, renumbered in order; see `Font.subset`. */
   subset(glyphs: readonly number[]): {
     readonly data: Uint8Array;
     readonly glyphs: readonly number[];
+    /** `"cff"` when `data` is a bare CID-keyed CFF table instead of a TrueType file. */
+    readonly format?: "truetype" | "cff";
   };
 }
 
@@ -169,8 +171,14 @@ export class EmbeddedFont {
     ).join("");
     const baseFont = new PdfName(`${tag}+${font.postScriptName}`);
 
+    const cff = subset.format === "cff";
     const file = writer.add(
-      new PdfStream(subset.data, new PdfDict({ Length1: subset.data.length })),
+      new PdfStream(
+        subset.data,
+        new PdfDict(
+          cff ? { Subtype: new PdfName("CIDFontType0C") } : { Length1: subset.data.length },
+        ),
+      ),
     );
 
     // Flags (table 123): 1 fixed pitch, 32 nonsymbolic, 64 italic.
@@ -187,7 +195,8 @@ export class EmbeddedFont {
         CapHeight: scaled(font.capHeight),
         // Not stored in TrueType fonts; this estimate from the weight is the usual practice.
         StemV: Math.round(50 + (font.weightClass / 65) ** 2),
-        FontFile2: file,
+        FontFile2: cff ? undefined : file,
+        FontFile3: cff ? file : undefined,
       }),
     );
 
@@ -195,7 +204,7 @@ export class EmbeddedFont {
     const descendant = writer.add(
       new PdfDict({
         Type: new PdfName("Font"),
-        Subtype: new PdfName("CIDFontType2"),
+        Subtype: new PdfName(cff ? "CIDFontType0" : "CIDFontType2"),
         BaseFont: baseFont,
         CIDSystemInfo: new PdfDict({
           Registry: PdfString.text("Adobe"),
@@ -205,7 +214,8 @@ export class EmbeddedFont {
         FontDescriptor: descriptor,
         DW: widths[0] ?? 0,
         W: [0, widths],
-        CIDToGIDMap: new PdfName("Identity"),
+        // A TrueType font maps CIDs to glyphs here; a CFF font does it in its own charset.
+        CIDToGIDMap: cff ? undefined : new PdfName("Identity"),
       }),
     );
 

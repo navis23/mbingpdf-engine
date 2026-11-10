@@ -38,7 +38,7 @@ export interface ShapeOptions {
   readonly language?: string;
 }
 
-/** What a shaper needs from a font. `TrueTypeFont` satisfies it. */
+/** What a shaper needs from a font. `Font` satisfies it. */
 export interface ShapableFont {
   table(tag: string): Uint8Array | undefined;
   glyphForCodePoint(codePoint: number): number;

@@ -7,12 +7,12 @@
  * be deterministic.
  */
 import type * as Core from "../../src/core/index.ts";
-import type * as Font from "../../src/font/index.ts";
+import type * as FontModule from "../../src/font/index.ts";
 import type * as Text from "../../src/text/index.ts";
 
 export type CoreModule = typeof Core;
 
-/** Font files in `test/fonts/`, without the `.ttf` extension. */
+/** The TrueType-outline fonts in `test/fonts/`, without the `.ttf` extension. */
 export const FONT_FILES = [
   "Inter-Variable",
   "JetBrainsMono-Variable",
@@ -21,12 +21,22 @@ export const FONT_FILES = [
   "BarlowCondensed-Bold",
 ] as const;
 
-export type FontFile = (typeof FONT_FILES)[number];
+/** A font with CFF outlines, in `test/fonts/` as an `.otf` file. */
+export const CFF_FONT_FILE = "SourceSans3-Regular";
+
+/** Every test font, with its file name. */
+export const ALL_FONT_FILES: readonly FontFile[] = [...FONT_FILES, CFF_FONT_FILE];
+
+export type FontFile = (typeof FONT_FILES)[number] | typeof CFF_FONT_FILE;
+
+export function fontFileName(file: FontFile): string {
+  return file === CFF_FONT_FILE ? `${file}.otf` : `${file}.ttf`;
+}
 
 /** Everything a sample may use. */
 export interface SampleEnv {
   readonly core: CoreModule;
-  readonly font: typeof Font;
+  readonly font: typeof FontModule;
   readonly text: typeof Text;
   /** The bytes of each test font. */
   readonly fonts: Readonly<Record<FontFile, Uint8Array>>;
@@ -269,6 +279,7 @@ const fonts: Sample = {
       "Sertifikat Penghargaan",
       "Åsa Ørsted — Zoë Müller — Đặng",
       "Helvetica next to embedded fonts",
+      "Source Sans 3 (CFF): AVATAR office — é ß 0123",
       "Inter Thin — AVATAR Tokyo 0123",
       "Inter Bold — AVATAR Tokyo 0123",
       "Inter Black Display — AVATAR",
@@ -282,7 +293,7 @@ const fonts: Sample = {
     const doc = new PdfDocument({ deterministic: true, info: { title: "Fonts" } });
     const page = doc.addPage({ size: PageSizes.A5 });
     const c = page.content;
-    const loaded = FONT_FILES.map((file) => new env.font.TrueTypeFont(env.fonts[file]));
+    const loaded = FONT_FILES.map((file) => new env.font.Font(env.fonts[file]));
     let y = page.height - 50;
     for (const font of loaded) {
       const line = `${font.familyName}: ${EMBEDDED_LINE}`;
@@ -299,11 +310,11 @@ const fonts: Sample = {
       y -= 38;
     }
     const [inter, , jakarta, , barlowBold] = loaded as [
-      Font.TrueTypeFont,
-      Font.TrueTypeFont,
-      Font.TrueTypeFont,
-      Font.TrueTypeFont,
-      Font.TrueTypeFont,
+      FontModule.Font,
+      FontModule.Font,
+      FontModule.Font,
+      FontModule.Font,
+      FontModule.Font,
     ];
     const title = "Sertifikat Penghargaan";
     const size = 34;
@@ -317,18 +328,19 @@ const fonts: Sample = {
     // The same font used again must reuse its subset.
     c.font(inter, 9).text("Inter again, smaller: 0123456789", 30, y - 110);
 
+    // A font with CFF outlines, embedded as a CID-keyed CFF subset.
+    const sourceSans = new env.font.Font(env.fonts[CFF_FONT_FILE]);
+    c.font(sourceSans, 11).text("Source Sans 3 (CFF): AVATAR office — é ß 0123", 30, y - 130);
+
     // Styles cut from the variable fonts.
-    y -= 150;
-    const styles: [Font.TrueTypeFont, string][] = [
+    y -= 160;
+    const styles: [FontModule.Font, string][] = [
       [inter.instance({ wght: 100 }), "Inter Thin — AVATAR Tokyo 0123"],
       [inter.instance("Bold"), "Inter Bold — AVATAR Tokyo 0123"],
       [inter.instance({ wght: 900, opsz: 32 }), "Inter Black Display — AVATAR"],
       [jakarta.instance("ExtraLight"), "Jakarta ExtraLight — Wawasan"],
       [jakarta.instance("ExtraBold"), "Jakarta ExtraBold — Wawasan"],
-      [
-        (loaded[1] as Font.TrueTypeFont).instance({ wght: 800 }),
-        "Mono ExtraBold: if (a != b) => {}",
-      ],
+      [(loaded[1] as FontModule.Font).instance({ wght: 800 }), "Mono ExtraBold: if (a != b) => {}"],
     ];
     for (const [font, line] of styles) {
       c.fillColor(gray(0)).font(font, 15).text(line, 30, y);
@@ -375,9 +387,9 @@ const paragraphs: Sample = {
     const doc = new PdfDocument({ deterministic: true, info: { title: "Paragraphs" } });
     const page = doc.addPage({ size: PageSizes.A5 });
     const c = page.content;
-    const inter = new env.font.TrueTypeFont(env.fonts["Inter-Variable"]);
-    const jakarta = new env.font.TrueTypeFont(env.fonts["PlusJakartaSans-Variable"]);
-    const barlowBold = new env.font.TrueTypeFont(env.fonts["BarlowCondensed-Bold"]);
+    const inter = new env.font.Font(env.fonts["Inter-Variable"]);
+    const jakarta = new env.font.Font(env.fonts["PlusJakartaSans-Variable"]);
+    const barlowBold = new env.font.Font(env.fonts["BarlowCondensed-Bold"]);
     const left = 36;
     const width = page.width - 2 * left;
     let top = page.height - 36;

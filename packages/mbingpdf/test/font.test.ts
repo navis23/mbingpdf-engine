@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import * as hb from "harfbuzzjs";
 import { describe, expect, test } from "vitest";
 import { PdfDocument } from "../src/core/index.ts";
-import { TrueTypeFont } from "../src/font/index.ts";
+import { Font } from "../src/font/index.ts";
 import { parseSfnt } from "../src/font/sfnt.ts";
 import { readFont } from "./harness/env.ts";
 import { harfbuzzSubset } from "./harness/hb-subset.ts";
@@ -10,7 +10,7 @@ import { extractText } from "./harness/render.ts";
 import { FONT_FILES, type FontFile } from "./harness/samples.ts";
 
 const latin1 = (bytes: Uint8Array): string => new TextDecoder("latin1").decode(bytes);
-const load = (file: FontFile): TrueTypeFont => new TrueTypeFont(readFont(file));
+const load = (file: FontFile): Font => new Font(readFont(file));
 
 /** A string that exercises ASCII, Latin-1, Latin Extended, punctuation and a missing glyph. */
 const CORPUS = "The quick brown fox — “Rp 1.250.000” éüŵßÅØĐ fi ffl 0123456789 →€™ 日";
@@ -19,7 +19,7 @@ function harfbuzzFont(file: FontFile): hb.Font {
   return new hb.Font(new hb.Face(new hb.Blob(readFont(file).slice().buffer)));
 }
 
-describe("TrueTypeFont", () => {
+describe("Font", () => {
   test("reads names and global metrics", () => {
     const inter = load("Inter-Variable");
     expect(inter.postScriptName).toBe("Inter-Regular");
@@ -81,7 +81,7 @@ describe("TrueTypeFont", () => {
   test("accepts a Node Buffer without corrupting it", () => {
     const buffer = readFileSync(new URL("./fonts/BarlowCondensed-Regular.ttf", import.meta.url));
     const before = Uint8Array.from(buffer);
-    const font = new TrueTypeFont(buffer);
+    const font = new Font(buffer);
     const fromBuffer = font.subset([0, font.glyphForCodePoint(0xe9)]);
     expect(Uint8Array.from(buffer)).toEqual(before);
     const plain = load("BarlowCondensed-Regular");
@@ -89,14 +89,12 @@ describe("TrueTypeFont", () => {
   });
 
   test("rejects files that are not TrueType fonts", () => {
-    expect(() => new TrueTypeFont(new Uint8Array(4))).toThrow(/too short/);
-    expect(() => new TrueTypeFont(new TextEncoder().encode("%PDF-1.7 not a font"))).toThrow(
+    expect(() => new Font(new Uint8Array(4))).toThrow(/too short/);
+    expect(() => new Font(new TextEncoder().encode("%PDF-1.7 not a font"))).toThrow(
       /unrecognised file signature/,
     );
-    expect(() => new TrueTypeFont(new TextEncoder().encode("OTTO\0\0\0\0\0\0\0\0"))).toThrow(/CFF/);
-    expect(() => new TrueTypeFont(new TextEncoder().encode("wOF2\0\0\0\0\0\0\0\0"))).toThrow(
-      /WOFF2/,
-    );
+    expect(() => new Font(new TextEncoder().encode("OTTO\0\0\0\0\0\0\0\0"))).toThrow(/CFF/);
+    expect(() => new Font(new TextEncoder().encode("wOF2\0\0\0\0\0\0\0\0"))).toThrow(/WOFF2/);
   });
 });
 
@@ -166,7 +164,7 @@ describe("subsetting", () => {
       "0123456789 (fi) [x] AVATAR!?";
     for (const file of FONT_FILES) {
       const bytes = readFont(file);
-      const font = new TrueTypeFont(bytes);
+      const font = new Font(bytes);
       const used = new Set(font.shape(text).map((glyph) => glyph.id));
       used.delete(0);
       const subset = font.subset([0, ...used]);
@@ -366,7 +364,7 @@ describe("embedding", () => {
 });
 
 /** A FontProgram built from a real font, for tests that override one property. */
-function metricsOf(font: TrueTypeFont) {
+function metricsOf(font: Font) {
   return {
     postScriptName: font.postScriptName,
     unitsPerEm: font.unitsPerEm,

@@ -1,10 +1,13 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 12:10 WIB · Session 2 · Milestone: M0 done, M1 (Fonts and text) mostly done · Branch: main_
+_Updated: 2026-11-10 12:45 WIB · Session 2 · Milestone: M0 and M1 done, M2 (Layout and pagination) next · Branch: main_
 
 ## Where we are
-M0 is finished and green in CI. `mbingpdf/core` writes valid multi-page PDFs with vector graphics, RGB/CMYK
-colour, opacity, print boxes and text in the 14 standard fonts, with byte-identical output on Node, Bun, Deno
-and Chromium. Nothing is published to npm. The root `mbingpdf` entry is still empty.
+M0 and M1 are finished and green. The library has three layers so far, each an entry point:
+`mbingpdf/core` (PDF writer, pages, drawing, standard fonts, font embedding), `mbingpdf/font` (TrueType, CFF
+and WOFF2 parsing, subsetting, shaping, variable-font instancing) and `mbingpdf/text` (line breaking,
+graphemes, hyphenation, paragraph layout, fit-to-width). Output is byte-identical on Node, Bun, Deno and
+Chromium. Nothing is published to npm. The root `mbingpdf` entry is still empty: the declarative API and the
+layout engine are M2.
 
 ## Done this session
 - Toolchain: pnpm workspace, TypeScript 7 strict + `isolatedDeclarations`, tsdown (ESM + CJS), Vitest, Biome,
@@ -22,7 +25,8 @@ M1 has just started; see `docs/05-roadmap.md`.
 ## Next steps (in order)
 1. ~~TrueType parsing and embedding as a CID font with `ToUnicode`~~ done (`src/font/`, `src/core/embedded-font.ts`).
 2. ~~Glyph subsetting for TrueType outlines~~ done.
-3. OpenType/CFF embedding and subsetting.
+3. ~~OpenType/CFF embedding and subsetting~~ done (`src/font/cff.ts`); the class is now `Font`, not
+   `TrueTypeFont`.
 4. ~~Shaping for simple scripts~~ done (`src/font/shaper.ts`, `src/font/layout/`); output equals HarfBuzz on the
    test corpus. Not covered: GSUB type 8, GPOS cursive, device/variation deltas, fallback mark placement.
 5. ~~Variable-font instancing~~ done (`font.instance({ wght: 700 })` or `font.instance("Bold")`;

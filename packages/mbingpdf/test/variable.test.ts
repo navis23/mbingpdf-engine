@@ -1,7 +1,7 @@
 import * as hb from "harfbuzzjs";
 import { describe, expect, test } from "vitest";
 import { PdfDocument } from "../src/core/index.ts";
-import { TrueTypeFont } from "../src/font/index.ts";
+import { Font } from "../src/font/index.ts";
 import { readFont } from "./harness/env.ts";
 import { extractText } from "./harness/render.ts";
 import type { FontFile } from "./harness/samples.ts";
@@ -29,18 +29,18 @@ const commands = (path: string): string => path.replace(/[-\d.]+/g, "");
 
 describe("variable fonts", () => {
   test("lists axes and named styles", () => {
-    const inter = new TrueTypeFont(readFont("Inter-Variable"));
+    const inter = new Font(readFont("Inter-Variable"));
     expect(inter.axes).toEqual([
       { tag: "opsz", name: "Optical size", min: 14, default: 14, max: 32 },
       { tag: "wght", name: "Weight", min: 100, default: 400, max: 900 },
     ]);
     expect(inter.namedInstances.map((instance) => instance.name)).toContain("Bold");
     expect(inter.variationCoords).toBeUndefined();
-    expect(new TrueTypeFont(readFont("BarlowCondensed-Regular")).axes).toEqual([]);
+    expect(new Font(readFont("BarlowCondensed-Regular")).axes).toEqual([]);
   });
 
   test("an instance is named after the matching style", () => {
-    const inter = new TrueTypeFont(readFont("Inter-Variable"));
+    const inter = new Font(readFont("Inter-Variable"));
     const bold = inter.instance({ wght: 700 });
     expect(bold.postScriptName).toBe("Inter-Bold");
     expect(bold.subfamilyName).toBe("Bold");
@@ -53,7 +53,7 @@ describe("variable fonts", () => {
   });
 
   test("values outside an axis are clamped", () => {
-    const jakarta = new TrueTypeFont(readFont("PlusJakartaSans-Variable"));
+    const jakarta = new Font(readFont("PlusJakartaSans-Variable"));
     const glyph = jakarta.glyphForCodePoint(0x6d);
     expect(jakarta.instance({ wght: 5000 }).advanceWidth(glyph)).toBe(
       jakarta.instance({ wght: 800 }).advanceWidth(glyph),
@@ -61,17 +61,17 @@ describe("variable fonts", () => {
   });
 
   test("rejects unknown axes, unknown styles and static fonts", () => {
-    const inter = new TrueTypeFont(readFont("Inter-Variable"));
+    const inter = new Font(readFont("Inter-Variable"));
     expect(() => inter.instance({ wdth: 80 })).toThrow(
       'Font has no "wdth" axis; it has opsz, wght',
     );
     expect(() => inter.instance("Chunky")).toThrow(/no style named "Chunky"; it has .*Bold/);
-    const barlow = new TrueTypeFont(readFont("BarlowCondensed-Regular"));
+    const barlow = new Font(readFont("BarlowCondensed-Regular"));
     expect(() => barlow.instance({ wght: 700 })).toThrow(/not a variable font/);
   });
 
   test.each(INSTANCES)("advances and outlines agree with HarfBuzz: %s %j", (file, settings) => {
-    const base = new TrueTypeFont(readFont(file));
+    const base = new Font(readFont(file));
     const font = base.instance(settings);
     const expected = reference(file, settings);
     const all = Array.from({ length: base.numGlyphs }, (_, i) => i);
@@ -108,7 +108,7 @@ describe("variable fonts", () => {
   });
 
   test.each(INSTANCES)("shaping agrees with HarfBuzz: %s %j", (file, settings) => {
-    const font = new TrueTypeFont(readFont(file)).instance(settings);
+    const font = new Font(readFont(file)).instance(settings);
     const expected = reference(file, settings);
     const texts = [
       "AVATAR Tokyo, WAVE. Yes! To: “Type”",
@@ -156,7 +156,7 @@ describe("variable fonts", () => {
   });
 
   test("heavier weights are wider and embed under their own name", async () => {
-    const jakarta = new TrueTypeFont(readFont("PlusJakartaSans-Variable"));
+    const jakarta = new Font(readFont("PlusJakartaSans-Variable"));
     const light = jakarta.instance("ExtraLight");
     const heavy = jakarta.instance("ExtraBold");
     expect(heavy.widthOfText("Sertifikat", 100)).toBeGreaterThan(
@@ -176,7 +176,7 @@ describe("variable fonts", () => {
   });
 
   test("an instance is written without hinting programs", () => {
-    const mono = new TrueTypeFont(readFont("JetBrainsMono-Variable"));
+    const mono = new Font(readFont("JetBrainsMono-Variable"));
     const tables = (data: Uint8Array): string => {
       const count = new DataView(data.buffer, data.byteOffset).getUint16(4);
       let tags = "";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { PdfDocument, StandardFonts } from "../src/core/index.ts";
-import { TrueTypeFont } from "../src/font/index.ts";
+import { Font } from "../src/font/index.ts";
 import {
   createPatternHyphenator,
   drawParagraph,
@@ -12,8 +12,8 @@ import {
 import { readFont } from "./harness/env.ts";
 import { extractText } from "./harness/render.ts";
 
-const inter = new TrueTypeFont(readFont("Inter-Variable"));
-const barlow = new TrueTypeFont(readFont("BarlowCondensed-Regular"));
+const inter = new Font(readFont("Inter-Variable"));
+const barlow = new Font(readFont("BarlowCondensed-Regular"));
 const { Helvetica, ZapfDingbats } = StandardFonts;
 
 const TEXT =

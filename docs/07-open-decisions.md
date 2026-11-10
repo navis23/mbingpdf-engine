@@ -25,8 +25,10 @@
 | 22 | Hyphenation | English uses the TeX en-US patterns (permissive notice licence). Indonesian uses our own rule-based syllabifier, because the TeX Indonesian patterns are GPL-2 and cannot ship in an MIT package | 2026-11-10 |
 | 23 | Line filling | Greedy (first fit). Knuth–Plass optimal breaking can be added later without changing the API | 2026-11-10 |
 | 24 | WOFF2 and Brotli | No Brotli decoder is bundled (its dictionary alone is 120 kB). `loadFont()` uses the runtime's own: `node:zlib` on Node, Bun and Deno, `DecompressionStream("brotli")` in browsers. `decodeWoff2()` accepts any decoder for runtimes with neither | 2026-11-10 |
+| 25 | CFF fonts | Embedded as a CID-keyed CFF subset (`CIDFontType0C`). The subset keeps every subroutine rather than tracing which are used, so it is larger than HarfBuzz's; correctness first | 2026-11-10 |
+| 26 | Font class name | One class, `Font`, for TrueType and CFF outlines (`loadFont()` also takes WOFF2). There is no separate `TrueTypeFont` | 2026-11-10 |
 
-Decisions 8–10 and 16–24 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–26 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

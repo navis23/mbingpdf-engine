@@ -10,7 +10,7 @@ import * as font from "../../dist/font/index.js";
 import * as text from "../../dist/text/index.js";
 import golden from "../golden/digests.json" with { type: "json" };
 import { compareDigests, digestSamples } from "./digest.ts";
-import { FONT_FILES } from "./samples.ts";
+import { ALL_FONT_FILES, fontFileName } from "./samples.ts";
 
 const runtime =
   typeof Deno !== "undefined"
@@ -20,9 +20,11 @@ const runtime =
       : `Node ${process.versions.node}`;
 
 const fonts = {};
-for (const file of FONT_FILES) {
+for (const file of ALL_FONT_FILES) {
   // Wrap in a plain Uint8Array: what Node and Bun return here is a Buffer.
-  fonts[file] = new Uint8Array(await readFile(new URL(`../fonts/${file}.ttf`, import.meta.url)));
+  fonts[file] = new Uint8Array(
+    await readFile(new URL(`../fonts/${fontFileName(file)}`, import.meta.url)),
+  );
 }
 
 const actual = await digestSamples({ core, font, text, fonts });

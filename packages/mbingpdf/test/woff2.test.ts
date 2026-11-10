@@ -3,7 +3,7 @@ import { brotliDecompressSync } from "node:zlib";
 import * as hb from "harfbuzzjs";
 import { describe, expect, test } from "vitest";
 import { PdfDocument } from "../src/core/index.ts";
-import { decodeWoff2, isWoff2, loadFont, TrueTypeFont, unwrapFont } from "../src/font/index.ts";
+import { decodeWoff2, Font, isWoff2, loadFont, unwrapFont } from "../src/font/index.ts";
 import { parseSfnt } from "../src/font/sfnt.ts";
 import { readFont } from "./harness/env.ts";
 import { extractText } from "./harness/render.ts";
@@ -39,7 +39,7 @@ describe("WOFF2", () => {
     // Glyph outlines are re-encoded, so compare what they draw.
     const a = new hb.Font(new hb.Face(new hb.Blob(decoded.slice().buffer)));
     const b = new hb.Font(new hb.Face(new hb.Blob(source.slice().buffer)));
-    const font = new TrueTypeFont(decoded);
+    const font = new Font(decoded);
     for (let glyph = 0; glyph < font.numGlyphs; glyph++) {
       expect(a.glyphToPath(glyph), `outline of glyph ${glyph}`).toBe(b.glyphToPath(glyph));
       expect(a.glyphHAdvance(glyph)).toBe(b.glyphHAdvance(glyph));
@@ -54,7 +54,7 @@ describe("WOFF2", () => {
 
   test("loadFont reads WOFF2, including variable fonts, and plain fonts alike", async () => {
     const fromWoff2 = await loadFont(read("PlusJakartaSans-Variable.woff2"), { wght: 700 });
-    const fromTtf = new TrueTypeFont(readFont("PlusJakartaSans-Variable")).instance({ wght: 700 });
+    const fromTtf = new Font(readFont("PlusJakartaSans-Variable")).instance({ wght: 700 });
     expect(fromWoff2.postScriptName).toBe("PlusJakartaSans-Bold");
     const text = "Sertifikat Penghargaan — AVATAR";
     expect(fromWoff2.shape(text)).toEqual(fromTtf.shape(text));
@@ -89,7 +89,7 @@ describe("WOFF2", () => {
   });
 
   test("explains what to do with a WOFF2 file given to the wrong function", () => {
-    expect(() => new TrueTypeFont(read("BarlowCondensed-Regular.woff2"))).toThrow(/loadFont\(\)/);
+    expect(() => new Font(read("BarlowCondensed-Regular.woff2"))).toThrow(/loadFont\(\)/);
     expect(() => decodeWoff2(readFont("BarlowCondensed-Regular"), brotli)).toThrow(
       /Not a WOFF2 file/,
     );

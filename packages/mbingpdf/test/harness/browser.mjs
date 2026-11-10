@@ -20,6 +20,7 @@ const TYPES = {
   ".ts": "text/javascript",
   ".json": "application/json",
   ".ttf": "font/ttf",
+  ".otf": "font/otf",
 };
 
 const server = createServer(async (request, response) => {
@@ -62,10 +63,10 @@ try {
     const font = await import("/dist/font/index.js");
     const text = await import("/dist/text/index.js");
     const { digestSamples } = await import("/test/harness/digest.ts");
-    const { FONT_FILES } = await import("/test/harness/samples.ts");
+    const { ALL_FONT_FILES, fontFileName } = await import("/test/harness/samples.ts");
     const fonts = {};
-    for (const file of FONT_FILES) {
-      const response = await fetch(`/test/fonts/${file}.ttf`);
+    for (const file of ALL_FONT_FILES) {
+      const response = await fetch(`/test/fonts/${fontFileName(file)}`);
       if (!response.ok) throw new Error(`Could not load ${file}: ${response.status}`);
       fonts[file] = new Uint8Array(await response.arrayBuffer());
     }

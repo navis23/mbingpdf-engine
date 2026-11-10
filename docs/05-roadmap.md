@@ -19,7 +19,7 @@ Repository, toolchain and a valid PDF.
 
 ## M1 — Fonts and text
 
-_Status: in progress — done: TrueType parsing, subsetting, CID embedding with `ToUnicode`, shaping (checked against HarfBuzz), variable-font instancing, line breaking and grapheme clusters (Unicode conformance tests pass), paragraph layout with alignment, justification, letter and word spacing, case transforms, fit-to-width, hyphenation for English and Indonesian, and font fallback. WOFF2 decoding is done too, and subsets are within 10% of HarfBuzz's (tested). Still to do: OpenType/CFF outlines, and the manual half of the exit test (copying text out of Acrobat)_
+_Status: done 2026-11-10, except the manual half of the exit test (copying text out of Acrobat; pdf.js extraction is tested instead). Everything listed below is built and tested: glyph mapping, shaping, instancing and subset size are checked against HarfBuzz, line breaking and grapheme clusters against the Unicode conformance files. Known limits: CFF subsets keep all subroutines, CFF2 and font collections are rejected, instances of variable fonts are unhinted, line filling is greedy_
 
 - TrueType and OpenType/CFF parsing, WOFF2 decoding, variable-font instancing.
 - Glyph subsetting, CID font embedding, `ToUnicode` maps.
@@ -33,7 +33,7 @@ _Status: in progress — done: TrueType parsing, subsetting, CID embedding with 
 
 ## M2 — Layout and pagination
 
-_Status: not started_
+_Status: next_
 
 - Document tree, style resolution and inheritance.
 - Box model, `Stack`, `Row` with flex semantics, `Box`, `Grid`, `Spacer`, `Absolute` with rotation.

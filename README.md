@@ -2,7 +2,13 @@
 
 A TypeScript library for generating production-grade PDF documents in any JavaScript runtime: browsers, Node, Bun, Deno and edge functions.
 
-**Status: early development.** Nothing is published to npm yet. The low-level writer (`mbingpdf/core`) can produce multi-page PDFs with vector graphics and standard-font text; fonts, layout and the declarative API come next. The design is in [`docs/`](./docs/README.md).
+**Status: early development.** Nothing is published to npm yet. What works today:
+
+- `mbingpdf/core` — the PDF writer: pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts, and embedding of subset fonts with searchable text.
+- `mbingpdf/font` — TrueType, OpenType/CFF and WOFF2 fonts: parsing, subsetting, variable-font instancing, and shaping (ligatures, kerning, accents) that matches HarfBuzz for Latin, Greek and Cyrillic.
+- `mbingpdf/text` — Unicode line breaking, hyphenation for English and Indonesian, and paragraph layout with alignment, justification, font fallback and fit-to-width.
+
+The layout engine with pagination and the declarative API come next. The design is in [`docs/`](./docs/README.md).
 
 ## Development
 

@@ -1,3 +1,4 @@
+import { subsetCff } from "./cff.ts";
 import {
   ARG_1_AND_2_ARE_WORDS,
   decodeGlyph,
@@ -23,10 +24,14 @@ import {
 } from "./variations.ts";
 import { unwrapFont } from "./woff2.ts";
 
-/** The result of {@link TrueTypeFont.subset}. */
+/** The result of {@link Font.subset}. */
 export interface FontSubset {
-  /** A font file holding only the requested glyphs, renumbered from zero. */
+  /**
+   * The requested glyphs only, renumbered from zero: a TrueType font file, or for a font with
+   * CFF outlines a bare, CID-keyed CFF table.
+   */
   readonly data: Uint8Array;
+  readonly format: "truetype" | "cff";
   /**
    * Original glyph ID of each glyph in the subset. It starts with the requested glyphs in the
    * order given; parts of composite glyphs that were not requested follow.
@@ -150,22 +155,23 @@ function parseCmap(table: Uint8Array): Map<number, number> {
 /**
  * Loads a font from the bytes of a `.ttf`, `.otf` or `.woff2` file. WOFF2 is decompressed with
  * the runtime's own Brotli decoder, which is why this is asynchronous; for the other formats
- * `new TrueTypeFont(bytes)` does the same without the wait.
+ * `new Font(bytes)` does the same without the wait.
  */
 export async function loadFont(
   data: Uint8Array,
   variation?: Readonly<Record<string, number>>,
-): Promise<TrueTypeFont> {
-  return new TrueTypeFont(await unwrapFont(data), variation);
+): Promise<Font> {
+  return new Font(await unwrapFont(data), variation);
 }
 
 /**
- * A font with TrueType outlines (`.ttf`, or `.otf` with a `glyf` table).
+ * A font parsed from a TrueType or OpenType file (`.ttf`, `.otf`), with either TrueType or CFF
+ * outlines.
  *
  * Parsing reads the tables needed for measuring and embedding; nothing is tied to a document,
  * so one instance can be shared. Metrics are in font units; divide by {@link unitsPerEm}.
  */
-export class TrueTypeFont {
+export class Font {
   readonly postScriptName: string;
   readonly familyName: string;
   readonly subfamilyName: string;
@@ -187,6 +193,8 @@ export class TrueTypeFont {
   readonly weightClass: number;
   /** False when the font's licence flags forbid embedding it in documents. */
   readonly embeddable: boolean;
+  /** How the glyph shapes are stored: quadratic TrueType curves or cubic CFF charstrings. */
+  readonly outlines: "truetype" | "cff";
   /**
    * Turns text into positioned glyphs. Replace it to use another shaping engine, for scripts
    * the built-in one does not cover.
@@ -217,16 +225,20 @@ export class TrueTypeFont {
   /**
    * @param data the font file
    * @param variation for a variable font, axis values such as `{ wght: 700 }`; prefer
-   *   {@link TrueTypeFont.instance}, which also accepts a named style
+   *   {@link Font.instance}, which also accepts a named style
    */
   constructor(data: Uint8Array, variation?: Readonly<Record<string, number>>) {
     this.#data = data;
     const sfnt = parseSfnt(data);
-    if (sfnt.flavor !== "truetype") {
-      throw new Error("Fonts with CFF outlines (most .otf files) are not supported yet");
-    }
     const tables = sfnt.tables;
     this.#tables = tables;
+    if (tables.has("glyf")) this.outlines = "truetype";
+    else if (tables.has("CFF ")) this.outlines = "cff";
+    else if (tables.has("CFF2")) {
+      throw new Error(
+        "Variable fonts with CFF2 outlines are not supported; use the TrueType version",
+      );
+    } else throw new Error("Font has neither glyf nor CFF outlines");
 
     const head = new BinaryReader(required(tables, "head"));
     this.unitsPerEm = head.u16At(18);
@@ -238,8 +250,9 @@ export class TrueTypeFont {
     this.#numberOfHMetrics = hhea.u16At(34);
     this.numGlyphs = new BinaryReader(required(tables, "maxp")).u16At(4);
     this.#hmtx = new BinaryReader(required(tables, "hmtx"));
-    this.#loca = new BinaryReader(required(tables, "loca"));
-    this.#glyf = required(tables, "glyf");
+    const empty = new Uint8Array(0);
+    this.#loca = new BinaryReader(this.outlines === "truetype" ? required(tables, "loca") : empty);
+    this.#glyf = tables.get("glyf") ?? empty;
     this.#cmap = parseCmap(required(tables, "cmap"));
 
     let ascender = hhea.i16At(4);
@@ -356,9 +369,9 @@ export class TrueTypeFont {
    * at their default) or the name of one of {@link namedInstances} (`"Bold"`). The result
    * behaves like a static font and embeds as one.
    */
-  instance(style: Readonly<Record<string, number>> | string): TrueTypeFont {
+  instance(style: Readonly<Record<string, number>> | string): Font {
     if (this.axes.length === 0) throw new RangeError("This is not a variable font");
-    if (typeof style !== "string") return new TrueTypeFont(this.#data, style);
+    if (typeof style !== "string") return new Font(this.#data, style);
     const named = this.namedInstances.find(
       (instance) => instance.name.toLowerCase() === style.toLowerCase(),
     );
@@ -366,7 +379,7 @@ export class TrueTypeFont {
       const known = this.namedInstances.map((instance) => instance.name).join(", ");
       throw new RangeError(`Font has no style named "${style}"; it has ${known}`);
     }
-    return new TrueTypeFont(this.#data, named.coordinates);
+    return new Font(this.#data, named.coordinates);
   }
 
   /** The raw bytes of a font table, such as `GSUB` or `kern`. */
@@ -429,7 +442,8 @@ export class TrueTypeFont {
   }
 
   #glyphData(glyph: number): Uint8Array {
-    if (glyph < 0 || glyph >= this.numGlyphs) return new Uint8Array(0);
+    if (glyph < 0 || glyph >= this.numGlyphs || this.outlines !== "truetype")
+      return new Uint8Array(0);
     const start = this.#longLoca ? this.#loca.u32At(glyph * 4) : this.#loca.u16At(glyph * 2) * 2;
     const end = this.#longLoca
       ? this.#loca.u32At(glyph * 4 + 4)
@@ -488,6 +502,13 @@ export class TrueTypeFont {
    */
   subset(glyphs: readonly number[]): FontSubset {
     if (glyphs[0] !== 0) throw new Error("A subset must start with glyph 0");
+    if (this.outlines === "cff") {
+      return {
+        data: subsetCff(required(this.#tables, "CFF "), glyphs),
+        glyphs: [...glyphs],
+        format: "cff",
+      };
+    }
     const order = [...glyphs];
     const newId = new Map<number, number>();
     // A glyph may be listed more than once; composites then refer to its first copy.
@@ -576,6 +597,6 @@ export class TrueTypeFont {
         if (table) tables.set(tag, table);
       }
     }
-    return { data: buildSfnt(tables), glyphs: order };
+    return { data: buildSfnt(tables), glyphs: order, format: "truetype" };
   }
 }

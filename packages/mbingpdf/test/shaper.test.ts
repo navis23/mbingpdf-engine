@@ -1,6 +1,6 @@
 import * as hb from "harfbuzzjs";
 import { describe, expect, test } from "vitest";
-import { type ShapeOptions, TrueTypeFont } from "../src/font/index.ts";
+import { Font, type ShapeOptions } from "../src/font/index.ts";
 import { readFont } from "./harness/env.ts";
 import { FONT_FILES, type FontFile } from "./harness/samples.ts";
 
@@ -61,13 +61,13 @@ function withHarfbuzz(reference: hb.Font, text: string, features: hb.Feature[] =
   );
 }
 
-const fonts = new Map<FontFile, { font: TrueTypeFont; reference: hb.Font }>();
-function load(file: FontFile): { font: TrueTypeFont; reference: hb.Font } {
+const fonts = new Map<FontFile, { font: Font; reference: hb.Font }>();
+function load(file: FontFile): { font: Font; reference: hb.Font } {
   let entry = fonts.get(file);
   if (!entry) {
     const bytes = readFont(file);
     entry = {
-      font: new TrueTypeFont(bytes),
+      font: new Font(bytes),
       reference: new hb.Font(new hb.Face(new hb.Blob(bytes.slice().buffer))),
     };
     fonts.set(file, entry);
@@ -177,7 +177,7 @@ describe("shaping", () => {
   });
 
   test("a custom shaper can be plugged in", () => {
-    const font = new TrueTypeFont(readFont("BarlowCondensed-Regular"));
+    const font = new Font(readFont("BarlowCondensed-Regular"));
     font.shaper = {
       shape: (_font, text) =>
         [...text].map((_char, i) => ({
