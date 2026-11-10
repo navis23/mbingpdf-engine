@@ -4,6 +4,8 @@ Milestones are ordered by dependency. Each ends with something a user can run an
 
 ## M0 — Foundations
 
+_Status: not started_
+
 Repository, toolchain and a valid PDF.
 
 - pnpm workspace, TypeScript strict, tsdown, Vitest, Biome, Changesets, CI on Node, Bun, Deno and a headless browser.
@@ -17,6 +19,8 @@ Repository, toolchain and a valid PDF.
 
 ## M1 — Fonts and text
 
+_Status: not started_
+
 - TrueType and OpenType/CFF parsing, WOFF2 decoding, variable-font instancing.
 - Glyph subsetting, CID font embedding, `ToUnicode` maps.
 - Simple-script shaping: kerning, ligatures, mark positioning, OpenType feature toggles.
@@ -28,6 +32,8 @@ Repository, toolchain and a valid PDF.
 **Exit:** a paragraph in a custom font with mixed weights wraps, justifies, and copies out of Acrobat as correct Unicode. Embedded font size is within 10% of the subset HarfBuzz's tooling produces for the same glyphs.
 
 ## M2 — Layout and pagination
+
+_Status: not started_
 
 - Document tree, style resolution and inheritance.
 - Box model, `Stack`, `Row` with flex semantics, `Box`, `Grid`, `Spacer`, `Absolute` with rotation.
@@ -41,6 +47,8 @@ Repository, toolchain and a valid PDF.
 **Exit:** a 50-page report with headings, paragraphs, images and a footer showing "Page X of Y" renders from the document API with no manual coordinates. The invoice example in the API doc runs minus the table.
 
 ## M3 — Tables, vector art and print
+
+_Status: not started_
 
 - Tables: column sizing, spans, borders, zebra rows, repeated headers and footers, split and non-split rows, group subtotals.
 - Lists, multi-column sections, per-section page size and orientation.
@@ -57,6 +65,8 @@ Repository, toolchain and a valid PDF.
 
 ## M4 — Developer experience and first public release
 
+_Status: not started_
+
 - JSX runtime.
 - `@mbingpdf/react` and `@mbingpdf/vue` preview components.
 - Preview server with hot reload and debug overlay.
@@ -69,6 +79,8 @@ Repository, toolchain and a valid PDF.
 
 ## M5 — Archival and accessibility standards
 
+_Status: not started_
+
 - Tagged PDF generated from element semantics; alt text, language, reading order, table header associations.
 - PDF/UA-1 and PDF/A-2b, A-2u, A-3b (A-3 enables embedded e-invoice XML such as Factur-X and ZUGFeRD).
 - XMP metadata.
@@ -77,6 +89,8 @@ Repository, toolchain and a valid PDF.
 **Exit:** the sample suite passes veraPDF for each claimed profile in CI, and passes Acrobat's accessibility checker by hand.
 
 ## M6 — Advanced
+
+_Status: not started_
 
 Order within this milestone follows user demand.
 

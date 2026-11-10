@@ -14,6 +14,7 @@ These documents are the plan we agree on before writing code. Nothing here is bu
 | [06-quality.md](./06-quality.md) | How we prove the output is correct and precise |
 | [07-open-decisions.md](./07-open-decisions.md) | What is decided, what is assumed |
 | [08-target-documents.md](./08-target-documents.md) | The real documents the library is designed against |
+| [SESSION-LOG.md](./SESSION-LOG.md) | What each working session did |
 
 ## The plan in one paragraph
 
