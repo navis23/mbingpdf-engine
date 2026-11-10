@@ -12,6 +12,7 @@ import {
   Row,
   render,
   Spacer,
+  Stack,
   StandardFonts,
   Text,
 } from "../src/index.ts";
@@ -87,12 +88,17 @@ describe("lists", () => {
     expect(markers({ marker: "upper-roman", start: 3 })).toEqual(["III.", "IV."]);
   });
 
-  test("lists nest, and items can be any element", () => {
+  test("lists nest, and an item with several parts is a Stack", () => {
     const [first] = pagesOf(
-      List({ marker: "decimal", gap: 4 }, "satu", [
-        Text("dua"),
-        List({ marker: "lower-alpha" }, "dalam", Row(Text("kiri"), Spacer(), Text("kanan"))),
-      ]),
+      List(
+        { marker: "decimal", gap: 4 },
+        "satu",
+        // An item made of several parts is wrapped in a Stack; a bare array would be three items.
+        Stack(
+          Text("dua"),
+          List({ marker: "lower-alpha" }, "dalam", Row(Text("kiri"), Spacer(), Text("kanan"))),
+        ),
+      ),
     );
     const items = texts(first?.items ?? []);
     expect(items.map((item) => item.text)).toEqual([
