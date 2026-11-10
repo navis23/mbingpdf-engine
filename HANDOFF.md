@@ -64,7 +64,13 @@ M1 has just started; see `docs/05-roadmap.md`.
     build.
 18. Also done in M4: shared graphics. An `Svg` becomes a Form XObject (`PdfDocument.createForm`,
     `ContentStream.form`, the `shared` display item), stored once per file per source and colour.
-19. M4 remaining: benchmarks against PDFKit, pdfmake and @react-pdf/renderer.
+19. In progress: benchmarks against PDFKit, pdfmake and @react-pdf/renderer. The script is done
+    (`benchmarks/run.mjs`; `pnpm build && pnpm --filter mbingpdf-benchmarks bench -- --runs 3`, about five
+    minutes) and the four outputs were checked to be the same document. Still to do: run it to the end,
+    write the numbers into `docs/benchmarks.md`, link it from the README and mark the roadmap item done.
+    First pass (one run): invoice 24 ms vs 150/62/63 ms; 2,000-row table 1.36 s vs 20.7 s/0.97 s/25.1 s;
+    300 paragraphs 421 ms vs 257 ms/644 ms/1.44 s (PDFKit, pdfmake, react-pdf). mbingpdf is slower than
+    pdfmake on the table and than PDFKit on plain text; say so in the doc.
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three

@@ -1,0 +1,16 @@
+{
+  "name": "mbingpdf-benchmarks",
+  "private": true,
+  "type": "module",
+  "description": "Speed and file-size comparison of mbingpdf with other PDF libraries.",
+  "scripts": {
+    "bench": "node --expose-gc run.mjs"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.3.0",
+    "mbingpdf": "workspace:*",
+    "pdfkit": "^0.17.0",
+    "pdfmake": "^0.2.20",
+    "react": "^19.3.1"
+  }
+}
