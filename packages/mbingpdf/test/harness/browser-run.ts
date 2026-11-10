@@ -20,5 +20,6 @@ export async function runSamples(): Promise<Record<string, string>> {
   const fonts = {} as Record<FontFile, Uint8Array>;
   for (const file of ALL_FONT_FILES) fonts[file] = await load(`/test/fonts/${fontFileName(file)}`);
   const photo = await load("/test/images/photo.jpg");
-  return digestSamples({ core, font, text, doc, photo, fonts } as SampleEnv);
+  const icc = await load("/test/icc/CGATS001Compat-v2-micro.icc");
+  return digestSamples({ core, font, text, doc, photo, icc, fonts } as SampleEnv);
 }

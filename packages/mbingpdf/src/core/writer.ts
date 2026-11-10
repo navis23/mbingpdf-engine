@@ -90,7 +90,7 @@ export class PdfWriter {
     if (this.#entries[num] !== undefined) throw new Error(`Object ${num} is already written`);
 
     if (value instanceof PdfStream) {
-      this.#writeStream(num, value.dict, value.data);
+      this.#writeStream(num, value.dict, value.data, value.compress);
       return;
     }
     if (this.#packed) {
@@ -186,10 +186,10 @@ export class PdfWriter {
     this.#offset += bytes.length;
   }
 
-  #writeStream(num: number, sourceDict: PdfDict, source: Uint8Array): void {
+  #writeStream(num: number, sourceDict: PdfDict, source: Uint8Array, compress = true): void {
     const dict = sourceDict.clone();
     let data = source;
-    if (this.#compress && !dict.has("Filter") && data.length > 0) {
+    if (this.#compress && compress && !dict.has("Filter") && data.length > 0) {
       const deflated = zlibSync(data, { level: 6 });
       if (deflated.length < data.length) {
         data = deflated;

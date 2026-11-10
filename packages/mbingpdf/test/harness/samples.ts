@@ -43,6 +43,8 @@ export interface SampleEnv {
   readonly doc: typeof Root;
   /** A small JPEG for samples that show images. */
   readonly photo: Uint8Array;
+  /** A CMYK output profile, for samples prepared for print. */
+  readonly icc: Uint8Array;
   /** The bytes of each test font. */
   readonly fonts: Readonly<Record<FontFile, Uint8Array>>;
 }
@@ -617,6 +619,123 @@ const tour: Sample = {
   },
 };
 
+/**
+ * A finisher certificate prepared for a print shop: full-bleed artwork, a name that shrinks to
+ * fit, CMYK and a spot colour, crop marks, and PDF/X-4 with an output intent.
+ */
+const certificate: Sample = {
+  // The letter-spaced title is left out: viewers report wide letter spacing as spaces.
+  text: [
+    [
+      "Diberikan kepada",
+      "Bartholomew Maximilian Wolfeschlegelstein",
+      "Half Marathon 21K",
+      "01:47:32",
+    ],
+  ],
+  build(env) {
+    const d = env.doc;
+    const jakarta = new d.Font(env.fonts["PlusJakartaSans-Variable"]);
+    const bold = jakarta.instance("Bold");
+    const barlow = new d.Font(env.fonts["BarlowCondensed-Bold"]);
+    const brand = d.cmyk(0.9, 0.55, 0, 0.1);
+    const gold = d.spot("PANTONE 871 C", d.cmyk(0.2, 0.3, 0.7, 0.15));
+    const bleed = d.mm(3);
+    const document = d.Document(
+      {
+        title: "Sertifikat Penyelesaian",
+        lang: "id",
+        font: jakarta,
+        size: 11,
+        color: d.cmyk(0, 0, 0, 0.85),
+      },
+      d.Page(
+        {
+          size: "A5",
+          orientation: "landscape",
+          margin: d.mm(14),
+          bleed,
+          marks: true,
+          fill: d.cmyk(0.02, 0.02, 0.06, 0),
+          gap: 6,
+          // The background is laid out across the bleed, so the frame runs off the trimmed edge.
+          background: d.Stack(
+            { height: "100%" },
+            d.Canvas({
+              width: "100%",
+              height: d.mm(148) + bleed * 2,
+              draw: (g, { width, height }) => {
+                // A band of colour that bleeds off three edges, and a faint pattern of rings.
+                g.rect(0, 0, width, d.mm(22) + bleed).fill(brand);
+                for (let i = 0; i < 9; i++) {
+                  g.circle(width - 70, height - 60, 20 + i * 14).stroke({
+                    color: d.cmyk(0.9, 0.55, 0, 0.1),
+                    width: 0.6,
+                  });
+                }
+                g.rect(
+                  bleed + 14,
+                  bleed + 14,
+                  width - 2 * (bleed + 14),
+                  height - 2 * (bleed + 14),
+                ).stroke({ color: gold, width: 1.5 });
+              },
+            }),
+          ),
+        },
+        d.Text(
+          {
+            font: barlow,
+            size: 13,
+            letterSpacing: 5,
+            color: d.cmyk(0, 0, 0, 0),
+            align: "center",
+            margin: { top: -2 },
+          },
+          "SERTIFIKAT PENYELESAIAN",
+        ),
+        d.Spacer(d.mm(18)),
+        d.Text({ align: "center", color: d.cmyk(0, 0, 0, 0.6) }, "Diberikan kepada"),
+        d.Text(
+          { font: bold, size: 34, fit: { min: 12, max: 34 }, align: "center", color: brand },
+          "Bartholomew Maximilian Wolfeschlegelstein",
+        ),
+        d.Text({ align: "center" }, "atas keberhasilannya menyelesaikan"),
+        d.Text({ font: barlow, size: 22, align: "center", color: gold }, "Half Marathon 21K"),
+        d.Spacer(d.mm(6)),
+        d.Row(
+          { justify: "center", gap: d.mm(16), align: "center" },
+          d.Stack(
+            { align: "center" },
+            d.Text({ size: 8, color: d.cmyk(0, 0, 0, 0.6) }, "WAKTU"),
+            d.Text({ font: bold, size: 16, features: { tnum: true } }, "01:47:32"),
+          ),
+          d.QrCode({
+            value: "https://contoh.id/sertifikat/0421",
+            size: d.mm(18),
+            quiet: 1,
+            color: d.cmyk(0, 0, 0, 1),
+          }),
+          d.Stack(
+            { align: "center" },
+            d.Text({ size: 8, color: d.cmyk(0, 0, 0, 0.6) }, "NOMOR DADA"),
+            d.Text({ font: bold, size: 16, features: { tnum: true } }, "0421"),
+          ),
+        ),
+      ),
+    );
+    return d.render.sync(document, {
+      deterministic: true,
+      conformance: "PDF/X-4",
+      outputIntent: {
+        profile: env.icc,
+        identifier: "CGATS TR 001",
+        info: "U.S. Web Coated (SWOP) stand-in",
+      },
+    });
+  },
+};
+
 /** The invoice from the API design. */
 const invoice: Sample = {
   text: [["Invoice", "INV-0042", "Sewa bus pariwisata", "Total Rp 4.850.000", "Page 1 of 1"]],
@@ -691,6 +810,7 @@ const invoice: Sample = {
 export const samples: Readonly<Record<string, Sample>> = {
   tour,
   invoice,
+  certificate,
   shapes,
   text,
   report,

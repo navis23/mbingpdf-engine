@@ -1,5 +1,5 @@
 /** From a document tree to pages, and from pages to a PDF file. */
-import { PdfDocument } from "../core/index.ts";
+import { type OutputIntent, orientedSize, PdfDocument } from "../core/index.ts";
 import type { DisplayItem, DisplayPage } from "./display.ts";
 import { type Box, LayoutError, type LayoutSink, layout, normalize } from "./engine.ts";
 import { paintBox } from "./paint.ts";
@@ -9,7 +9,7 @@ import type { Child, LayoutNode, PageInfo, PageProps } from "./types.ts";
 
 export interface LayoutWarning {
   /** What kind of problem this is. */
-  readonly code: "missing-glyph";
+  readonly code: "missing-glyph" | "low-resolution-image";
   readonly message: string;
 }
 
@@ -23,6 +23,15 @@ export interface RenderOptions {
   compress?: boolean;
   /** Called for problems that do not stop the document from being made. */
   onWarning?: (warning: LayoutWarning) => void;
+  /**
+   * A standard the file must meet. `"PDF/X-4"`, for commercial printing, needs an
+   * `outputIntent`, embedded fonts throughout, and is checked when the file is written.
+   */
+  conformance?: "PDF/X-4";
+  /** The printing condition the document is prepared for: an ICC profile and its name. */
+  outputIntent?: OutputIntent;
+  /** Warn about images that would print below this resolution, such as 300. */
+  minImageDpi?: number;
 }
 
 /** The result of laying out a document: its pages, ready for any backend. */
@@ -53,7 +62,11 @@ function furniture(
 }
 
 /** Lays out a document into pages of drawing instructions, without writing a file. */
-export function layoutDocument(document: LayoutNode<"Document">): DocumentLayout {
+export function layoutDocument(
+  document: LayoutNode<"Document">,
+  options: { minImageDpi?: number } = {},
+): DocumentLayout {
+  const lowResolution: string[] = [];
   if (document?.type !== "Document") throw new LayoutError("render() needs a Document element");
   const sink: LayoutSink = { missingCharacters: new Set(), page: { width: 0, height: 0 } };
   const base = inherit(DEFAULT_TEXT, document.props);
@@ -146,14 +159,17 @@ export function layoutDocument(document: LayoutNode<"Document">): DocumentLayout
     const contentWidth = plan.width - margin.left - margin.right;
     const contentHeight = plan.height - margin.top - margin.bottom;
     const items: DisplayItem[] = [];
+    const bleed = Math.max(0, props.bleed ?? 0);
+    // The top-left corner of the bleed; plain zero, not negative zero, when there is none.
+    const edge = bleed === 0 ? 0 : -bleed;
     if (props.fill !== undefined) {
       items.push({
         type: "path",
         commands: [
-          ["M", 0, 0],
-          ["L", plan.width, 0],
-          ["L", plan.width, plan.height],
-          ["L", 0, plan.height],
+          ["M", edge, edge],
+          ["L", plan.width + bleed, edge],
+          ["L", plan.width + bleed, plan.height + bleed],
+          ["L", edge, plan.height + bleed],
           ["Z"],
         ],
         fill: toColor(props.fill),
@@ -161,13 +177,22 @@ export function layoutDocument(document: LayoutNode<"Document">): DocumentLayout
     }
     const background = furniture(props.background, info);
     if (background) {
+      // The background covers the bleed too, so full-bleed artwork needs no special care.
+      const width = plan.width + bleed * 2;
+      const height = plan.height + bleed * 2;
+      sink.page = { width, height };
       const box = measureIn(
-        { ...background, props: { width: plan.width, height: plan.height } },
+        { ...background, props: { width, height } },
         plan.context,
-        plan.width,
-        plan.height,
+        width,
+        height,
       );
-      if (box) paintBox(box, 0, 0, items);
+      if (box) {
+        const painted: DisplayItem[] = [];
+        paintBox(box, 0, 0, painted);
+        items.push(...shiftItems(painted, -bleed, -bleed));
+      }
+      sink.page = { width: plan.width, height: plan.height };
     }
     const header = measureIn(
       furniture(props.header, info),
@@ -184,8 +209,45 @@ export function layoutDocument(document: LayoutNode<"Document">): DocumentLayout
       contentHeight,
     );
     if (footer) paintBox(footer, margin.left, plan.height - margin.bottom - footer.height, items);
-    return { width: plan.width, height: plan.height, items };
+    const marks =
+      props.marks === true
+        ? { crop: true, registration: true }
+        : props.marks
+          ? { crop: props.marks.crop ?? false, registration: props.marks.registration ?? false }
+          : undefined;
+    return {
+      width: plan.width,
+      height: plan.height,
+      items,
+      ...(bleed > 0 ? { bleed } : {}),
+      ...(marks && (marks.crop || marks.registration) ? { marks } : {}),
+    };
   });
+
+  // Images stretched too far print blurred; say so before the job goes to press.
+  const minDpi = options.minImageDpi;
+  if (minDpi !== undefined) {
+    const reported = new Set<object>();
+    const visit = (list: readonly DisplayItem[], pageNumber: number): void => {
+      for (const item of list) {
+        if (item.type === "group") visit(item.items, pageNumber);
+        else if (item.type === "image" && !reported.has(item.image)) {
+          const size = orientedSize(item.image);
+          const dpi = Math.min((size.width * 72) / item.width, (size.height * 72) / item.height);
+          if (dpi < minDpi - 0.5) {
+            reported.add(item.image);
+            lowResolution.push(
+              `An image on page ${pageNumber} prints at ${Math.round(dpi)} dpi, below the ${minDpi} dpi asked for ` +
+                `(${size.width} × ${size.height} pixels shown ${Math.round(item.width)} × ${Math.round(item.height)} points).`,
+            );
+          }
+        }
+      }
+    };
+    pages.forEach((page, i) => {
+      visit(page.items, i + 1);
+    });
+  }
 
   const warnings: LayoutWarning[] = [];
   if (sink.missingCharacters.size > 0) {
@@ -195,12 +257,56 @@ export function layoutDocument(document: LayoutNode<"Document">): DocumentLayout
       message: `No font in use has a glyph for ${list}. Add a font that covers them to the font list.`,
     });
   }
+  for (const message of lowResolution) warnings.push({ code: "low-resolution-image", message });
   return { pages, warnings };
+}
+
+/** Moves display items by an offset. */
+function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): DisplayItem[] {
+  if (dx === 0 && dy === 0) return [...items];
+  return items.map((item): DisplayItem => {
+    switch (item.type) {
+      case "path":
+        return {
+          ...item,
+          commands: item.commands.map((command) => {
+            if (command[0] === "Z") return command;
+            const moved: (string | number)[] = [command[0]];
+            for (let i = 1; i < command.length; i += 2) {
+              moved.push((command[i] as number) + dx, (command[i + 1] as number) + dy);
+            }
+            return moved as unknown as (typeof item.commands)[number];
+          }),
+        };
+      case "group":
+        return {
+          ...item,
+          ...(item.rotate
+            ? { rotate: { ...item.rotate, cx: item.rotate.cx + dx, cy: item.rotate.cy + dy } }
+            : {}),
+          items: shiftItems(item.items, dx, dy),
+        };
+      case "image":
+        return {
+          ...item,
+          x: item.x + dx,
+          y: item.y + dy,
+          ...(item.clip
+            ? { clip: { ...item.clip, x: item.clip.x + dx, y: item.clip.y + dy } }
+            : {}),
+        };
+      default:
+        return { ...item, x: item.x + dx, y: item.y + dy };
+    }
+  });
 }
 
 /** Lays out a document and writes it as a PDF file. */
 function renderSync(document: LayoutNode<"Document">, options: RenderOptions = {}): Uint8Array {
-  const result = layoutDocument(document);
+  const result = layoutDocument(
+    document,
+    options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {},
+  );
   for (const warning of result.warnings) options.onWarning?.(warning);
   const props = document.props;
   const info: Record<string, string> = {};
@@ -213,8 +319,12 @@ function renderSync(document: LayoutNode<"Document">, options: RenderOptions = {
     deterministic: options.deterministic ?? false,
     compress: options.compress ?? true,
     ...(props.lang !== undefined ? { lang: props.lang } : {}),
+    ...(options.conformance ? { conformance: options.conformance } : {}),
+    ...(options.outputIntent ? { outputIntent: options.outputIntent } : {}),
   });
-  for (const page of result.pages) writeDisplayPage(pdf, page);
+  for (const page of result.pages) {
+    writeDisplayPage(pdf, page, { boxes: options.conformance !== undefined });
+  }
   return pdf.finish();
 }
 

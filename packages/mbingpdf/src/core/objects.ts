@@ -138,10 +138,17 @@ export class PdfDict {
 export class PdfStream {
   readonly dict: PdfDict;
   readonly data: Uint8Array;
+  /** False to store the data as it is even when the writer compresses streams. */
+  readonly compress: boolean;
 
-  constructor(data: Uint8Array, dict: PdfDict = new PdfDict()) {
+  constructor(
+    data: Uint8Array,
+    dict: PdfDict = new PdfDict(),
+    options: { compress?: boolean } = {},
+  ) {
     this.data = data;
     this.dict = dict;
+    this.compress = options.compress ?? true;
   }
 }
 

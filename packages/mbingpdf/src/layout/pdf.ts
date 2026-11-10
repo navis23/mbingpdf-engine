@@ -1,5 +1,5 @@
 /** The PDF backend: writes a display list to a page of a PDF document. */
-import type { AnyFont, ContentStream, PdfDocument } from "../core/index.ts";
+import { type AnyFont, type ContentStream, cmyk, type PdfDocument } from "../core/index.ts";
 import type { DisplayItem, DisplayPage, PathCommand } from "./display.ts";
 
 function tracePath(content: ContentStream, commands: readonly PathCommand[]): void {
@@ -69,14 +69,89 @@ function drawItems(
   }
 }
 
+const MM = 72 / 25.4;
+/** Room left outside the bleed when printer's marks are drawn. */
+const MARKS_MARGIN = 10 * MM;
+
 /** Adds a page to the document and draws the display list on it. */
-export function writeDisplayPage(document: PdfDocument, page: DisplayPage): void {
-  const pdfPage = document.addPage({ size: [page.width, page.height] });
+export function writeDisplayPage(
+  document: PdfDocument,
+  page: DisplayPage,
+  options: { boxes?: boolean } = {},
+): void {
+  const bleed = page.bleed ?? 0;
+  const margin = page.marks ? MARKS_MARGIN : 0;
+  // The sheet is the finished page plus bleed plus room for marks on every side.
+  const offset = bleed + margin;
+  const sheetWidth = page.width + offset * 2;
+  const sheetHeight = page.height + offset * 2;
+  // Print standards want the trim size stated even when it is the whole sheet.
+  const printed = bleed > 0 || page.marks !== undefined || options.boxes === true;
+  const pdfPage = document.addPage({
+    size: [sheetWidth, sheetHeight],
+    ...(printed
+      ? {
+          trimBox: [offset, offset, offset + page.width, offset + page.height],
+          bleedBox: [margin, margin, sheetWidth - margin, sheetHeight - margin],
+        }
+      : {}),
+  });
   const content = pdfPage.content;
-  // The display list measures from the top-left corner; PDF measures from the bottom-left.
-  content.transform(1, 0, 0, -1, 0, page.height);
+  // The display list measures from the top-left corner of the finished page; PDF measures
+  // from the bottom-left corner of the sheet.
+  content.transform(1, 0, 0, -1, offset, offset + page.height);
+  if (printed) {
+    // Nothing may spill past the bleed into the marks.
+    content
+      .save()
+      .rect(-bleed, -bleed, page.width + bleed * 2, page.height + bleed * 2)
+      .clip();
+  }
   drawItems(content, page.items, page.height, (x, y, width, height, url) =>
-    pdfPage.addLink(x, y, width, height, url),
+    pdfPage.addLink(x + offset, y + offset, width, height, url),
   );
+  if (printed) content.restore();
+
+  if (page.marks) {
+    // Marks print on every plate: registration colour is all four process inks at full.
+    const gap = bleed + 2 * MM;
+    const length = 5 * MM;
+    content
+      .save()
+      .strokeColor(cmyk(1, 1, 1, 1))
+      .lineWidth(0.25);
+    if (page.marks.crop) {
+      for (const x of [0, page.width]) {
+        for (const y of [0, page.height]) {
+          const outwardX = x === 0 ? -1 : 1;
+          const outwardY = y === 0 ? -1 : 1;
+          content.moveTo(x + outwardX * gap, y).lineTo(x + outwardX * (gap + length), y);
+          content.moveTo(x, y + outwardY * gap).lineTo(x, y + outwardY * (gap + length));
+        }
+      }
+      content.stroke();
+    }
+    if (page.marks.registration) {
+      const radius = 1.5 * MM;
+      const arm = 2.5 * MM;
+      const distance = bleed + margin / 2;
+      const targets: [number, number][] = [
+        [page.width / 2, -distance],
+        [page.width / 2, page.height + distance],
+        [-distance, page.height / 2],
+        [page.width + distance, page.height / 2],
+      ];
+      for (const [x, y] of targets) {
+        content.circle(x, y, radius).stroke();
+        content
+          .moveTo(x - arm, y)
+          .lineTo(x + arm, y)
+          .moveTo(x, y - arm)
+          .lineTo(x, y + arm)
+          .stroke();
+      }
+    }
+    content.restore();
+  }
   pdfPage.end();
 }

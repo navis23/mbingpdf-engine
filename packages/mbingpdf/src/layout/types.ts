@@ -345,8 +345,16 @@ export interface PageProps extends Omit<TextProps, "size"> {
    * frames. `Absolute` children are positioned against the page.
    */
   background?: Child | ((info: PageInfo) => Child);
-  /** Colour of the sheet. */
+  /** Colour of the sheet. With a bleed, it runs to the edge of the bleed. */
   fill?: ColorInput;
+  /**
+   * For work that is trimmed after printing: how far the artwork may run past the cut line,
+   * typically 3 mm. `size` stays the finished size; the `background` is laid out across the
+   * bleed as well, so a full-bleed design simply fills it.
+   */
+  bleed?: number;
+  /** Printer's marks outside the bleed: crop marks at the corners, registration targets. */
+  marks?: boolean | { readonly crop?: boolean; readonly registration?: boolean };
   /** Space between children. */
   gap?: number;
 }

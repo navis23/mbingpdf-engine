@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 14:50 WIB · Session 2 · Milestone: M0–M2 done; M3 in progress (tables done) · Branch: main_
+_Updated: 2026-11-10 15:40 WIB · Session 2 · Milestone: M0–M2 done; M3 in progress (tables, lists, QR, print done) · Branch: main_
 
 ## Where we are
 M0, M1 and M2 are finished. The root `mbingpdf` entry now has
@@ -40,9 +40,13 @@ M1 has just started; see `docs/05-roadmap.md`.
 9. ~~M2 layout engine~~ done (`src/layout/`, exported from the root `mbingpdf` entry): elements, flex,
    fragmentation, headers/footers, `render()`. Images are in `src/image/` (`mbingpdf/image`).
 10. ~~M2 leftovers~~ done: `mbingpdf/svg` (`renderSvg`), Web Worker check in `test/harness/browser.mjs`.
-11. M3: ~~tables~~ done (`src/layout/table.ts`). Remaining, in this order: lists, `fit` on Text, QR codes,
-    print (bleed, crop marks, output intent, PDF/X-4), themes (`defineTheme`), outlines and internal links,
-    table of contents, SVG input, multi-column sections, shared graphics (Form XObjects).
+11. M3 done so far: tables (`src/layout/table.ts`), lists, `fit` on Text, QR codes (`src/qr/`), print
+    (bleed, marks, spot colours, output intent, PDF/X-4, XMP, DPI warnings). Samples `invoice` and
+    `certificate` are the two M3 acceptance documents.
+12. M3 remaining, in this order: themes (`defineTheme`), outlines and internal links, table of contents,
+    SVG input (`Svg` element), multi-column sections, shared graphics (Form XObjects), the 5,000-bib
+    benchmark.
+13. Then M4 (developer experience and first release): see the roadmap.
 
 ## Waiting on the owner
 None. The owner asked for autonomous work: decide, commit and push without asking, and report afterwards.
@@ -58,7 +62,7 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 312 tests, build). Runtime digests match on Node, Deno, Chromium
+- Checks: `pnpm check` green (lint, typecheck, 356 tests, build). Runtime digests match on Node, Deno, Chromium
   and in a Web Worker.
 - Published: not published.
 
@@ -75,6 +79,8 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 - Regenerating data: `scripts/generate-*.mjs` (standard fonts, Unicode tables, en-US hyphenation); inputs are
   not in the repo, the scripts' headers say where to get them.
 - pdf.js reports wide letter spacing as spaces between letters when extracting text.
+- Run checks as their own step and commit only when they pass; do not chain a commit after a piped check
+  (a failing test was pushed once that way and fixed in the next commit).
 - After an intended output change: review `test/.artifacts/`, then `pnpm test:update`.
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 

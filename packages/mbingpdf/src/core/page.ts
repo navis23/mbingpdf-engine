@@ -1,3 +1,4 @@
+import type { Color } from "./color.ts";
 import { type AnyFont, ContentStream, type FontBinding } from "./content.ts";
 import type { PdfImage } from "./image.ts";
 import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
@@ -19,6 +20,8 @@ export interface PageHost {
   readonly pagesRef: PdfRef;
   /** A shared graphics state with the given opacities. */
   opacityState(fill: number | undefined, stroke: number | undefined): { name: string; ref: PdfRef };
+  /** The document-wide colour space for a spot colour. */
+  spotColorResource(color: Extract<Color, { space: "spot" }>): { name: string; ref: PdfRef };
   /** The document-wide XObject for an image. */
   imageResource(image: PdfImage): { name: string; ref: PdfRef };
   /** The document-wide font object and encoder for a font. */
@@ -87,6 +90,11 @@ export class PdfPage {
       image: (image) => {
         const resource = host.imageResource(image);
         this.setResource("XObject", resource.name, resource.ref);
+        return resource.name;
+      },
+      spotColor: (color) => {
+        const resource = host.spotColorResource(color);
+        this.setResource("ColorSpace", resource.name, resource.ref);
         return resource.name;
       },
     });

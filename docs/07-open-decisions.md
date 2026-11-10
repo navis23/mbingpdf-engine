@@ -37,8 +37,13 @@
 | 34 | Table cells and rows | A row is an array of cells; a cell is any child. `TableRow(props, ...)` and `Cell(props, ...)` exist for rows and cells that need properties. Column spans are supported, row spans are not | 2026-11-10 |
 | 35 | Table lines | Not CSS border-collapse: a table has up to five kinds of line (outer, between rows, between columns, under the header, above the footer), set with `borders`. Lines take up space | 2026-11-10 |
 | 36 | Text wider than its box | A word wider than its column is broken between characters rather than left to overflow | 2026-11-10 |
+| 37 | Lists | A list item is one child; an item with several parts is wrapped in a `Stack` (a bare array is flattened into separate items, like any children). Items stay whole across pages unless `splitItems` is set | 2026-11-10 |
+| 38 | QR quiet zone | `QrCode` includes the standard four-module quiet zone inside its `size` by default, so a code scans wherever it is placed | 2026-11-10 |
+| 39 | Bleed | `Page({ size, bleed })`: `size` is the finished size and coordinates start at its corner. The page `fill` and `background` extend across the bleed; content is clipped at the bleed edge. Marks add 10 mm around the bleed | 2026-11-10 |
+| 40 | Metadata | XMP is always written, uncompressed, alongside the information dictionary | 2026-11-10 |
+| 41 | PDF/X-4 | Checked when the file is written: an output intent, a trim box on every page and embedded fonts are required, and the standard fonts are refused. No profile is bundled; the test profile is CC0 | 2026-11-10 |
 
-Decisions 8–10 and 16–36 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–41 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

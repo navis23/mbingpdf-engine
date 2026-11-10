@@ -8,6 +8,16 @@ export type Color =
       readonly m: number;
       readonly y: number;
       readonly k: number;
+    }
+  | {
+      /** A spot colour: an ink of its own on press, such as a Pantone colour or a varnish. */
+      readonly space: "spot";
+      /** The ink's name, exactly as the printer knows it. */
+      readonly name: string;
+      /** The process colour to show on screens and to print where the ink is not available. */
+      readonly alternate: Extract<Color, { space: "cmyk" }>;
+      /** How much of the ink to lay down, from 0 (none) to 1 (solid). */
+      readonly tint: number;
     };
 
 function unit(value: number, label: string): number {
@@ -40,4 +50,15 @@ export function hex(value: string): Color {
   if (digits.length === 3) digits = digits.replace(/./g, "$&$&");
   const channel = (at: number): number => Number.parseInt(digits.slice(at, at + 2), 16) / 255;
   return rgb(channel(0), channel(2), channel(4));
+}
+
+/**
+ * A spot colour: `spot("PANTONE 286 C", cmyk(1, 0.75, 0, 0.02))`. The CMYK value is what
+ * screens and presses without the ink show instead.
+ */
+export function spot(name: string, alternate: Color, tint = 1): Color {
+  if (alternate.space !== "cmyk")
+    throw new RangeError("The alternate of a spot colour must be a cmyk() colour");
+  if (name.trim() === "") throw new RangeError("A spot colour needs the name of its ink");
+  return { space: "spot", name, alternate, tint: unit(tint, "tint") };
 }

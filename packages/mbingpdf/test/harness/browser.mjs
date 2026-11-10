@@ -22,6 +22,7 @@ const TYPES = {
   ".ttf": "font/ttf",
   ".otf": "font/otf",
   ".jpg": "image/jpeg",
+  ".icc": "application/vnd.iccprofile",
 };
 
 const server = createServer(async (request, response) => {

@@ -17,6 +17,7 @@ export const env: SampleEnv = {
   text,
   doc,
   photo: new Uint8Array(readFileSync(new URL("../images/photo.jpg", import.meta.url))),
+  icc: new Uint8Array(readFileSync(new URL("../icc/CGATS001Compat-v2-micro.icc", import.meta.url))),
   fonts: Object.fromEntries(ALL_FONT_FILES.map((file) => [file, readFont(file)])) as Record<
     FontFile,
     Uint8Array

@@ -3,7 +3,7 @@
  */
 
 export { ByteWriter } from "./bytes.ts";
-export { type Color, cmyk, gray, hex, rgb } from "./color.ts";
+export { type Color, cmyk, gray, hex, rgb, spot } from "./color.ts";
 export {
   type AnyFont,
   type ContentResources,
@@ -15,7 +15,12 @@ export {
   type Opacity,
   type TextRenderingMode,
 } from "./content.ts";
-export { PdfDocument, type PdfDocumentOptions, type PdfInfo } from "./document.ts";
+export {
+  type OutputIntent,
+  PdfDocument,
+  type PdfDocumentOptions,
+  type PdfInfo,
+} from "./document.ts";
 export { EmbeddedFont, type FontProgram } from "./embedded-font.ts";
 export type { PositionedGlyph } from "./glyph-run.ts";
 export { orientationMatrix, orientedSize, type PdfImage } from "./image.ts";

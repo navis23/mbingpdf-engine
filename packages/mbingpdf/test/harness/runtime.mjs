@@ -30,7 +30,11 @@ for (const file of ALL_FONT_FILES) {
 
 const photo = new Uint8Array(await readFile(new URL("../images/photo.jpg", import.meta.url)));
 
-const actual = await digestSamples({ core, font, text, doc, photo, fonts });
+const icc = new Uint8Array(
+  await readFile(new URL("../icc/CGATS001Compat-v2-micro.icc", import.meta.url)),
+);
+
+const actual = await digestSamples({ core, font, text, doc, photo, icc, fonts });
 const different = compareDigests(actual, golden);
 if (different.length > 0) {
   for (const name of different) {

@@ -26,8 +26,11 @@ function css(color: Color): string {
   if (color.space === "gray")
     return `rgb(${byte(color.gray)},${byte(color.gray)},${byte(color.gray)})`;
   if (color.space === "rgb") return `rgb(${byte(color.r)},${byte(color.g)},${byte(color.b)})`;
-  // A screen cannot show CMYK; this is the plain conversion, good enough for a preview.
-  return `rgb(${byte((1 - color.c) * (1 - color.k))},${byte((1 - color.m) * (1 - color.k))},${byte((1 - color.y) * (1 - color.k))})`;
+  // A screen cannot show CMYK or spot inks; this is the plain conversion, good enough for a
+  // preview. A spot colour is shown as its process alternate at the given tint.
+  const { c, m, y, k } = color.space === "spot" ? color.alternate : color;
+  const tint = color.space === "spot" ? color.tint : 1;
+  return `rgb(${byte(1 - tint * (1 - (1 - c) * (1 - k)))},${byte(1 - tint * (1 - (1 - m) * (1 - k)))},${byte(1 - tint * (1 - (1 - y) * (1 - k)))})`;
 }
 
 function pathData(commands: readonly (PathCommand | OutlineCommand)[]): string {

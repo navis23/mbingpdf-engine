@@ -1,8 +1,9 @@
+import type { Color } from "./color.ts";
 import type { AnyFont, FontBinding } from "./content.ts";
 import { EmbeddedFont } from "./embedded-font.ts";
 import { writeGlyphRun } from "./glyph-run.ts";
 import { type PdfImage, writeImage } from "./image.ts";
-import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfString } from "./objects.ts";
+import { PdfDict, PdfName, type PdfObject, type PdfRef, PdfStream, PdfString } from "./objects.ts";
 import { PdfPage, type PdfPageOptions } from "./page.ts";
 import { writeObject } from "./serialize.ts";
 import { StandardFont } from "./standard-font.ts";
@@ -22,8 +23,26 @@ export interface PdfInfo {
   modDate?: Date;
 }
 
+/** The printing condition a document is prepared for. */
+export interface OutputIntent {
+  /** The ICC profile of the press and paper, as the print shop names it: the file's bytes. */
+  profile: Uint8Array;
+  /** The registered name of the condition, such as `"FOGRA39"` or `"CGATS TR 001"`. */
+  identifier: string;
+  /** A human-readable description; default: the identifier. */
+  info?: string;
+  /** Where the condition is registered. Default `"http://www.color.org"`. */
+  registry?: string;
+}
+
 export interface PdfDocumentOptions extends PdfWriterOptions {
   info?: PdfInfo;
+  /**
+   * A standard the file must meet. `"PDF/X-4"` is for commercial printing: it needs an
+   * output intent, a trim box on every page, and every font embedded.
+   */
+  conformance?: "PDF/X-4";
+  outputIntent?: OutputIntent;
   /** Language of the document's text, as a BCP 47 tag such as `"id"` or `"en-GB"`. */
   lang?: string;
   /**
@@ -42,6 +61,11 @@ export class PdfDocument {
   readonly #info: PdfInfo;
   readonly #deterministic: boolean;
   readonly #lang: string | undefined;
+  readonly #conformance: "PDF/X-4" | undefined;
+  readonly #outputIntent: OutputIntent | undefined;
+  readonly #spots: Map<string, { name: string; ref: PdfRef }> = new Map();
+  #usesStandardFonts = false;
+  #now: Date | undefined;
   readonly #pagesRef: PdfRef;
   readonly #pages: PdfPage[] = [];
   readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
@@ -54,6 +78,17 @@ export class PdfDocument {
     this.#info = options.info ?? {};
     this.#deterministic = options.deterministic ?? false;
     this.#lang = options.lang;
+    this.#conformance = options.conformance;
+    this.#outputIntent = options.outputIntent;
+    if (options.conformance === "PDF/X-4" && !options.outputIntent) {
+      throw new Error("PDF/X-4 needs an output intent: the ICC profile of the printing condition");
+    }
+    if (options.outputIntent) {
+      const profile = options.outputIntent.profile;
+      const signature = String.fromCharCode(...profile.subarray(36, 40));
+      if (profile.length < 132 || signature !== "acsp")
+        throw new Error("The output intent profile is not an ICC profile");
+    }
     this.#pagesRef = this.writer.allocate();
   }
 
@@ -70,6 +105,7 @@ export class PdfDocument {
         opacityState: (fill, stroke) => this.#opacityState(fill, stroke),
         fontResource: (font) => this.#fontResource(font),
         imageResource: (image) => this.#imageResource(image),
+        spotColorResource: (color) => this.#spotColor(color),
       },
       options,
     );
@@ -91,14 +127,49 @@ export class PdfDocument {
         Count: this.#pages.length,
       }),
     );
+    if (this.#conformance === "PDF/X-4") {
+      if (this.#usesStandardFonts) {
+        throw new Error(
+          "PDF/X-4 requires every font to be embedded; the 14 standard fonts cannot be used",
+        );
+      }
+      for (const page of this.#pages) {
+        if (!page.trimBox) throw new Error("PDF/X-4 requires a trim box on every page");
+      }
+    }
+    const intent = this.#outputIntent;
+    const outputIntents = intent
+      ? [
+          new PdfDict({
+            Type: new PdfName("OutputIntent"),
+            S: new PdfName("GTS_PDFX"),
+            OutputConditionIdentifier: PdfString.text(intent.identifier),
+            Info: PdfString.text(intent.info ?? intent.identifier),
+            RegistryName: PdfString.text(intent.registry ?? "http://www.color.org"),
+            DestOutputProfile: writer.add(
+              new PdfStream(intent.profile, new PdfDict({ N: iccComponents(intent.profile) })),
+            ),
+          }),
+        ]
+      : undefined;
+    const infoDict = this.#infoDict();
     const root = writer.add(
       new PdfDict({
         Type: new PdfName("Catalog"),
         Pages: this.#pagesRef,
         Lang: this.#lang === undefined ? undefined : PdfString.text(this.#lang),
+        // Kept uncompressed so that tools which only look for the packet can find it.
+        Metadata: writer.add(
+          new PdfStream(
+            this.#xmp(),
+            new PdfDict({ Type: new PdfName("Metadata"), Subtype: new PdfName("XML") }),
+            { compress: false },
+          ),
+        ),
+        OutputIntents: outputIntents,
       }),
     );
-    const info = writer.add(this.#infoDict());
+    const info = writer.add(infoDict);
     return writer.finish({ root, info });
   }
 
@@ -119,6 +190,24 @@ export class PdfDocument {
     return state;
   }
 
+  /** One Separation colour space per ink, whatever tints of it are used. */
+  #spotColor(color: Extract<Color, { space: "spot" }>): { name: string; ref: PdfRef } {
+    let resource = this.#spots.get(color.name);
+    if (!resource) {
+      const { c, m, y, k } = color.alternate;
+      const ref = this.writer.add([
+        new PdfName("Separation"),
+        new PdfName(color.name),
+        new PdfName("DeviceCMYK"),
+        // Tint 0 is bare paper, tint 1 the alternate colour, and in between a straight line.
+        new PdfDict({ FunctionType: 2, Domain: [0, 1], C0: [0, 0, 0, 0], C1: [c, m, y, k], N: 1 }),
+      ]);
+      resource = { name: `CS${this.#spots.size + 1}`, ref };
+      this.#spots.set(color.name, resource);
+    }
+    return resource;
+  }
+
   /** One XObject per image, however many times and on however many pages it is drawn. */
   #imageResource(image: PdfImage): { name: string; ref: PdfRef } {
     let resource = this.#images.get(image);
@@ -135,6 +224,7 @@ export class PdfDocument {
     if (resource) return resource;
     const name = `F${this.#fonts.size + 1}`;
     if (font instanceof StandardFont) {
+      this.#usesStandardFonts = true;
       const ref = this.writer.add(
         new PdfDict({
           Type: new PdfName("Font"),
@@ -184,12 +274,68 @@ export class PdfDocument {
     return resource;
   }
 
+  /** The dates to stamp the file with; none in deterministic mode unless given. */
+  #dates(): { created: Date | undefined; modified: Date | undefined } {
+    this.#now ??= new Date();
+    const created = this.#info.creationDate ?? (this.#deterministic ? undefined : this.#now);
+    return { created, modified: this.#info.modDate ?? created };
+  }
+
+  /** The XMP metadata packet: the same details as the information dictionary, as XML. */
+  #xmp(): Uint8Array {
+    const info = this.#info;
+    const { created, modified } = this.#dates();
+    const xmlText = (value: string): string =>
+      value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const date = (value: Date): string => value.toISOString().replace(/\.\d+Z$/, "Z");
+    const lines: string[] = [];
+    if (info.title !== undefined) {
+      lines.push(
+        `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${xmlText(info.title)}</rdf:li></rdf:Alt></dc:title>`,
+      );
+    }
+    if (info.author !== undefined) {
+      lines.push(
+        `<dc:creator><rdf:Seq><rdf:li>${xmlText(info.author)}</rdf:li></rdf:Seq></dc:creator>`,
+      );
+    }
+    if (info.subject !== undefined) {
+      lines.push(
+        `<dc:description><rdf:Alt><rdf:li xml:lang="x-default">${xmlText(info.subject)}</rdf:li></rdf:Alt></dc:description>`,
+      );
+    }
+    if (info.keywords !== undefined)
+      lines.push(`<pdf:Keywords>${xmlText(info.keywords)}</pdf:Keywords>`);
+    lines.push(`<pdf:Producer>${xmlText(info.producer ?? "mbingpdf")}</pdf:Producer>`);
+    if (info.creator !== undefined)
+      lines.push(`<xmp:CreatorTool>${xmlText(info.creator)}</xmp:CreatorTool>`);
+    if (created) lines.push(`<xmp:CreateDate>${date(created)}</xmp:CreateDate>`);
+    if (modified) {
+      lines.push(`<xmp:ModifyDate>${date(modified)}</xmp:ModifyDate>`);
+      lines.push(`<xmp:MetadataDate>${date(modified)}</xmp:MetadataDate>`);
+    }
+    if (this.#conformance === "PDF/X-4") {
+      lines.push("<pdfxid:GTS_PDFXVersion>PDF/X-4</pdfxid:GTS_PDFXVersion>");
+      lines.push("<pdf:Trapped>False</pdf:Trapped>");
+    }
+    const xml =
+      '<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>\n' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/">\n' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n' +
+      '<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/" ' +
+      'xmlns:pdf="http://ns.adobe.com/pdf/1.3/" xmlns:xmp="http://ns.adobe.com/xap/1.0/" ' +
+      'xmlns:pdfxid="http://www.npes.org/pdfx/ns/id/">\n' +
+      `${lines.join("\n")}\n` +
+      "</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n" +
+      '<?xpacket end="w"?>';
+    return new TextEncoder().encode(xml);
+  }
+
   #infoDict(): PdfDict {
     const info = this.#info;
     const text = (value: string | undefined): PdfObject | undefined =>
       value === undefined ? undefined : PdfString.text(value);
-    const created = info.creationDate ?? (this.#deterministic ? undefined : new Date());
-    const modified = info.modDate ?? created;
+    const { created, modified } = this.#dates();
     return new PdfDict({
       Title: text(info.title),
       Author: text(info.author),
@@ -199,6 +345,15 @@ export class PdfDocument {
       Producer: PdfString.text(info.producer ?? "mbingpdf"),
       CreationDate: created && PdfString.date(created),
       ModDate: modified && PdfString.date(modified),
+      ...(this.#conformance === "PDF/X-4"
+        ? { GTS_PDFXVersion: PdfString.text("PDF/X-4"), Trapped: new PdfName("False") }
+        : {}),
     });
   }
+}
+
+/** Number of colour components of an ICC profile, from the colour space in its header. */
+function iccComponents(profile: Uint8Array): number {
+  const space = String.fromCharCode(...profile.subarray(16, 20));
+  return space === "CMYK" ? 4 : space === "GRAY" ? 1 : 3;
 }

@@ -37,6 +37,8 @@ export interface ContentResources {
   font(font: AnyFont): FontBinding;
   /** Registers an image with the page and returns its resource name. */
   image(image: PdfImage): string;
+  /** Registers a spot colour's colour space with the page and returns its resource name. */
+  spotColor(color: Extract<Color, { space: "spot" }>): string;
 }
 
 /** A font that every viewer has built in, or a font program to embed. */
@@ -442,6 +444,13 @@ export class ContentStream {
         return this.#op(stroking ? "RG" : "rg", n(color.r), n(color.g), n(color.b));
       case "cmyk":
         return this.#op(stroking ? "K" : "k", n(color.c), n(color.m), n(color.y), n(color.k));
+      case "spot": {
+        if (!this.#resources)
+          throw new Error("Spot colours need a content stream that belongs to a page");
+        const space = this.#name(this.#resources.spotColor(color));
+        this.#op(stroking ? "CS" : "cs", space);
+        return this.#op(stroking ? "SCN" : "scn", n(color.tint));
+      }
     }
   }
 

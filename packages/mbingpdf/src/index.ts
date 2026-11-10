@@ -13,10 +13,12 @@ export {
   hex,
   inch,
   mm,
+  type OutputIntent,
   PageSizes,
   type PdfImage,
   rgb,
   StandardFonts,
+  spot,
 } from "./core/index.ts";
 export { Font, loadFont } from "./font/index.ts";
 export { decodeImage } from "./image/index.ts";

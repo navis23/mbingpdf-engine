@@ -72,7 +72,11 @@ export type DisplayItem =
     };
 
 export interface DisplayPage {
+  /** The finished (trimmed) size of the page. Coordinates are measured from its corner. */
   readonly width: number;
   readonly height: number;
   readonly items: readonly DisplayItem[];
+  /** How far artwork may extend past each edge; items may have coordinates in that band. */
+  readonly bleed?: number;
+  readonly marks?: { readonly crop: boolean; readonly registration: boolean };
 }
