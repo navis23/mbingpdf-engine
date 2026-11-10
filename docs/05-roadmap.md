@@ -33,7 +33,7 @@ _Status: done 2026-11-10, except the manual half of the exit test (copying text 
 
 ## M2 — Layout and pagination
 
-_Status: next_
+_Status: in progress — done: the document tree and element functions, inherited text styles, the box model, `Stack`, `Row` (flex grow, shrink, basis, justify, align), `Box`, `Grid`, `Spacer`, `Absolute` with rotation, `Canvas`, inline text with spans and links, JPEG and PNG images, fragmentation across pages (forced breaks, `keepTogether`, `keepWithNext`, widows and orphans, split boxes and rows), headers, footers and backgrounds with page number and total, and `render()` with `render.stream()` and `render.sync()`. The exit test passes. Still to do: the SVG preview backend and a check that rendering works inside a Web Worker. Not done by design: row wrapping, and true incremental streaming (the stream is produced after layout)_
 
 - Document tree, style resolution and inheritance.
 - Box model, `Stack`, `Row` with flex semantics, `Box`, `Grid`, `Spacer`, `Absolute` with rotation.

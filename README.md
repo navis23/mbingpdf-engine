@@ -2,13 +2,32 @@
 
 A TypeScript library for generating production-grade PDF documents in any JavaScript runtime: browsers, Node, Bun, Deno and edge functions.
 
-**Status: early development.** Nothing is published to npm yet. What works today:
+**Status: early development.** Nothing is published to npm yet, and the API may still change.
 
-- `mbingpdf/core` — the PDF writer: pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts, and embedding of subset fonts with searchable text.
-- `mbingpdf/font` — TrueType, OpenType/CFF and WOFF2 fonts: parsing, subsetting, variable-font instancing, and shaping (ligatures, kerning, accents) that matches HarfBuzz for Latin, Greek and Cyrillic.
-- `mbingpdf/text` — Unicode line breaking, hyphenation for English and Indonesian, and paragraph layout with alignment, justification, font fallback and fit-to-width.
+```ts
+import { Document, Page, Row, Stack, Text, Image, render, mm } from "mbingpdf";
 
-The layout engine with pagination and the declarative API come next. The design is in [`docs/`](./docs/README.md).
+const pdf = await render(
+  Document(
+    { title: "Invoice INV-0042" },
+    Page(
+      { size: "A4", margin: mm(20), footer: ({ page, pages }) => Text({ align: "center" }, `Page ${page} of ${pages}`) },
+      Row({ justify: "space-between" }, Image({ src: logo, width: mm(40) }), Text({ size: 22 }, "Invoice")),
+      Stack({ gap: 4 }, Text("Yayasan Contoh"), Text("Jl. Merdeka No. 17, Bandung")),
+    ),
+  ),
+); // Uint8Array
+```
+
+What works today:
+
+- **Documents** (`mbingpdf`) — elements laid out with flexbox-style rows and stacks, text with mixed styles and links, images, grids, absolute positioning and free drawing; content flows over pages with forced breaks, keep-together, keep-with-next and widow/orphan control; headers and footers know the page number and total.
+- **Text** (`mbingpdf/text`) — Unicode line breaking, hyphenation for English and Indonesian, justification, font fallback and fit-to-width.
+- **Fonts** (`mbingpdf/font`) — TrueType, OpenType/CFF and WOFF2: subsetting, variable-font instancing, and shaping (ligatures, kerning, accents) that matches HarfBuzz for Latin, Greek and Cyrillic.
+- **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
+- **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
+
+Tables, lists, themes and print output (crop marks, PDF/X-4) come next. The design is in [`docs/`](./docs/README.md).
 
 ## Development
 

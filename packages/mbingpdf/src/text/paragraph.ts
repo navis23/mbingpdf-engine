@@ -39,7 +39,29 @@ export interface TextStyle {
   transform?: TextTransform;
 }
 
-export interface ParagraphOptions extends TextStyle {
+/** How a stretch of text looks, beyond its font: used for spans inside a paragraph. */
+export interface InlineStyle extends TextStyle {
+  /** Fill colour of the text. The layout only carries it; the caller decides what it means. */
+  color?: unknown;
+  /** A web address that the text links to. */
+  link?: string;
+  underline?: boolean;
+  strikethrough?: boolean;
+  /**
+   * Distance between baselines as a multiple of this span's font size. Overrides the
+   * paragraph's `lineHeight` for lines the span is on.
+   */
+  lineHeight?: number;
+}
+
+/** A stretch of text in one style. A paragraph is a list of these. */
+export interface InlineSpan {
+  text: string;
+  style: InlineStyle;
+}
+
+/** Options that apply to the paragraph as a whole. */
+export interface ParagraphShape {
   /** The width lines must fit in, in points. Omit for no wrapping. */
   width?: number;
   /** Default `"left"`. `"justify"` stretches word spaces on every line but the last. */
@@ -53,9 +75,15 @@ export interface ParagraphOptions extends TextStyle {
   hyphenate?: Hyphenator;
 }
 
-/** A stretch of glyphs in one font. */
+export interface ParagraphOptions extends TextStyle, ParagraphShape {}
+
+/** A stretch of glyphs in one font and one style. */
 export interface TextRun {
   readonly font: TextFont;
+  /** Font size in points. */
+  readonly size: number;
+  /** The style of the span this run came from. */
+  readonly style: InlineStyle;
   readonly glyphs: readonly PositionedGlyph[];
   /** What the glyphs stand for; glyph clusters are offsets into it. */
   readonly text: string;
@@ -85,7 +113,13 @@ export interface ParagraphLayout {
   /** The width given, or the width of the longest line when none was. */
   readonly width: number;
   readonly height: number;
+  /** Font size of the first span. */
   readonly size: number;
+  /**
+   * The narrowest the paragraph can be made without splitting a word: the width of its widest
+   * unbreakable piece.
+   */
+  readonly minContentWidth: number;
   /** Characters that none of the fonts could show; they are drawn as "missing" boxes. */
   readonly missingCharacters: readonly string[];
 }
@@ -120,37 +154,63 @@ function applyTransform(text: string, transform: TextTransform | undefined): str
   return text;
 }
 
-/** Splits text into stretches that one font of the chain can show. */
+const fontsOf = (style: TextStyle): readonly TextFont[] =>
+  Array.isArray(style.font) ? (style.font as readonly TextFont[]) : [style.font as TextFont];
+
+interface Item {
+  font: TextFont;
+  style: InlineStyle;
+  start: number;
+  end: number;
+}
+
+/**
+ * Splits text into stretches that have one style and that one font can show. `boundaries`
+ * gives, for each span, the offset at which it ends.
+ */
 function itemize(
   text: string,
-  fonts: readonly TextFont[],
+  styles: readonly InlineStyle[],
+  boundaries: readonly number[],
   missing: Set<string>,
-): { font: TextFont; start: number; end: number }[] {
-  const primary = fonts[0] as TextFont;
-  const items: { font: TextFont; start: number; end: number }[] = [];
-  let start = 0;
-  let current: TextFont | undefined;
-  let position = 0;
-  for (const end of graphemeBreaks(text)) {
-    const cluster = text.slice(position, end);
-    let font: TextFont | undefined;
-    // Stay in the current font when it can show the cluster; spaces and punctuation then
-    // do not bounce between fonts.
-    if (current?.hasGlyphsFor(cluster)) font = current;
-    else font = fonts.find((candidate) => candidate.hasGlyphsFor(cluster));
-    if (!font) {
-      // Line and paragraph separators have no glyph and are not "missing".
-      if (cluster.trim() !== "") missing.add(cluster);
-      font = current ?? primary;
+): Item[] {
+  const items: Item[] = [];
+  let spanStart = 0;
+  styles.forEach((style, index) => {
+    const spanEnd = Math.min(boundaries[index] as number, text.length);
+    if (spanEnd <= spanStart) return;
+    const fonts = fontsOf(style);
+    const primary = fonts[0] as TextFont;
+    const part = text.slice(spanStart, spanEnd);
+    let start = 0;
+    let current: TextFont | undefined;
+    let position = 0;
+    for (const end of graphemeBreaks(part)) {
+      const cluster = part.slice(position, end);
+      let font: TextFont | undefined;
+      // Stay in the current font when it can show the cluster; spaces and punctuation then
+      // do not bounce between fonts.
+      if (current?.hasGlyphsFor(cluster)) font = current;
+      else font = fonts.find((candidate) => candidate.hasGlyphsFor(cluster));
+      if (!font) {
+        // Line and paragraph separators have no glyph and are not "missing".
+        if (cluster.trim() !== "") missing.add(cluster);
+        font = current ?? primary;
+      }
+      if (font !== current) {
+        if (current && position > start) {
+          items.push({ font: current, style, start: spanStart + start, end: spanStart + position });
+        }
+        start = position;
+        current = font;
+      }
+      position = end;
     }
-    if (font !== current) {
-      if (current && position > start) items.push({ font: current, start, end: position });
-      start = position;
-      current = font;
+    if (current && position > start) {
+      items.push({ font: current, style, start: spanStart + start, end: spanStart + position });
     }
-    position = end;
-  }
-  if (current && position > start) items.push({ font: current, start, end: position });
+    spanStart = spanEnd;
+  });
   return items;
 }
 
@@ -185,29 +245,49 @@ const runWidth = (font: TextFont, glyphs: readonly PositionedGlyph[], size: numb
   return (total * size) / font.unitsPerEm;
 };
 
-/** Lays out text as a paragraph. Line feeds in the text start new lines. */
+/** Lays out text in one style as a paragraph. Line feeds in the text start new lines. */
 export function layoutParagraph(source: string, options: ParagraphOptions): ParagraphLayout {
-  const { size } = options;
-  if (!(size > 0)) throw new RangeError("Font size must be positive");
-  const fonts = Array.isArray(options.font)
-    ? (options.font as readonly TextFont[])
-    : [options.font as TextFont];
-  const primary = fonts[0];
-  if (!primary) throw new RangeError("At least one font is required");
-  const maxWidth = options.width ?? Number.POSITIVE_INFINITY;
+  return layoutSpans([{ text: source, style: options }], options);
+}
+
+/**
+ * Lays out a paragraph made of spans in different styles: bold words, a link, a larger
+ * figure. Lines break as if the spans were one text.
+ */
+export function layoutSpans(
+  spans: readonly InlineSpan[],
+  shape: ParagraphShape = {},
+): ParagraphLayout {
+  if (spans.length === 0) throw new RangeError("A paragraph needs at least one span");
+  for (const span of spans) {
+    if (!(span.style.size > 0)) throw new RangeError("Font size must be positive");
+    if (fontsOf(span.style).length === 0) throw new RangeError("At least one font is required");
+  }
+  const maxWidth = shape.width ?? Number.POSITIVE_INFINITY;
   if (!(maxWidth > 0)) throw new RangeError("Paragraph width must be positive");
-  const align = options.align ?? "left";
-  const text = applyTransform(source, options.transform);
+  const align = shape.align ?? "left";
   const missing = new Set<string>();
+
+  // One text for line breaking, remembering where each span ends.
+  let text = "";
+  const styles: InlineStyle[] = [];
+  const boundaries: number[] = [];
+  for (const span of spans) {
+    text += applyTransform(span.text, span.style.transform);
+    styles.push(span.style);
+    boundaries.push(text.length);
+  }
+  const firstStyle = styles[0] as InlineStyle;
 
   // Measure the whole text once: `prefix[i]` is the width of everything before offset i.
   const advances = new Float64Array(text.length + 1);
-  for (const item of itemize(text, fonts, missing)) {
+  for (const item of itemize(text, styles, boundaries, missing)) {
     const slice = text.slice(item.start, item.end);
-    const glyphs = shapeRun(item.font, slice, options, false);
+    const glyphs = shapeRun(item.font, slice, item.style, false);
     for (const glyph of glyphs) {
       const at = item.start + glyph.cluster;
-      advances[at] = (advances[at] as number) + (glyph.xAdvance * size) / item.font.unitsPerEm;
+      advances[at] =
+        (advances[at] as number) + (glyph.xAdvance * item.style.size) / item.font.unitsPerEm;
     }
   }
   const prefix = new Float64Array(text.length + 1);
@@ -220,19 +300,29 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
   const opportunities: Opportunity[] = lineBreaks(text).map(({ offset, mandatory }) => ({
     offset,
     mandatory,
-    hyphen: text.charAt(offset - 1) === "­",
+    hyphen: text.charAt(offset - 1) === "\u00ad",
   }));
-  if (options.hyphenate && Number.isFinite(maxWidth)) {
+  if (shape.hyphenate && Number.isFinite(maxWidth)) {
     for (const match of text.matchAll(WORD)) {
-      for (const point of options.hyphenate(match[0])) {
+      for (const point of shape.hyphenate(match[0])) {
         opportunities.push({ offset: match.index + point, mandatory: false, hyphen: true });
       }
     }
     opportunities.sort((a, b) => a.offset - b.offset || Number(b.mandatory) - Number(a.mandatory));
   }
 
-  const hyphenFont = fonts.find((font) => font.hasGlyphsFor("-")) ?? primary;
-  const hyphenWidth = runWidth(hyphenFont, hyphenFont.shape("-"), size);
+  /** The style in effect at a text offset. */
+  const styleAt = (offset: number): InlineStyle => {
+    const index = boundaries.findIndex((end) => offset < end);
+    return styles[index < 0 ? styles.length - 1 : index] as InlineStyle;
+  };
+  /** Width of the hyphen that a break at `offset` would add, in the style of the text there. */
+  const hyphenWidthAt = (offset: number): number => {
+    const style = styleAt(Math.max(0, offset - 1));
+    const fonts = fontsOf(style);
+    const font = fonts.find((candidate) => candidate.hasGlyphsFor("-")) ?? (fonts[0] as TextFont);
+    return runWidth(font, font.shape("-"), style.size);
+  };
   /** The end of a line's visible text: spaces and the line break itself hang off the end. */
   const trimEnd = (start: number, end: number): number => {
     let at = end;
@@ -240,6 +330,16 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
       at--;
     return at;
   };
+
+  let minContentWidth = 0;
+  {
+    let from = 0;
+    for (const opportunity of opportunities) {
+      const width = widthOf(from, trimEnd(from, opportunity.offset));
+      if (width > minContentWidth) minContentWidth = width;
+      from = opportunity.offset;
+    }
+  }
 
   // Greedy line filling: take as many break opportunities as fit.
   const pieces: { start: number; end: number; hyphen: boolean; last: boolean }[] = [];
@@ -251,7 +351,8 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
     for (let j = next; j < opportunities.length; j++) {
       const opportunity = opportunities[j] as Opportunity;
       const width =
-        widthOf(start, trimEnd(start, opportunity.offset)) + (opportunity.hyphen ? hyphenWidth : 0);
+        widthOf(start, trimEnd(start, opportunity.offset)) +
+        (opportunity.hyphen ? hyphenWidthAt(opportunity.offset) : 0);
       if (width > maxWidth + tolerance) break;
       best = j;
       if (opportunity.mandatory) break;
@@ -291,24 +392,37 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
   const lines: TextLine[] = [];
   let top = 0;
   let longest = 0;
-  const metricsOf = (font: TextFont): { ascent: number; descent: number; gap: number } => ({
-    ascent: (font.ascender * size) / font.unitsPerEm,
-    descent: (-font.descender * size) / font.unitsPerEm,
-    gap: (font.lineGap * size) / font.unitsPerEm,
-  });
+  /** How much room a font at a size and line height needs above and below the baseline. */
+  const extent = (font: TextFont, style: InlineStyle): { above: number; below: number } => {
+    const scale = style.size / font.unitsPerEm;
+    const ascent = font.ascender * scale;
+    const descent = -font.descender * scale;
+    const lineHeight = style.lineHeight ?? shape.lineHeight;
+    const height =
+      lineHeight !== undefined ? lineHeight * style.size : ascent + descent + font.lineGap * scale;
+    // Extra line spacing is shared equally above and below the text ("half-leading").
+    const half = (height - (ascent + descent)) / 2;
+    return { above: ascent + half, below: descent + half };
+  };
   for (const piece of pieces) {
-    const lineText = text.slice(piece.start, piece.end) + (piece.hyphen ? "-" : "");
-    const items = itemize(lineText, fonts, missing);
+    const body = text.slice(piece.start, piece.end);
+    const lineText = body + (piece.hyphen ? "-" : "");
+    // The added hyphen takes the style of the text before it.
+    const lineBoundaries = boundaries.map((end) =>
+      end >= piece.end ? lineText.length : Math.max(0, end - piece.start),
+    );
+    const items = itemize(lineText, styles, lineBoundaries, missing);
     const shaped = items.map((item, i) => {
       const runText = lineText.slice(item.start, item.end);
       return {
         font: item.font,
+        style: item.style,
         text: runText,
-        glyphs: shapeRun(item.font, runText, options, i === items.length - 1),
+        glyphs: shapeRun(item.font, runText, item.style, i === items.length - 1),
       };
     });
     let width = 0;
-    for (const run of shaped) width += runWidth(run.font, run.glyphs, size);
+    for (const run of shaped) width += runWidth(run.font, run.glyphs, run.style.size);
 
     let x = 0;
     if (Number.isFinite(maxWidth)) {
@@ -326,7 +440,7 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
         if (spaces > 0) {
           const extra = slack / spaces;
           for (const run of shaped) {
-            const perPoint = run.font.unitsPerEm / size;
+            const perPoint = run.font.unitsPerEm / run.style.size;
             run.glyphs = run.glyphs.map((glyph) =>
               isWordSpace(run.text.charAt(glyph.cluster))
                 ? { ...glyph, xAdvance: glyph.xAdvance + extra * perPoint }
@@ -338,25 +452,40 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
       }
     }
 
-    const used =
-      shaped.length > 0 ? shaped.map((run) => metricsOf(run.font)) : [metricsOf(primary)];
-    const ascent = Math.max(...used.map((metrics) => metrics.ascent));
-    const descent = Math.max(...used.map((metrics) => metrics.descent));
-    const height =
-      options.lineHeight !== undefined
-        ? options.lineHeight * size
-        : Math.max(...used.map((metrics) => metrics.ascent + metrics.descent + metrics.gap));
-    // Extra line spacing is shared equally above and below the text ("half-leading").
-    const baseline = top + (height - (ascent + descent)) / 2 + ascent;
+    // An empty line takes the height of the style in effect where it sits.
+    const extents =
+      shaped.length > 0
+        ? shaped.map((run) => extent(run.font, run.style))
+        : [extent(fontsOf(styleAt(piece.start))[0] as TextFont, styleAt(piece.start))];
+    const above = Math.max(...extents.map((entry) => entry.above));
+    const below = Math.max(...extents.map((entry) => entry.below));
+    const height = above + below;
 
     const runs: TextRun[] = [];
     let runX = x;
     for (const run of shaped) {
-      const widthOfRun = runWidth(run.font, run.glyphs, size);
-      runs.push({ font: run.font, glyphs: run.glyphs, text: run.text, x: runX, width: widthOfRun });
+      const widthOfRun = runWidth(run.font, run.glyphs, run.style.size);
+      runs.push({
+        font: run.font,
+        size: run.style.size,
+        style: run.style,
+        glyphs: run.glyphs,
+        text: run.text,
+        x: runX,
+        width: widthOfRun,
+      });
       runX += widthOfRun;
     }
-    lines.push({ runs, text: lineText, x, width, top, height, baseline, hyphenated: piece.hyphen });
+    lines.push({
+      runs,
+      text: lineText,
+      x,
+      width,
+      top,
+      height,
+      baseline: top + above,
+      hyphenated: piece.hyphen,
+    });
     longest = Math.max(longest, width);
     top += height;
   }
@@ -365,7 +494,8 @@ export function layoutParagraph(source: string, options: ParagraphOptions): Para
     lines,
     width: Number.isFinite(maxWidth) ? maxWidth : longest,
     height: top,
-    size,
+    size: firstStyle.size,
+    minContentWidth,
     missingCharacters: [...missing],
   };
 }
@@ -384,7 +514,7 @@ export function drawParagraph(
     for (const run of line.runs) {
       if (run.glyphs.length === 0) continue;
       content
-        .font(run.font, layout.size)
+        .font(run.font, run.size)
         .beginText()
         .moveText(x + run.x, top - line.baseline)
         .showGlyphs(run.glyphs, run.text)

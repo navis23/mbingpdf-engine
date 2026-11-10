@@ -24,6 +24,8 @@ export interface PdfInfo {
 
 export interface PdfDocumentOptions extends PdfWriterOptions {
   info?: PdfInfo;
+  /** Language of the document's text, as a BCP 47 tag such as `"id"` or `"en-GB"`. */
+  lang?: string;
   /**
    * When true the library never reads the clock: dates appear only if given in `info`, so the
    * same input always yields the same bytes. Default `false`, which stamps the current time.
@@ -39,6 +41,7 @@ export class PdfDocument {
   readonly writer: PdfWriter;
   readonly #info: PdfInfo;
   readonly #deterministic: boolean;
+  readonly #lang: string | undefined;
   readonly #pagesRef: PdfRef;
   readonly #pages: PdfPage[] = [];
   readonly #opacityStates: Map<string, { name: string; ref: PdfRef }> = new Map();
@@ -50,6 +53,7 @@ export class PdfDocument {
     this.writer = new PdfWriter(options);
     this.#info = options.info ?? {};
     this.#deterministic = options.deterministic ?? false;
+    this.#lang = options.lang;
     this.#pagesRef = this.writer.allocate();
   }
 
@@ -87,7 +91,13 @@ export class PdfDocument {
         Count: this.#pages.length,
       }),
     );
-    const root = writer.add(new PdfDict({ Type: new PdfName("Catalog"), Pages: this.#pagesRef }));
+    const root = writer.add(
+      new PdfDict({
+        Type: new PdfName("Catalog"),
+        Pages: this.#pagesRef,
+        Lang: this.#lang === undefined ? undefined : PdfString.text(this.#lang),
+      }),
+    );
     const info = writer.add(this.#infoDict());
     return writer.finish({ root, info });
   }

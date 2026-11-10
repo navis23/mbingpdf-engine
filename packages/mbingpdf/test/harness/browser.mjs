@@ -21,6 +21,7 @@ const TYPES = {
   ".json": "application/json",
   ".ttf": "font/ttf",
   ".otf": "font/otf",
+  ".jpg": "image/jpeg",
 };
 
 const server = createServer(async (request, response) => {
@@ -62,6 +63,7 @@ try {
     const core = await import("/dist/core/index.js");
     const font = await import("/dist/font/index.js");
     const text = await import("/dist/text/index.js");
+    const doc = await import("/dist/index.js");
     const { digestSamples } = await import("/test/harness/digest.ts");
     const { ALL_FONT_FILES, fontFileName } = await import("/test/harness/samples.ts");
     const fonts = {};
@@ -70,7 +72,8 @@ try {
       if (!response.ok) throw new Error(`Could not load ${file}: ${response.status}`);
       fonts[file] = new Uint8Array(await response.arrayBuffer());
     }
-    return digestSamples({ core, font, text, fonts });
+    const photo = new Uint8Array(await (await fetch("/test/images/photo.jpg")).arrayBuffer());
+    return digestSamples({ core, font, text, doc, photo, fonts });
   });
   if (errors.length > 0) throw new Error(`Page errors: ${errors.join("; ")}`);
   const different = compareDigests(actual, golden);

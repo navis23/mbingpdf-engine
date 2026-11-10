@@ -27,8 +27,13 @@
 | 24 | WOFF2 and Brotli | No Brotli decoder is bundled (its dictionary alone is 120 kB). `loadFont()` uses the runtime's own: `node:zlib` on Node, Bun and Deno, `DecompressionStream("brotli")` in browsers. `decodeWoff2()` accepts any decoder for runtimes with neither | 2026-11-10 |
 | 25 | CFF fonts | Embedded as a CID-keyed CFF subset (`CIDFontType0C`). The subset keeps every subroutine rather than tracing which are used, so it is larger than HarfBuzz's; correctness first | 2026-11-10 |
 | 26 | Font class name | One class, `Font`, for TrueType and CFF outlines (`loadFont()` also takes WOFF2). There is no separate `TrueTypeFont` | 2026-11-10 |
+| 27 | Element call style | `Element(props?, ...children)`: properties are optional and children are variadic, so `Text("Hi")` works. Arrays of children are flattened and `null`/`false` skipped | 2026-11-10 |
+| 28 | `size` on `Page` | Means the paper size. The default font size for a page is `fontSize`; everywhere else `size` is the font size | 2026-11-10 |
+| 29 | Split boxes | A box split across pages is cut open at the split (no bottom border on the first part, no top border on the second) and its background runs to the page edge | 2026-11-10 |
+| 30 | Unsplittable content | An image taller than a page is scaled to fit; a fixed-height box is clipped to the page; `keepTogether` is ignored for blocks taller than a page. Layout does not throw for these | 2026-11-10 |
+| 31 | Image size without dimensions | 96 pixels per inch (1 px = 0.75 pt), as in CSS, shrunk to the available width | 2026-11-10 |
 
-Decisions 8–10 and 16–26 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–31 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

@@ -1,7 +1,31 @@
 /**
- * `mbingpdf` — public API: element factories, themes and `render()`.
+ * `mbingpdf` — describe a document, get a PDF.
  *
- * Nothing is exported yet; the writer lives in `mbingpdf/core`.
+ * This entry point has everything needed to build documents: the elements, `render`, units,
+ * colours and font loading. The lower layers remain available on their own as
+ * `mbingpdf/core`, `mbingpdf/font`, `mbingpdf/text` and `mbingpdf/image`.
  */
-
-export {};
+export {
+  type Color,
+  cm,
+  cmyk,
+  gray,
+  hex,
+  inch,
+  mm,
+  PageSizes,
+  type PdfImage,
+  rgb,
+  StandardFonts,
+} from "./core/index.ts";
+export { Font, loadFont } from "./font/index.ts";
+export { decodeImage } from "./image/index.ts";
+export * from "./layout/index.ts";
+export {
+  fitText,
+  type Hyphenator,
+  hyphenateEnglish,
+  hyphenateIndonesian,
+  type TextAlign,
+  type TextFont,
+} from "./text/index.ts";

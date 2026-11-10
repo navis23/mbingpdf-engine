@@ -8,6 +8,7 @@
  */
 import type * as Core from "../../src/core/index.ts";
 import type * as FontModule from "../../src/font/index.ts";
+import type * as Root from "../../src/index.ts";
 import type * as Text from "../../src/text/index.ts";
 
 export type CoreModule = typeof Core;
@@ -38,6 +39,10 @@ export interface SampleEnv {
   readonly core: CoreModule;
   readonly font: typeof FontModule;
   readonly text: typeof Text;
+  /** The document-level API: the `mbingpdf` entry point. */
+  readonly doc: typeof Root;
+  /** A small JPEG for samples that show images. */
+  readonly photo: Uint8Array;
   /** The bytes of each test font. */
   readonly fonts: Readonly<Record<FontFile, Uint8Array>>;
 }
@@ -482,7 +487,214 @@ const paragraphs: Sample = {
   },
 };
 
+const LOREM =
+  "Dengan ini menerangkan bahwa pembayaran untuk keberangkatan rombongan telah diterima " +
+  "sepenuhnya. Sertifikat penghargaan akan dikirimkan paling lambat empat belas hari setelah " +
+  "kegiatan berakhir, bersama kuitansi resmi dan rincian biaya perjalanan. ";
+
+/** A tour of the document API: every element, flowing over several pages. */
+const tour: Sample = {
+  text: [
+    ["PT Contoh Sejahtera", "Ringkasan", "Judul di samping gambar", "Halaman 1 dari 5"],
+    ["Halaman 2 dari 5"],
+    ["Halaman 3 dari 5"],
+    ["Kotak yang tidak terpisah", "Halaman 4 dari 5"],
+    ["Label", "Peserta 20", "Halaman 5 dari 5"],
+  ],
+  build(env) {
+    const d = env.doc;
+    const inter = new d.Font(env.fonts["Inter-Variable"]);
+    const bold = inter.instance("Bold");
+    const document = d.Document(
+      { title: "Laporan", lang: "id", font: inter, size: 10, lineHeight: 1.45 },
+      d.Page(
+        {
+          size: "A5",
+          margin: d.mm(15),
+          gap: 8,
+          header: d.Row(
+            { border: { bottom: { width: 0.5, color: "#999999" } }, padding: [0, 0, 4, 0] },
+            d.Text({ font: bold }, "PT Contoh Sejahtera"),
+            d.Spacer(),
+            d.Text({ color: "#666666" }, "Laporan Bulanan"),
+          ),
+          footer: ({ page, pages }) =>
+            d.Text(
+              { align: "center", size: 8, color: "#666666", padding: [6, 0, 0, 0] },
+              `Halaman ${page} dari ${pages}`,
+            ),
+          background: d.Absolute(
+            { anchor: "page", top: 250, left: 60, rotate: -30, opacity: 0.08 },
+            d.Text({ font: bold, size: 70 }, "CONTOH"),
+          ),
+        },
+        d.Text({ font: bold, size: 20, keepWithNext: true }, "Ringkasan"),
+        d.Row(
+          { gap: 10, align: "start" },
+          d.Image({ src: env.photo, width: 90 }),
+          d.Stack(
+            { grow: 1, gap: 4 },
+            d.Text({ font: bold }, "Judul di samping gambar"),
+            d.Text({ hyphenate: d.hyphenateIndonesian, align: "justify" }, LOREM),
+          ),
+        ),
+        d.Box(
+          {
+            background: "#eef2ff",
+            padding: 8,
+            radius: 4,
+            border: { width: 0.5, color: "#6366f1" },
+          },
+          d.Text(
+            "Catatan: ",
+            d.Span({ font: bold, color: "#b91c1c" }, "penting"),
+            " — lihat ",
+            d.Link({ href: "https://example.com", color: "#1d4ed8" }, "example.com"),
+            " untuk rincian, atau ",
+            d.Span({ strikethrough: true }, "abaikan"),
+            d.Span({ underline: true }, " baca ini"),
+            ".",
+          ),
+        ),
+        d.Row(
+          { gap: 6 },
+          d.Box({ background: "#fee2e2", padding: 6, grow: 1 }, d.Text("Satu")),
+          d.Box(
+            { background: "#dcfce7", padding: 6, grow: 2 },
+            d.Text("Dua (dua kali lebih lebar)\nbaris kedua"),
+          ),
+          d.Box({ background: "#dbeafe", padding: 6, width: 60 }, d.Text("60 pt")),
+        ),
+        d.Row({ justify: "space-between" }, d.Text("kiri"), d.Text("tengah"), d.Text("kanan")),
+        d.Canvas({
+          width: "100%",
+          height: 60,
+          draw: (g, { width, height }) => {
+            g.rect(0, 0, width, height).stroke({ color: "#999999", width: 0.5 });
+            for (let i = 0; i < 8; i++) {
+              const bar = 10 + ((i * 17) % 40);
+              g.roundedRect(8 + i * 22, height - 6 - bar, 14, bar, 2).fill("#2563eb");
+            }
+            g.line(0, height / 2, width, height / 2).stroke({ color: "#ef4444", dash: [3, 2] });
+            g.circle(width - 30, height / 2, 16).fillAndStroke("#fde68a", {
+              color: "#b45309",
+              width: 1.5,
+            });
+          },
+        }),
+        Array.from({ length: 5 }, (_value, i) => [
+          d.Text({ font: bold, size: 13, keepWithNext: true }, `Bagian ${i + 1}`),
+          d.Text({ hyphenate: d.hyphenateIndonesian, align: "justify" }, LOREM.repeat(2 + (i % 3))),
+        ]),
+        d.Box(
+          {
+            border: { left: { width: 3, color: "#f59e0b" } },
+            background: "#fffbeb",
+            padding: [6, 10],
+            keepTogether: true,
+          },
+          d.Text({ font: bold }, "Kotak yang tidak terpisah"),
+          d.Text(LOREM),
+        ),
+        d.PageBreak(),
+        d.Text({ font: bold, size: 14 }, "Label"),
+        d.Grid(
+          { columns: 3, cell: { height: 40 }, gap: 6 },
+          ...Array.from({ length: 20 }, (_value, i) =>
+            d.Box(
+              { border: { width: 0.5 }, padding: 4, height: 40 },
+              d.Text({ size: 8 }, `Peserta ${i + 1}`),
+              d.Absolute(
+                { right: 3, bottom: 3 },
+                d.Text({ size: 6, color: "#999999" }, `#${1000 + i}`),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    return d.render.sync(document, { deterministic: true });
+  },
+};
+
+/** The invoice from the API design, without the table (tables come in M3). */
+const invoice: Sample = {
+  text: [["Invoice", "INV-0042", "Sewa bus pariwisata", "Total Rp 4.850.000", "Page 1 of 1"]],
+  build(env) {
+    const d = env.doc;
+    const inter = new d.Font(env.fonts["Inter-Variable"]);
+    const semiBold = inter.instance("SemiBold");
+    const items: [string, number, number][] = [
+      ["Sewa bus pariwisata", 1, 3_500_000],
+      ["Tiket masuk rombongan", 30, 25_000],
+      ["Makan siang", 30, 20_000],
+    ];
+    const money = (value: number): string =>
+      `Rp ${value.toLocaleString("id-ID").replace(/,/g, ".")}`;
+    const total = items.reduce((sum, [, quantity, price]) => sum + quantity * price, 0);
+    const numbers = { features: { tnum: true } } as const;
+    const document = d.Document(
+      { title: "Invoice INV-0042", lang: "en", font: inter, size: 10, color: "#111827" },
+      d.Page(
+        {
+          size: "A4",
+          margin: d.mm(20),
+          gap: 18,
+          footer: ({ page, pages }) =>
+            d.Text({ size: 8, color: "#6B7280", align: "center" }, `Page ${page} of ${pages}`),
+        },
+        d.Row(
+          { justify: "space-between", align: "start" },
+          d.Image({ src: env.photo, width: d.mm(40) }),
+          d.Stack(
+            { align: "end", gap: 2 },
+            d.Text({ font: semiBold, size: 22 }, "Invoice"),
+            d.Text({ color: "#6B7280" }, "INV-0042"),
+          ),
+        ),
+        d.Row(
+          { gap: 24 },
+          d.Stack(
+            { grow: 1, gap: 2 },
+            d.Text({ size: 8, color: "#6B7280" }, "BILL TO"),
+            d.Text({ font: semiBold }, "Yayasan Contoh"),
+            d.Text("Jl. Merdeka No. 17\nBandung 40111"),
+          ),
+          d.Stack(
+            { gap: 2 },
+            d.Text({ size: 8, color: "#6B7280" }, "DATE"),
+            d.Text("10 November 2026"),
+          ),
+        ),
+        d.Stack(
+          d.Row(
+            { background: "#F3F4F6", padding: [6, 8], font: semiBold, size: 9 },
+            d.Text({ grow: 1 }, "Description"),
+            d.Text({ width: 50, align: "right" }, "Qty"),
+            d.Text({ width: 90, align: "right" }, "Amount"),
+          ),
+          items.map(([name, quantity, price]) =>
+            d.Row(
+              { padding: [6, 8], border: { bottom: { width: 0.5, color: "#E5E7EB" } }, ...numbers },
+              d.Text({ grow: 1 }, name),
+              d.Text({ width: 50, align: "right" }, String(quantity)),
+              d.Text({ width: 90, align: "right" }, money(quantity * price)),
+            ),
+          ),
+        ),
+        d.Stack(
+          { keepTogether: true, align: "end" },
+          d.Text({ font: semiBold, size: 14, ...numbers }, `Total ${money(total)}`),
+        ),
+      ),
+    );
+    return d.render.sync(document, { deterministic: true });
+  },
+};
+
 export const samples: Readonly<Record<string, Sample>> = {
+  tour,
+  invoice,
   shapes,
   text,
   report,

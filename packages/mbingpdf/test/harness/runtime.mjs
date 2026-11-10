@@ -7,6 +7,7 @@
 import { readFile } from "node:fs/promises";
 import * as core from "../../dist/core/index.js";
 import * as font from "../../dist/font/index.js";
+import * as doc from "../../dist/index.js";
 import * as text from "../../dist/text/index.js";
 import golden from "../golden/digests.json" with { type: "json" };
 import { compareDigests, digestSamples } from "./digest.ts";
@@ -27,7 +28,9 @@ for (const file of ALL_FONT_FILES) {
   );
 }
 
-const actual = await digestSamples({ core, font, text, fonts });
+const photo = new Uint8Array(await readFile(new URL("../images/photo.jpg", import.meta.url)));
+
+const actual = await digestSamples({ core, font, text, doc, photo, fonts });
 const different = compareDigests(actual, golden);
 if (different.length > 0) {
   for (const name of different) {

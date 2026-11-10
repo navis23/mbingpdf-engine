@@ -1,13 +1,13 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 12:45 WIB · Session 2 · Milestone: M0 and M1 done, M2 (Layout and pagination) next · Branch: main_
+_Updated: 2026-11-10 13:40 WIB · Session 2 · Milestone: M0 and M1 done, M2 (Layout and pagination) nearly done · Branch: main_
 
 ## Where we are
-M0 and M1 are finished and green. The library has three layers so far, each an entry point:
-`mbingpdf/core` (PDF writer, pages, drawing, standard fonts, font embedding), `mbingpdf/font` (TrueType, CFF
-and WOFF2 parsing, subsetting, shaping, variable-font instancing) and `mbingpdf/text` (line breaking,
-graphemes, hyphenation, paragraph layout, fit-to-width). Output is byte-identical on Node, Bun, Deno and
-Chromium. Nothing is published to npm. The root `mbingpdf` entry is still empty: the declarative API and the
-layout engine are M2.
+M0 and M1 are finished; M2 is finished except for the SVG preview backend. The root `mbingpdf` entry now has
+the document API: `Document`, `Page`, `Stack`, `Row`, `Box`, `Text`, `Span`, `Link`, `Image`, `Grid`,
+`Spacer`, `Absolute`, `Canvas`, `PageBreak` and `render()`. Underneath are `mbingpdf/core` (PDF writer),
+`mbingpdf/font` (TrueType, CFF, WOFF2, shaping, variable fonts), `mbingpdf/text` (line breaking, hyphenation,
+paragraphs) and `mbingpdf/image` (JPEG, PNG). Output is byte-identical on Node, Bun, Deno and Chromium.
+Nothing is published to npm.
 
 ## Done this session
 - Toolchain: pnpm workspace, TypeScript 7 strict + `isolatedDeclarations`, tsdown (ESM + CJS), Vitest, Biome,
@@ -37,7 +37,10 @@ M1 has just started; see `docs/05-roadmap.md`.
    `hyphenateEnglish`, `hyphenateIndonesian`.
 8. ~~M1 exit test, automated half~~ done: subsets within 10% of `hb-subset`. The Acrobat copy check is manual
    and still open; text extraction is checked with pdf.js meanwhile.
-9. Then M2 (layout and pagination): document tree, box model, flex, fragmentation across pages.
+9. ~~M2 layout engine~~ done (`src/layout/`, exported from the root `mbingpdf` entry): elements, flex,
+   fragmentation, headers/footers, `render()`. Images are in `src/image/` (`mbingpdf/image`).
+10. M2 leftovers: SVG preview backend (`mbingpdf/svg`), Web Worker check.
+11. Then M3: tables, lists, multi-column, outlines, SVG input, QR codes, themes, print marks, PDF/X-4.
 
 ## Waiting on the owner
 None. The owner asked for autonomous work: decide, commit and push without asking, and report afterwards.
@@ -53,7 +56,7 @@ None. The owner asked for autonomous work: decide, commit and push without askin
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: `pnpm check` green (lint, typecheck, 192 tests, build). Runtime digests match on Node, Deno, Chromium.
+- Checks: `pnpm check` green (lint, typecheck, 275 tests, build). Runtime digests match on Node, Deno, Chromium.
 - Published: not published.
 
 ## Gotchas / don't redo
