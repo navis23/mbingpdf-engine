@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-10 19:15 WIB · Session 2 · Milestone: M0–M3 done; M4 in progress, release prepared · Branch: main_
+_Updated: 2026-11-10 19:15 WIB · Session 2 · Milestone: M0–M3 done; M4 done except the owner's steps · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -64,13 +64,11 @@ M1 has just started; see `docs/05-roadmap.md`.
     build.
 18. Also done in M4: shared graphics. An `Svg` becomes a Form XObject (`PdfDocument.createForm`,
     `ContentStream.form`, the `shared` display item), stored once per file per source and colour.
-19. In progress: benchmarks against PDFKit, pdfmake and @react-pdf/renderer. The script is done
-    (`benchmarks/run.mjs`; `pnpm build && pnpm --filter mbingpdf-benchmarks bench -- --runs 3`, about five
-    minutes) and the four outputs were checked to be the same document. Still to do: run it to the end,
-    write the numbers into `docs/benchmarks.md`, link it from the README and mark the roadmap item done.
-    First pass (one run): invoice 24 ms vs 150/62/63 ms; 2,000-row table 1.36 s vs 20.7 s/0.97 s/25.1 s;
-    300 paragraphs 421 ms vs 257 ms/644 ms/1.44 s (PDFKit, pdfmake, react-pdf). mbingpdf is slower than
-    pdfmake on the table and than PDFKit on plain text; say so in the doc.
+19. Also done in M4: benchmarks (`benchmarks/run.mjs`, results in `docs/benchmarks.md`). mbingpdf is
+    fastest on the invoice and smallest everywhere; pdfmake is about twice as fast on a 2,000-row table and
+    PDFKit on plain paragraphs. Speeding up long tables is the open follow-up.
+20. M4 has nothing left that can be done without the owner (see below). Next after that: M5 in
+    `docs/05-roadmap.md` (tagged PDF, PDF/UA, PDF/A, encryption).
 
 ## Waiting on the owner
 The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three

@@ -37,6 +37,7 @@ What works today:
 - [Quick start](./docs/guide/quick-start.md) — from a first document to themes, tables and print.
 - [Element reference](./docs/guide/elements.md) — every element and its properties.
 - [`examples/`](./examples) — starter templates: invoice, report, letter, certificate, label sheet. Build them with `pnpm build && pnpm --filter mbingpdf-examples build`.
+- [Benchmarks](./docs/benchmarks.md) — speed and file size next to PDFKit, pdfmake and @react-pdf/renderer.
 - [`docs/`](./docs/README.md) — the design and the roadmap.
 
 ## Development

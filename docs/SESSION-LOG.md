@@ -23,3 +23,8 @@ Append-only. One short entry per working session; newest at the bottom.
 - Mistake to learn from: one commit was pushed with a failing test because the commit was chained after a
   piped check; fixed in the next commit. Checks now run as their own step.
 - Next: the rest of M4 (see HANDOFF.md). Publishing and the app switch-over wait for the owner.
+- Later in the session: M4 finished apart from the owner's steps. Added `@mbingpdf/react`, `@mbingpdf/vue`
+  (preview components), `@mbingpdf/dev` (the `mbingpdf dev` preview server and `mbingpdf build`), shared
+  graphics (an `Svg` is stored once per file), and benchmarks (`docs/benchmarks.md`). Decisions: rows 55–65.
+- Next: the owner publishes 0.1.0 (needs the `@mbingpdf` npm organisation and `NPM_TOKEN`) and switches one
+  document in each app; then M5.
