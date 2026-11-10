@@ -1,6 +1,7 @@
 /** Turning the loose forms that properties accept into the exact values layout works with. */
 import { type Color, gray, hex, PageSizes, StandardFonts } from "../core/index.ts";
 import type { InlineStyle, TextAlign, TextFont } from "../text/index.ts";
+import { resolveThemeFont, type Theme } from "./theme.ts";
 import type {
   Border,
   BorderSide,
@@ -20,8 +21,26 @@ export interface Sides {
 
 export const NO_SIDES: Sides = { top: 0, right: 0, bottom: 0, left: 0 };
 
+let activeTheme: Theme | undefined;
+
+/** Sets the theme that colour names are looked up in while a document is laid out. */
+export function useTheme(theme: Theme | undefined): void {
+  activeTheme = theme;
+}
+
 export function toColor(input: ColorInput): Color {
-  return typeof input === "string" ? hex(input) : input;
+  if (typeof input !== "string") return input;
+  if (input.startsWith("#")) return hex(input);
+  const named = activeTheme?.colors?.[input];
+  if (named === undefined) {
+    const known = Object.keys(activeTheme?.colors ?? {});
+    throw new RangeError(
+      known.length > 0
+        ? `Unknown colour "${input}". The theme has: ${known.join(", ")}.`
+        : `Unknown colour "${input}": use a hex colour such as "#0F62FE", or name a colour in the theme.`,
+    );
+  }
+  return typeof named === "string" ? hex(named) : named;
 }
 
 export function toSides(edges: Edges | undefined): Sides {
@@ -114,6 +133,11 @@ export function toPageSize(
 
 /** The text properties in effect at some point in the tree, with nothing left undefined. */
 export interface TextContext {
+  theme: Theme | undefined;
+  /** The theme font family in use, when the font was chosen by name. */
+  family: string | undefined;
+  weight: number;
+  italic: boolean;
   font: TextFont | readonly TextFont[];
   size: number;
   color: Color;
@@ -131,6 +155,10 @@ export interface TextContext {
 }
 
 export const DEFAULT_TEXT: TextContext = {
+  theme: undefined,
+  family: undefined,
+  weight: 400,
+  italic: false,
   font: StandardFonts.Helvetica,
   size: 10,
   color: gray(0),
@@ -148,12 +176,59 @@ export const DEFAULT_TEXT: TextContext = {
 };
 
 /** The text context for an element's content: its own text properties over its parent's. */
-export function inherit(parent: TextContext, props: TextProps): TextContext {
+export function inherit(parent: TextContext, given: TextProps): TextContext {
+  // A named style is a set of properties; anything given alongside it wins.
+  let props: TextProps & { leading?: number } = given;
+  if (given.style !== undefined) {
+    const named = parent.theme?.text?.[given.style];
+    if (!named) {
+      const known = Object.keys(parent.theme?.text ?? {});
+      throw new RangeError(
+        known.length > 0
+          ? `Unknown text style "${given.style}". The theme has: ${known.join(", ")}.`
+          : `Unknown text style "${given.style}": text styles need a theme with a \`text\` entry.`,
+      );
+    }
+    // A style's leading belongs to the style's own size: turn it into a ratio there, so
+    // that overriding the size keeps the proportion.
+    const { leading, ...rest } = named as TextProps & { leading?: number };
+    const ownSize = named.size ?? parent.size;
+    props = {
+      ...rest,
+      ...(leading !== undefined && named.lineHeight === undefined
+        ? { lineHeight: leading / ownSize }
+        : {}),
+      ...given,
+    };
+  }
+
+  // A font given by name is a family; the weight and slant pick the font within it.
+  const family =
+    typeof props.font === "string" ? props.font : props.font ? undefined : parent.family;
+  const weight = props.weight ?? parent.weight;
+  const italic = props.italic ?? parent.italic;
+  let font = parent.font;
+  if (props.font !== undefined && typeof props.font !== "string") font = props.font;
+  else if (
+    family !== undefined &&
+    (family !== parent.family || weight !== parent.weight || italic !== parent.italic)
+  ) {
+    font = resolveThemeFont(parent.theme, family, weight, italic);
+  }
+
+  const size = props.size ?? parent.size;
   return {
-    font: props.font ?? parent.font,
-    size: props.size ?? parent.size,
+    theme: parent.theme,
+    family,
+    weight,
+    italic,
+    font,
+    size,
     color: props.color === undefined ? parent.color : toColor(props.color),
-    lineHeight: props.lineHeight ?? parent.lineHeight,
+    // A leading in points becomes a ratio, so that it follows later changes of size the way a
+    // line height does.
+    lineHeight:
+      props.lineHeight ?? (props.leading !== undefined ? props.leading / size : parent.lineHeight),
     letterSpacing: props.letterSpacing ?? parent.letterSpacing,
     wordSpacing: props.wordSpacing ?? parent.wordSpacing,
     textAlign: props.textAlign ?? parent.textAlign,

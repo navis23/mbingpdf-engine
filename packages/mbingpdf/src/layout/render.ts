@@ -11,7 +11,15 @@ import {
 } from "./engine.ts";
 import { paintBox } from "./paint.ts";
 import { writeDisplayPage } from "./pdf.ts";
-import { DEFAULT_TEXT, inherit, type TextContext, toColor, toPageSize, toSides } from "./style.ts";
+import {
+  DEFAULT_TEXT,
+  inherit,
+  type TextContext,
+  toColor,
+  toPageSize,
+  toSides,
+  useTheme,
+} from "./style.ts";
 import type { Child, LayoutNode, PageInfo, PageProps } from "./types.ts";
 
 export interface LayoutWarning {
@@ -108,7 +116,15 @@ function layoutPass(
     headingCount: 0,
     usesToc: false,
   };
-  const base = inherit(DEFAULT_TEXT, document.props);
+  // The theme's "body" style, if it has one, is the document's default text.
+  const theme = document.props.theme;
+  useTheme(theme);
+  const themed: TextContext = { ...DEFAULT_TEXT, theme };
+  const { theme: _theme, ...documentText } = document.props;
+  const base = inherit(
+    theme?.text?.body ? inherit(themed, { style: "body" }) : themed,
+    documentText,
+  );
 
   // Anything that is not a Page is put on a default page, so small documents need no ceremony.
   const sections: LayoutNode<"Page">[] = [];

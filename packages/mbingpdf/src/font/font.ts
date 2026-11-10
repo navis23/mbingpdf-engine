@@ -376,6 +376,17 @@ export class Font {
    */
   instance(style: Readonly<Record<string, number>> | string): Font {
     if (this.axes.length === 0) throw new RangeError("This is not a variable font");
+    // Every axis at its default is this font itself.
+    if (typeof style !== "string") {
+      for (const tag of Object.keys(style)) {
+        if (!this.axes.some((axis) => axis.tag === tag)) {
+          const known = this.axes.map((axis) => axis.tag).join(", ");
+          throw new RangeError(`Font has no "${tag}" axis; it has ${known}`);
+        }
+      }
+      if (this.axes.every((axis) => (style[axis.tag] ?? axis.default) === axis.default))
+        return this;
+    }
     // The same style asked for twice is the same font: otherwise a document that calls this
     // for every paragraph would embed the font once per paragraph.
     const key =

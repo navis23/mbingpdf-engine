@@ -5,12 +5,16 @@
 import type { Color, PdfImage } from "../core/index.ts";
 import type { Hyphenator, TextAlign, TextFont, TextTransform } from "../text/index.ts";
 import type { CanvasContext } from "./canvas.ts";
+import type { Theme, ThemeColorName, ThemeFontName, ThemeTextStyleName } from "./theme.ts";
 
 /** A size in points, or a percentage of the space available: `120` or `"50%"`. */
 export type Length = number | `${number}%`;
 
-/** A colour object from `rgb()`, `cmyk()` or `gray()`, or a hex string such as `"#0F62FE"`. */
-export type ColorInput = Color | string;
+/**
+ * A colour object from `rgb()`, `cmyk()`, `gray()` or `spot()`, a hex string such as
+ * `"#0F62FE"`, or the name of a colour in the document's theme.
+ */
+export type ColorInput = Color | `#${string}` | ThemeColorName;
 
 /**
  * Space on the four sides of a box: one number for all sides, `[vertical, horizontal]`,
@@ -50,8 +54,17 @@ export type Justify = "start" | "center" | "end" | "space-between" | "space-arou
 
 /** Text properties. Set on any element, they apply to all text inside it. */
 export interface TextProps {
-  /** A font, or a list to fall back through for characters the first one lacks. */
-  font?: TextFont | readonly TextFont[];
+  /** A named text style from the document's theme; other properties given here override it. */
+  style?: ThemeTextStyleName;
+  /**
+   * A font, a list to fall back through for characters the first one lacks, or the name of a
+   * font family in the theme.
+   */
+  font?: TextFont | readonly TextFont[] | ThemeFontName;
+  /** With a theme font family: the weight, 100–900. 400 is regular, 700 bold. */
+  weight?: number;
+  /** With a theme font family: use the italic. */
+  italic?: boolean;
   /** Font size in points. */
   size?: number;
   color?: ColorInput;
@@ -398,6 +411,8 @@ export interface PageProps extends Omit<TextProps, "size"> {
 }
 
 export interface DocumentProps extends TextProps {
+  /** Named fonts, colours and text styles for the whole document; see `defineTheme`. */
+  theme?: Theme;
   title?: string;
   author?: string;
   subject?: string;

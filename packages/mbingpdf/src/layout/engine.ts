@@ -998,6 +998,11 @@ const HEADING_SCALE = [2, 1.5, 1.25, 1.1, 1, 0.9];
 /** A heading is a paragraph with a default size; this is that paragraph. */
 function headingText(node: LayoutNode<"Heading">, context: TextContext): LayoutNode<"Text"> {
   const { level, bookmark: _bookmark, ...props } = node.props as HeadingProps;
+  // A theme that defines "h1" … "h6" styles its headings; otherwise they are just larger.
+  const themed = `h${level ?? 1}`;
+  if (props.style === undefined && context.theme?.text?.[themed]) {
+    return { type: "Text", props: { ...props, style: themed }, children: node.children };
+  }
   const scale = HEADING_SCALE[(level ?? 1) - 1] ?? 1;
   return {
     type: "Text",

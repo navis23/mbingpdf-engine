@@ -49,8 +49,10 @@
 | 46 | Long documents | `render()` writes each page to the file as soon as it is painted instead of holding every page's drawing list; documents with a table of contents are written again per layout pass. `layoutDocument()` still returns all pages | 2026-11-10 |
 | 47 | Font instances | `font.instance()` returns the same object for the same style, so asking for "Bold" in every paragraph embeds it once | 2026-11-10 |
 | 48 | Batch budget | 5,000 A5 bibs with fitted numerals and QR codes: under 60 s and 2.5 kB per bib as a test limit; measured about 10 s, 1.3 kB per bib and 300 MB of memory | 2026-11-10 |
+| 49 | Themes | `defineTheme({ fonts, colors, text })` passed as `Document({ theme })`. Names are used directly: `style: "h1"`, `color: "brand"`, `font: "body"` with `weight` and `italic`. Type checking of the names is opt-in through `declare module "mbingpdf" { interface Register { theme: typeof theme } }` | 2026-11-10 |
+| 50 | Theme conventions | The `body` text style is the document default; `h1`–`h6` style `Heading`. A style's `leading` (points) is kept as a ratio of the style's size. A font family is a variable font or a set of sources keyed by weight (`"400i"` for italic) | 2026-11-10 |
 
-Decisions 8–10 and 16–48 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
+Decisions 8–10 and 16–50 were made by the plan's author under delegated authority and can be revisited: 8 if a customer or regulator asks for archival or accessible files, 9 when a print shop names a different profile.
 
 ## Assumed until someone objects
 

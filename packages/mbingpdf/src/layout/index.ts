@@ -36,6 +36,13 @@ export {
   type RenderOptions,
   render,
 } from "./render.ts";
+export {
+  defineTheme,
+  type Register,
+  type Theme,
+  type ThemeFontFamily,
+  type ThemeTextStyle,
+} from "./theme.ts";
 export type {
   AbsoluteProps,
   Align,
