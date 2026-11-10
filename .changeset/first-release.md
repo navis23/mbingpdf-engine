@@ -14,10 +14,11 @@ First release.
 - Themes with `defineTheme`; JSX through `mbingpdf/jsx-runtime`.
 - SVG artwork used many times (a logo on every page) is stored once in the file.
 - Print: CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
+- `Barcode` (Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF), `BarChart`, `LineChart`, `PieChart`, and text on a `Canvas`; `mbingpdf/barcode` for barcode patterns alone.
 - Standards: PDF/A-2 and PDF/A-3 (levels b, u, a) and PDF/UA-1 through `conformance`; tagged PDF with `tagged: true`, with `alt`, `decorative` and `role` on elements.
 - Attached files with `Document({ attachments })`, and `facturX()` for Factur-X e-invoices.
 - Password protection with AES-256 and permissions through `encryption`.
 - SVG preview with `renderSvg` and `previewPages` from `mbingpdf/svg`.
 - `@mbingpdf/react` and `@mbingpdf/vue`: a `PdfPreview` component and `usePdf` for each framework.
-- Lower layers on their own: `mbingpdf/core`, `mbingpdf/font`, `mbingpdf/text`, `mbingpdf/image`, `mbingpdf/qr`.
+- Lower layers on their own: `mbingpdf/core`, `mbingpdf/font`, `mbingpdf/text`, `mbingpdf/image`, `mbingpdf/qr`, `mbingpdf/barcode`.
 - `@mbingpdf/dev`: the `mbingpdf` command. `mbingpdf dev file.tsx` shows a document in the browser and redraws it on every save; `mbingpdf build file.tsx` writes the PDF.

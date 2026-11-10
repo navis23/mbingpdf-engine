@@ -90,7 +90,7 @@ _Status: done except the manual check. PDF/A-2b, 2u, 2a and PDF/A-3b, 3u, 3a; ta
 
 ## M6 — Advanced
 
-_Status: not started_
+_Status: in progress. Done: barcodes (Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF, ITF-14) and the chart kit (bar, line, pie) with text on `Canvas`. The rest waits for demand._
 
 Order within this milestone follows user demand.
 

@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-11 04:40 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps · Branch: main_
+_Updated: 2026-11-11 05:20 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps; M6 started · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -78,7 +78,14 @@ M1 has just started; see `docs/05-roadmap.md`.
     - AES-256 encryption (`render(doc, { encryption })`; `src/core/crypto.ts`, `src/core/encryption.ts`);
     - veraPDF validates the samples at every level in `test/conformance.test.ts` (Docker image
       `verapdf/cli` or a local `verapdf`; required on the Node 24 CI job).
-22. Next: M6 in `docs/05-roadmap.md`, ordered by demand. Open follow-ups: long-table speed; a hyphen added
+22. M6, first items (the owner asked for these): barcodes and charts.
+    - `mbingpdf/barcode` (`src/barcode/index.ts`): Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF, ITF-14;
+      `Barcode` element in `src/layout/barcode.ts`;
+    - `BarChart`, `LineChart`, `PieChart` in `src/layout/charts.ts`, each a function returning a `Canvas`;
+    - `Canvas` text: `g.text()` and `g.measureText()` in `src/layout/canvas.ts`;
+    - the `charts` sample covers all of it in the golden images and runtime digests.
+23. Next: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
+    reading PDFs, HTML subset). Open follow-ups: long-table speed; a hyphen added
     by hyphenation is read as a real hyphen in tagged files; tagged output and encryption are not in the
     benchmarks.
 
@@ -104,10 +111,9 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: lint, typecheck, build, size and 491 tests green, except that the two speed assertions (5,000
-  bibs under 60 s, 1,000 rows under 5 s) failed on this laptop while another project was loading it; old and
-  new code timed the same side by side, and CI passes them. Runtime digests match on Node, Deno, Chromium
-  and in a Web Worker (10 samples).
+- Checks: lint, typecheck, build, size and 548 tests green. The two speed assertions (5,000 bibs under
+  60 s, 1,000 rows under 5 s) fail on this laptop when another project is loading it; they pass otherwise
+  and in CI. Runtime digests match on Node, Deno, Chromium and in a Web Worker (11 samples).
 - Published: not published.
 
 ## Gotchas / don't redo
@@ -134,6 +140,9 @@ things do need them, all part of the M4 exit:
   (`pdfinfo -struct-text`) shows them.
 - CI's gzip measures about 1 kB more than this machine's (145.1 against 144.1 kB for the root entry). Set
   size budgets from the CI figure with a few kB to spare, and look at CI before the next push.
+- Barcode tests decode with `zbarimg` and `ZXingReader` when installed (both are here; CI has zbar only).
+  Reference patterns typed from memory were wrong twice while the encoder was right: trust the scanners.
+- Chart colours must be resolved inside `draw`, not when the element is made: the theme is not active yet.
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 
 ## Resume checklist

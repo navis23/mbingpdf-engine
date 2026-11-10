@@ -19,7 +19,9 @@
     "report",
     "pdf-x",
     "svg",
-    "qr-code"
+    "qr-code",
+    "barcode",
+    "charts"
   ],
   "type": "module",
   "sideEffects": false,
@@ -73,6 +75,16 @@
       "require": {
         "types": "./dist/image/index.d.cts",
         "default": "./dist/image/index.cjs"
+      }
+    },
+    "./barcode": {
+      "import": {
+        "types": "./dist/barcode/index.d.ts",
+        "default": "./dist/barcode/index.js"
+      },
+      "require": {
+        "types": "./dist/barcode/index.d.cts",
+        "default": "./dist/barcode/index.cjs"
       }
     },
     "./qr": {

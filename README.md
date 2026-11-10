@@ -22,6 +22,7 @@ const pdf = await render(
 What works today:
 
 - **Documents** (`mbingpdf`) — rows and stacks with flexbox-style sizing, tables with repeated headers, lists, multi-column sections, grids, text with mixed styles and links, images, SVG artwork and QR codes as vectors, absolute positioning and free drawing. Content flows over pages with forced breaks, keep-together, keep-with-next and widow/orphan control; headers and footers know the page number and total; headings become bookmarks and a table of contents.
+- **Barcodes and charts** — Code 128, EAN-13, EAN-8, UPC-A, Code 39 and ITF as vectors (`mbingpdf/barcode` for the patterns alone); bar, line and pie charts; text on a `Canvas`.
 - **Themes** — fonts with weights, colours and text styles defined once with `defineTheme` and used by name.
 - **Print** — CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
 - **Standards** — PDF/A-2 and PDF/A-3 for archiving, and tagged PDF with PDF/UA-1 for accessibility: headings, lists, tables and figures become the file's structure. Checked with veraPDF in the tests.

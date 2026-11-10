@@ -33,3 +33,5 @@ Append-only. One short entry per working session; newest at the bottom.
   encryption with permissions. veraPDF validates the samples in the tests and on one CI job. Decisions:
   rows 66–74.
 - Next: M6, by demand; the owner's steps for M4 and the Acrobat checks are unchanged.
+- Later on 2026-11-11: M6 started with what the owner asked for first: barcodes (six symbologies, checked
+  by decoding with zbar and ZXing), bar, line and pie charts, and text on `Canvas`. Decisions: rows 75–77.

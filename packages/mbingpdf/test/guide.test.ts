@@ -6,7 +6,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
+  BarChart,
+  Barcode,
   Box,
+  Canvas,
   Cell,
   cmyk,
   Document,
@@ -16,12 +19,14 @@ import {
   hyphenateIndonesian,
   Image,
   inspect,
+  LineChart,
   Link,
   List,
   loadFont,
   mm,
   Page,
   PageBreak,
+  PieChart,
   QrCode,
   Row,
   render,
@@ -157,6 +162,47 @@ describe("quick start guide", () => {
     const text = (await extractText(await render(document)))[0] ?? [];
     expect(text).toEqual(
       expect.arrayContaining(["Description", "Bus", "Total", "Rp 3500000", "3. Third"]),
+    );
+  });
+
+  test("barcodes and charts", async () => {
+    const months = ["Jan", "Feb", "Mar"];
+    const lastYear = [3, 4, 5];
+    const thisYear = [4, 6, 9];
+    const document = Document(
+      { font: inter },
+      Page(
+        Barcode({ value: "BIB-0421" }),
+        Barcode({ type: "ean13", value: "899123456789" }),
+        BarChart({ labels: ["Jan", "Feb", "Mar"], values: [12, 19, 7], title: "Pesanan" }),
+        LineChart({
+          labels: months,
+          series: [
+            { name: "2025", values: lastYear },
+            { name: "2026", values: thisYear },
+          ],
+          format: (value) => `Rp ${value} jt`,
+        }),
+        PieChart({
+          data: [
+            { label: "Bus", value: 45 },
+            { label: "Minibus", value: 25 },
+          ],
+          donut: true,
+        }),
+        Canvas({
+          width: 100,
+          height: 20,
+          draw: (g) => {
+            g.text("label", 50, 10, { align: "center" });
+            expect(g.measureText("label")).toBeGreaterThan(10);
+          },
+        }),
+      ),
+    );
+    const text = (await extractText(await render(document)))[0] ?? [];
+    expect(text).toEqual(
+      expect.arrayContaining(["BIB-0421", "8991234567891", "Pesanan", "Rp 10 jt", "64%", "label"]),
     );
   });
 

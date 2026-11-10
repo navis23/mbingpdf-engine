@@ -89,6 +89,27 @@ Svg({ src: svgMarkup, width: 120 });                  // drawn as vectors, sharp
 QrCode({ value: "https://example.com/t/0421", size: mm(25) });
 ```
 
+## Barcodes and charts
+
+```ts
+import { Barcode, BarChart, LineChart, PieChart } from "mbingpdf";
+
+Barcode({ value: "BIB-0421" });                                  // Code 128: any plain text
+Barcode({ type: "ean13", value: "899123456789" });               // the check digit is added
+
+BarChart({ labels: ["Jan", "Feb", "Mar"], values: [12, 19, 7], title: "Pesanan" });
+LineChart({
+  labels: months,
+  series: [{ name: "2025", values: lastYear }, { name: "2026", values: thisYear }],
+  format: (value) => `Rp ${value} jt`,
+});
+PieChart({ data: [{ label: "Bus", value: 45 }, { label: "Minibus", value: 25 }], donut: true });
+```
+
+Both are vector drawings in the document's own font. A chart is as wide as its container and 180 points tall unless told otherwise; in a `Row`, give each chart `grow: 1, basis: 0` to share the width. A barcode is as wide as its bars need: a value the code cannot hold is an error when the element is made, not a label that will not scan.
+
+For a drawing of your own, `Canvas` has the same tools the charts use, including text: `g.text("label", x, y, { align: "center" })` and `g.measureText("label")`.
+
 ## Tables and lists
 
 ```ts

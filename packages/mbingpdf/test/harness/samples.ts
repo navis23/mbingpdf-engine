@@ -1042,6 +1042,155 @@ const invoice: Sample = {
   },
 };
 
+/** Every kind of chart and barcode on one page. */
+const charts: Sample = {
+  text: [
+    [
+      "Pesanan",
+      "Rp 30 jt",
+      "Jakarta Selatan",
+      "-8",
+      "2026",
+      "45%",
+      "Belum",
+      "BIB-0421",
+      "8991234567891",
+      "MBING-42",
+      "tengah",
+      "miring",
+    ],
+  ],
+  build(env, options) {
+    const d = env.doc;
+    const inter = new d.Font(env.fonts["Inter-Variable"]);
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "Mei",
+      "Jun",
+      "Jul",
+      "Agu",
+      "Sep",
+      "Okt",
+      "Nov",
+      "Des",
+    ];
+    const bus = [12, 19, 7, 15, 22, 30, 28, 35, 31, 24, 18, 26];
+    const minibus = [8, 11, 14, 9, 17, 21, 25, 22, 27, 30, 26, 33];
+    const half = { grow: 1, basis: 0, height: 150 } as const;
+    const document = d.Document(
+      { title: "Charts and barcodes", lang: "id", font: inter, size: 10 },
+      d.Page(
+        { size: "A4", margin: 36, gap: 12 },
+        d.Row(
+          { gap: 16 },
+          d.BarChart({
+            ...half,
+            labels: months.slice(0, 6),
+            values: bus.slice(0, 6),
+            title: "Pesanan",
+            valueLabels: true,
+          }),
+          d.BarChart({
+            ...half,
+            labels: months.slice(0, 6),
+            series: [
+              { name: "Bus", values: bus.slice(0, 6) },
+              { name: "Minibus", values: minibus.slice(0, 6) },
+            ],
+            format: (value) => `Rp ${value} jt`,
+          }),
+        ),
+        d.Row(
+          { gap: 16 },
+          d.BarChart({
+            ...half,
+            stacked: true,
+            valueLabels: true,
+            labels: months,
+            series: [
+              { name: "Bus", values: bus },
+              { name: "Minibus", values: minibus },
+            ],
+          }),
+          d.BarChart({
+            ...half,
+            horizontal: true,
+            valueLabels: true,
+            labels: ["Bandung", "Jakarta Selatan", "Yogyakarta"],
+            values: [42, -8, 27],
+          }),
+        ),
+        d.Row(
+          { gap: 16 },
+          d.LineChart({
+            ...half,
+            labels: months,
+            series: [
+              { name: "2025", values: bus },
+              { name: "2026", values: [...minibus.slice(0, 8), null, null, 20, 25] },
+            ],
+          }),
+          d.LineChart({
+            ...half,
+            labels: months,
+            values: bus,
+            area: true,
+            smooth: true,
+            points: false,
+          }),
+        ),
+        d.Row(
+          { gap: 16, align: "center" },
+          d.PieChart({
+            ...half,
+            data: [
+              { label: "Bus", value: 45 },
+              { label: "Minibus", value: 25 },
+              { label: "Sedan", value: 18 },
+              { label: "Motor", value: 9 },
+              { label: "Lain", value: 3 },
+            ],
+          }),
+          d.PieChart({
+            ...half,
+            donut: true,
+            valueLabels: "value",
+            data: [
+              { label: "Lunas", value: 72 },
+              { label: "Belum", value: 28, color: d.cmyk(0, 0.3, 0.9, 0) },
+            ],
+          }),
+          d.Stack(
+            { gap: 6, align: "center" },
+            d.Barcode({ value: "BIB-0421" }),
+            d.Barcode({ type: "ean13", value: "899123456789", barHeight: 24 }),
+            d.Barcode({ type: "code39", value: "MBING-42", moduleWidth: 0.8, barHeight: 24 }),
+          ),
+        ),
+        d.Canvas({
+          width: "100%",
+          height: 30,
+          alt: "Tulisan di kanvas",
+          draw: (g, size) => {
+            g.text("kiri", 0, 15, { baseline: "middle" });
+            g.text("tengah", size.width / 2, 15, { align: "center", baseline: "middle", size: 14 });
+            g.text("kanan", size.width, 15, {
+              align: "right",
+              baseline: "middle",
+              color: "#B91C1C",
+            });
+            g.text("miring", size.width * 0.75, 15, { rotate: -20, size: 8 });
+          },
+        }),
+      ),
+    );
+    return d.render.sync(document, { deterministic: true, ...options });
+  },
+};
+
 /** The invoice again, archived and accessible: tagged, PDF/A-2a and PDF/UA-1. */
 const accessible: Sample = {
   text: invoice.text,
@@ -1054,6 +1203,7 @@ export const samples: Readonly<Record<string, Sample>> = {
   tour,
   invoice,
   accessible,
+  charts,
   certificate,
   agreement,
   shapes,

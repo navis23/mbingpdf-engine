@@ -1,7 +1,18 @@
 /**
  * The document level: elements, layout with pagination, and rendering.
  */
-export { CanvasContext, type CanvasStroke } from "./canvas.ts";
+export { Barcode, type BarcodeProps } from "./barcode.ts";
+export { CanvasContext, type CanvasStroke, type CanvasText } from "./canvas.ts";
+export {
+  BarChart,
+  type BarChartProps,
+  type ChartSeries,
+  LineChart,
+  type LineChartProps,
+  PieChart,
+  type PieChartProps,
+  type PieSlice,
+} from "./charts.ts";
 export type {
   DisplayItem,
   DisplayPage,

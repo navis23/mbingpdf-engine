@@ -15,7 +15,7 @@ import {
   normalize,
   type TocEntry,
 } from "./engine.ts";
-import { paintBox } from "./paint.ts";
+import { paintBox, shiftItems } from "./paint.ts";
 import { writeDisplayPage } from "./pdf.ts";
 import {
   DEFAULT_TEXT,
@@ -493,52 +493,6 @@ export function inspect(document: LayoutNode): { page: number; boxes: InspectedB
     toc = result.headings;
   }
   return pages;
-}
-
-/** Moves display items by an offset. */
-function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): DisplayItem[] {
-  if (dx === 0 && dy === 0) return [...items];
-  return items.map((item): DisplayItem => {
-    switch (item.type) {
-      case "path":
-        return {
-          ...item,
-          commands: item.commands.map((command) => {
-            if (command[0] === "Z") return command;
-            if (command[0] === "R")
-              return ["R", command[1] + dx, command[2] + dy, command[3], command[4]];
-            const moved: (string | number)[] = [command[0]];
-            for (let i = 1; i < command.length; i += 2) {
-              moved.push((command[i] as number) + dx, (command[i + 1] as number) + dy);
-            }
-            return moved as unknown as (typeof item.commands)[number];
-          }),
-        };
-      case "shared":
-        return { ...item, x: item.x + dx, y: item.y + dy };
-      case "tagged":
-        return { ...item, items: shiftItems(item.items, dx, dy) };
-      case "group":
-        return {
-          ...item,
-          ...(item.rotate
-            ? { rotate: { ...item.rotate, cx: item.rotate.cx + dx, cy: item.rotate.cy + dy } }
-            : {}),
-          items: shiftItems(item.items, dx, dy),
-        };
-      case "image":
-        return {
-          ...item,
-          x: item.x + dx,
-          y: item.y + dy,
-          ...(item.clip
-            ? { clip: { ...item.clip, x: item.clip.x + dx, y: item.clip.y + dy } }
-            : {}),
-        };
-      default:
-        return { ...item, x: item.x + dx, y: item.y + dy };
-    }
-  });
 }
 
 /** Lays out a document and writes it as a PDF file. */

@@ -121,7 +121,20 @@ A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is f
 | `Image({ src })` | JPEG or PNG bytes. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
 | `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks. The same artwork used many times (a logo on every page) is stored once in the file |
 | `QrCode({ value })` | `size` (default 72), `level`: `"L"`, `"M"`, `"Q"`, `"H"`; `quiet` (default 4 modules); `color` |
-| `Canvas({ width, height, draw })` | `draw(g, { width, height })` with `g.rect`, `roundedRect`, `circle`, `ellipse`, `line`, `moveTo`, `lineTo`, `curveTo`, `closePath`, then `fill(color)`, `stroke({ color, width, dash, cap, join })` or `fillAndStroke(color, stroke)` |
+| `Barcode({ value })` | `type`: `"code128"` (default; any ASCII text), `"ean13"`, `"ean8"`, `"upca"`, `"code39"`, `"itf"`, `"itf14"`. `moduleWidth` (narrowest bar, default 1), `barHeight` (default 36), `showText` (default true), `textSize`, `quiet` (margin in modules, default 10), `color`. Check digits are added when left out and refused when wrong |
+| `Canvas({ width, height, draw })` | `draw(g, { width, height })` with `g.rect`, `roundedRect`, `circle`, `ellipse`, `line`, `moveTo`, `lineTo`, `curveTo`, `closePath`, then `fill(color)`, `stroke({ color, width, dash, cap, join })` or `fillAndStroke(color, stroke)`. Text: `g.text(text, x, y, { size, color, font, align, baseline, rotate })` draws one line; `g.measureText(text, { size, font })` gives its width |
+
+## Charts
+
+Each chart is a `Canvas` that draws itself, and takes the box properties of any element.
+
+| Element | Notes |
+| --- | --- |
+| `BarChart({ labels, values })` | Or `series: [{ name, values, color }]` for several sets of bars. `stacked`, `horizontal` |
+| `LineChart({ labels, values })` | Or `series`. `area`, `smooth`, `points` (default true). A `null` value leaves a gap |
+| `PieChart({ data })` | `data: [{ label, value, color }]`. `donut` (true, or the hole's share of the radius), `valueLabels`: `"percent"` (default), `"value"` or `false` |
+
+Shared: `width` (default `"100%"`), `height` (default 180), `title`, `colors` (the palette; the default stays distinct for colour-blind readers), `legend`, `labelSize` (default 8), `format` (how a value is written). Bar and line charts also take `min`, `max`, `grid` and `valueLabels`. The value axis starts at zero unless the data goes below it or `min` says otherwise. In a tagged PDF a chart is a figure described by its `title`; give it an `alt` that says what the chart shows.
 
 ## Rendering
 

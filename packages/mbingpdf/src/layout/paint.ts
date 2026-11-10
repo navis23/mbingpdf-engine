@@ -21,23 +21,49 @@ function sameSide(
   );
 }
 
-/** Shifts every coordinate a canvas callback records, so it draws where its box is. */
-function translate(items: DisplayItem[], dx: number, dy: number): DisplayItem[] {
-  return items.map((item) => {
-    if (item.type !== "path") return item;
-    return {
-      ...item,
-      commands: item.commands.map((command) => {
-        if (command[0] === "Z") return command;
-        if (command[0] === "R")
-          return ["R", command[1] + dx, command[2] + dy, command[3], command[4]];
-        const shifted: (string | number)[] = [command[0]];
-        for (let i = 1; i < command.length; i += 2) {
-          shifted.push((command[i] as number) + dx, (command[i + 1] as number) + dy);
-        }
-        return shifted as unknown as PathCommand;
-      }),
-    };
+/** Moves display items by an offset. */
+export function shiftItems(items: readonly DisplayItem[], dx: number, dy: number): DisplayItem[] {
+  if (dx === 0 && dy === 0) return [...items];
+  return items.map((item): DisplayItem => {
+    switch (item.type) {
+      case "path":
+        return {
+          ...item,
+          commands: item.commands.map((command) => {
+            if (command[0] === "Z") return command;
+            if (command[0] === "R")
+              return ["R", command[1] + dx, command[2] + dy, command[3], command[4]];
+            const moved: (string | number)[] = [command[0]];
+            for (let i = 1; i < command.length; i += 2) {
+              moved.push((command[i] as number) + dx, (command[i + 1] as number) + dy);
+            }
+            return moved as unknown as (typeof item.commands)[number];
+          }),
+        };
+      case "shared":
+        return { ...item, x: item.x + dx, y: item.y + dy };
+      case "tagged":
+        return { ...item, items: shiftItems(item.items, dx, dy) };
+      case "group":
+        return {
+          ...item,
+          ...(item.rotate
+            ? { rotate: { ...item.rotate, cx: item.rotate.cx + dx, cy: item.rotate.cy + dy } }
+            : {}),
+          items: shiftItems(item.items, dx, dy),
+        };
+      case "image":
+        return {
+          ...item,
+          x: item.x + dx,
+          y: item.y + dy,
+          ...(item.clip
+            ? { clip: { ...item.clip, x: item.clip.x + dx, y: item.clip.y + dy } }
+            : {}),
+        };
+      default:
+        return { ...item, x: item.x + dx, y: item.y + dy };
+    }
   });
 }
 
@@ -244,11 +270,14 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
   if (box.canvas) {
     const canvas = box.canvas;
     const drawn: DisplayItem[] = [];
-    canvas.draw(new CanvasContext(drawn, canvas.color), {
-      width: canvas.width,
-      height: canvas.height,
-    });
-    target.push(...translate(drawn, x + canvas.x, y + canvas.y));
+    canvas.draw(
+      new CanvasContext(drawn, canvas.color, { fonts: canvas.fonts, size: canvas.size }),
+      {
+        width: canvas.width,
+        height: canvas.height,
+      },
+    );
+    target.push(...shiftItems(drawn, x + canvas.x, y + canvas.y));
   }
 
   if (box.vector) {

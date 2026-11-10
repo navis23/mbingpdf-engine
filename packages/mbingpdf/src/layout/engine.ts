@@ -12,6 +12,7 @@ import {
   type InlineSpan,
   layoutSpans,
   type ParagraphLayout,
+  type TextFont,
   type TextLine,
 } from "../text/index.ts";
 import type { CanvasContext } from "./canvas.ts";
@@ -80,6 +81,9 @@ export interface Box {
   canvas?: {
     draw: CanvasProps["draw"];
     color: Color;
+    /** The fonts and size that text drawn on the canvas starts from. */
+    fonts: readonly TextFont[];
+    size: number;
     x: number;
     y: number;
     width: number;
@@ -1024,7 +1028,7 @@ function layoutCanvas(node: LayoutNode<"Canvas">, context: TextContext, area: Ar
     children: [],
     canvas: {
       draw: props.draw,
-      color: inherit(context, props).color,
+      ...canvasText(inherit(context, props)),
       x: decoration.inset.left,
       y: decoration.inset.top,
       width: Math.max(0, width - decoration.inset.left - decoration.inset.right),
@@ -1033,6 +1037,21 @@ function layoutCanvas(node: LayoutNode<"Canvas">, context: TextContext, area: Ar
   };
   decorate(box, node, decoration, { top: false, bottom: false });
   return { box };
+}
+
+/** What a canvas inherits from the text around it: colour, fonts and size. */
+function canvasText(context: TextContext): {
+  color: Color;
+  fonts: readonly TextFont[];
+  size: number;
+} {
+  return {
+    color: context.color,
+    fonts: Array.isArray(context.font)
+      ? (context.font as readonly TextFont[])
+      : [context.font as TextFont],
+    size: context.size,
+  };
 }
 
 /** Font size of each heading level, as a multiple of the surrounding text size. */
@@ -1424,7 +1443,8 @@ function layoutQrCode(node: LayoutNode<"QrCode">, context: TextContext, area: Ar
         }
         g.fill();
       },
-      color: props.color === undefined ? inherit(context, props).color : toColor(props.color),
+      ...canvasText(inherit(context, props)),
+      ...(props.color === undefined ? {} : { color: toColor(props.color) }),
       x: decoration.inset.left,
       y: decoration.inset.top,
       width: size,

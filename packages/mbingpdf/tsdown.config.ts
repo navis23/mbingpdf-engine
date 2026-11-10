@@ -5,6 +5,7 @@ const config: UserConfig = defineConfig({
     index: "src/index.ts",
     "jsx-runtime": "src/jsx-runtime.ts",
     "jsx-dev-runtime": "src/jsx-dev-runtime.ts",
+    "barcode/index": "src/barcode/index.ts",
     "core/index": "src/core/index.ts",
     "font/index": "src/font/index.ts",
     "image/index": "src/image/index.ts",
