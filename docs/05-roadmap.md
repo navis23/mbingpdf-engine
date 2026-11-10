@@ -19,7 +19,7 @@ Repository, toolchain and a valid PDF.
 
 ## M1 — Fonts and text
 
-_Status: in progress — done: TrueType parsing, subsetting, CID embedding with `ToUnicode`, shaping (checked against HarfBuzz), variable-font instancing, line breaking and grapheme clusters (Unicode conformance tests pass), paragraph layout with alignment, justification, letter and word spacing, case transforms, fit-to-width, hyphenation for English and Indonesian, and font fallback. Still to do: OpenType/CFF outlines, WOFF2, and the exit test (Acrobat copy check; subset size against HarfBuzz)_
+_Status: in progress — done: TrueType parsing, subsetting, CID embedding with `ToUnicode`, shaping (checked against HarfBuzz), variable-font instancing, line breaking and grapheme clusters (Unicode conformance tests pass), paragraph layout with alignment, justification, letter and word spacing, case transforms, fit-to-width, hyphenation for English and Indonesian, and font fallback. WOFF2 decoding is done too, and subsets are within 10% of HarfBuzz's (tested). Still to do: OpenType/CFF outlines, and the manual half of the exit test (copying text out of Acrobat)_
 
 - TrueType and OpenType/CFF parsing, WOFF2 decoding, variable-font instancing.
 - Glyph subsetting, CID font embedding, `ToUnicode` maps.

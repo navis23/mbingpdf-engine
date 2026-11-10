@@ -21,6 +21,7 @@ import {
   roundDelta,
   type VariationAxis,
 } from "./variations.ts";
+import { unwrapFont } from "./woff2.ts";
 
 /** The result of {@link TrueTypeFont.subset}. */
 export interface FontSubset {
@@ -144,6 +145,18 @@ function parseCmap(table: Uint8Array): Map<number, number> {
     }
   }
   return map;
+}
+
+/**
+ * Loads a font from the bytes of a `.ttf`, `.otf` or `.woff2` file. WOFF2 is decompressed with
+ * the runtime's own Brotli decoder, which is why this is asynchronous; for the other formats
+ * `new TrueTypeFont(bytes)` does the same without the wait.
+ */
+export async function loadFont(
+  data: Uint8Array,
+  variation?: Readonly<Record<string, number>>,
+): Promise<TrueTypeFont> {
+  return new TrueTypeFont(await unwrapFont(data), variation);
 }
 
 /**

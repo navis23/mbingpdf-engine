@@ -20,8 +20,11 @@ export function parseSfnt(input: Uint8Array): Sfnt {
   else if (version === "ttcf") throw new Error("Font collections (.ttc) are not supported yet");
   else if (version === "wOFF")
     throw new Error("WOFF 1 fonts are not supported; use TTF, OTF or WOFF2");
-  else if (version === "wOF2") throw new Error("WOFF2 fonts are not supported yet");
-  else throw new Error("Not a font: unrecognised file signature");
+  else if (version === "wOF2") {
+    throw new Error(
+      "This is a WOFF2 font: load it with loadFont(), or decode it with decodeWoff2() first",
+    );
+  } else throw new Error("Not a font: unrecognised file signature");
 
   const count = reader.u16();
   reader.skip(6);
@@ -55,8 +58,15 @@ function checksum(data: Uint8Array): number {
   return (sum + last) >>> 0;
 }
 
-/** Assembles tables into a TrueType file with correct checksums. */
-export function buildSfnt(tables: ReadonlyMap<string, Uint8Array>): Uint8Array {
+/**
+ * Assembles tables into a font file with correct checksums.
+ *
+ * @param version the first four bytes: `0x00010000` for TrueType outlines, `OTTO` for CFF
+ */
+export function buildSfnt(
+  tables: ReadonlyMap<string, Uint8Array>,
+  version = 0x00010000,
+): Uint8Array {
   const tags = [...tables.keys()].sort();
   const count = tags.length;
   const entrySelector = Math.floor(Math.log2(count));

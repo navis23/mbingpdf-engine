@@ -27,12 +27,12 @@ M1 has just started; see `docs/05-roadmap.md`.
    test corpus. Not covered: GSUB type 8, GPOS cursive, device/variation deltas, fallback mark placement.
 5. ~~Variable-font instancing~~ done (`font.instance({ wght: 700 })` or `font.instance("Bold")`;
    `src/font/variations.ts`, `gvar.ts`, `glyf.ts`). Instances are written unhinted (no `cvar` support).
-6. WOFF2 decoding (needs a Brotli decoder; decide how before starting).
+6. ~~WOFF2 decoding~~ done (`src/font/woff2.ts`, `loadFont()`); Brotli comes from the runtime (row 24).
 7. ~~Line breaking, justification, fit-to-width, hyphenation, fallback~~ done (`src/text/`, exported as
    `mbingpdf/text`): `layoutParagraph`, `drawParagraph`, `fitText`, `lineBreaks`, `graphemes`,
    `hyphenateEnglish`, `hyphenateIndonesian`.
-8. M1 exit test: compare subset size with `hb-subset` (wasm is in `harfbuzzjs`); the Acrobat copy check is
-   manual.
+8. ~~M1 exit test, automated half~~ done: subsets within 10% of `hb-subset`. The Acrobat copy check is manual
+   and still open; text extraction is checked with pdf.js meanwhile.
 9. Then M2 (layout and pagination): document tree, box model, flex, fragmentation across pages.
 
 ## Waiting on the owner
