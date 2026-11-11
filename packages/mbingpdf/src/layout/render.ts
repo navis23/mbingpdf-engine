@@ -5,7 +5,9 @@ import {
   orientedSize,
   PdfDocument,
   type PdfEncryptionOptions,
+  type PdfImage,
 } from "../core/index.ts";
+import { shrinkImage } from "../image/index.ts";
 import type { DisplayItem, DisplayPage } from "./display.ts";
 import {
   type Box,
@@ -59,6 +61,14 @@ export interface RenderOptions {
   outputIntent?: OutputIntent;
   /** Warn about images that would print below this resolution, such as 300. */
   minImageDpi?: number;
+  /**
+   * Store an image with far more pixels than it needs at this resolution (more than twice as
+   * many) at this resolution instead, such as 300 for print or 150 for the screen: a large
+   * upload drawn as a small logo then adds a few kilobytes, not hundreds. The picture is
+   * averaged down; one drawn at several sizes keeps enough for the largest. JPEG files are
+   * embedded as they are, whatever their size.
+   */
+  maxImageDpi?: number;
   /**
    * Make a tagged PDF: the file carries the document's structure (headings, paragraphs,
    * lists, tables, figures) and reading order, for screen readers and for text that reflows.
@@ -138,6 +148,9 @@ function layoutPass(
   document: LayoutNode,
   options: {
     minImageDpi?: number;
+    maxImageDpi?: number;
+    /** The smaller copies made so far of each image, kept from one pass to the next. */
+    shrunk?: Map<PdfImage, PdfImage[]>;
     debug?: boolean;
     tagged?: boolean;
     onBoxes?: (page: number, boxes: InspectedBox[]) => void;
@@ -402,6 +415,48 @@ function layoutPass(
     visit(list, pageNumber);
   };
 
+  // An image with far more pixels than its place on the page can show is stored smaller.
+  const maxDpi = options.maxImageDpi;
+  const shrunk = options.shrunk ?? new Map<PdfImage, PdfImage[]>();
+  const fitResolution = (list: readonly DisplayItem[]): readonly DisplayItem[] => {
+    if (maxDpi === undefined || !(maxDpi > 0)) return list;
+    let changed = false;
+    const out = list.map((item): DisplayItem => {
+      if (item.type === "group" || item.type === "tagged") {
+        const items = fitResolution(item.items);
+        if (items === item.items) return item;
+        changed = true;
+        return { ...item, items };
+      }
+      if (item.type !== "image") return item;
+      const size = orientedSize(item.image);
+      const scale = Math.max(
+        (item.width * maxDpi) / 72 / size.width,
+        (item.height * maxDpi) / 72 / size.height,
+      );
+      const width = Math.ceil(item.image.width * scale);
+      const height = Math.ceil(item.image.height * scale);
+      if (!(width * height * 2 <= item.image.width * item.image.height)) return item;
+      let copies = shrunk.get(item.image);
+      if (!copies) {
+        copies = [];
+        shrunk.set(item.image, copies);
+      }
+      // The smallest copy that is large enough, so the same document always gives the same file.
+      let image = copies
+        .filter((copy) => copy.width >= width && copy.height >= height)
+        .sort((a, b) => a.width - b.width)[0];
+      if (!image) {
+        image = shrinkImage(item.image, width, height);
+        if (image === item.image) return item;
+        copies.push(image);
+      }
+      changed = true;
+      return { ...item, image };
+    });
+    return changed ? out : list;
+  };
+
   const headings: TocEntry[] = [];
   const collectHeadings = (list: readonly DisplayItem[], pageNumber: number): void => {
     for (const item of list) {
@@ -416,9 +471,11 @@ function layoutPass(
   // so a long document never holds more than one page of drawing instructions.
   const pages: DisplayPage[] = [];
   planned.forEach((plan, index) => {
-    const page = buildPage(plan, index);
+    let page = buildPage(plan, index);
     plan.body = undefined;
     checkResolution(page.items, index + 1);
+    const items = fitResolution(page.items);
+    if (items !== page.items) page = { ...page, items };
     collectHeadings(page.items, index + 1);
     if (consume) consume(page);
     else pages.push(page);
@@ -534,6 +591,9 @@ function renderSync(document: LayoutNode, options: RenderOptions = {}): Uint8Arr
     );
   const layoutOptions = {
     ...(options.minImageDpi !== undefined ? { minImageDpi: options.minImageDpi } : {}),
+    ...(options.maxImageDpi !== undefined
+      ? { maxImageDpi: options.maxImageDpi, shrunk: new Map<PdfImage, PdfImage[]>() }
+      : {}),
     ...(options.debug ? { debug: true } : {}),
     ...(tagged ? { tagged: true } : {}),
   };

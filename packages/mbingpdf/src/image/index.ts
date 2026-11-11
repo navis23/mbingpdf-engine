@@ -7,6 +7,7 @@ import { decodePng, isPng } from "./png.ts";
 
 export { decodeJpeg, isJpeg } from "./jpeg.ts";
 export { decodePng, isPng } from "./png.ts";
+export { shrinkImage } from "./resize.ts";
 
 /** The name of an image format this library does not read itself, from a file's first bytes. */
 function foreignFormat(data: Uint8Array): string | undefined {

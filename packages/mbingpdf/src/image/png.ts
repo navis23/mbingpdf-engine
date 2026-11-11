@@ -18,7 +18,7 @@ const VALID_DEPTHS: Record<number, readonly number[]> = {
 };
 
 /** Reverses PNG row filtering in place and returns the rows without their filter bytes. */
-function unfilter(
+export function unfilter(
   data: Uint8Array,
   rowBytes: number,
   rows: number,

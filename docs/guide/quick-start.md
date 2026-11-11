@@ -94,6 +94,8 @@ Svg({ src: svgMarkup, width: 120 });                  // drawn as vectors, sharp
 QrCode({ value: "https://example.com/t/0421", size: mm(25) });
 ```
 
+A large image drawn small makes a large file. `render(document, { maxImageDpi: 300 })` stores PNG and WebP images at the size they are drawn.
+
 ## Barcodes and charts
 
 ```ts

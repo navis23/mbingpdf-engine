@@ -146,7 +146,7 @@ Shared: `width` (default `"100%"`), `height` (default 180), `title`, `colors` (t
 | `renderSvg(document)` from `mbingpdf/svg` | `string[]`, one SVG per page |
 | `inspect(document)` | every box on every page, as plain data |
 
-Options: `deterministic`, `compress`, `onWarning`, `strict`, `debug`, `minImageDpi`, `tagged`, `conformance`, `outputIntent: { profile, identifier }`, `encryption: { userPassword, ownerPassword, permissions }`.
+Options: `deterministic`, `compress`, `onWarning`, `strict`, `debug`, `minImageDpi`, `maxImageDpi`, `tagged`, `conformance`, `outputIntent: { profile, identifier }`, `encryption: { userPassword, ownerPassword, permissions }`.
 
 `permissions` (all allowed unless set to `false`): `print` (or `"low"` for a degraded print only), `modify`, `copy`, `annotate`, `fillForms`, `assemble`.
 
