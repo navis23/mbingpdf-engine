@@ -2,7 +2,11 @@
 
 mbingpdf turns a description of a document into a PDF. You say what is on the page; it works out where everything goes, including where pages break. It runs the same in a browser, on Node, Bun and Deno, and in a Web Worker.
 
-> The package is not on npm yet. Until it is, install it from this repository.
+```sh
+npm install mbingpdf
+```
+
+Node 22 or later on a server; any current browser. No dependencies.
 
 ## A first document
 

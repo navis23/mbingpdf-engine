@@ -7,7 +7,7 @@ the document API: `Document`, `Page`, `Stack`, `Row`, `Box`, `Text`, `Span`, `Li
 `Spacer`, `Absolute`, `Canvas`, `PageBreak` and `render()`. Underneath are `mbingpdf/core` (PDF writer),
 `mbingpdf/font` (TrueType, CFF, WOFF2, shaping, variable fonts), `mbingpdf/text` (line breaking, hyphenation,
 paragraphs) and `mbingpdf/image` (JPEG, PNG). Output is byte-identical on Node, Bun, Deno and Chromium.
-Nothing is published to npm.
+Version 0.1.0 is prepared; the owner publishes it by running the Release workflow.
 
 ## Done this session
 - Toolchain: pnpm workspace, TypeScript 7 strict + `isolatedDeclarations`, tsdown (ESM + CJS), Vitest, Biome,
@@ -94,8 +94,9 @@ M1 has just started; see `docs/05-roadmap.md`.
     Second round (decision 84): a fixed-height stack no longer splits when its content is slightly too
     tall; preview text includes pictures' `alt`.
 24. Publishing: the owner has created the npm organisation and added `NPM_TOKEN`; a dry run of the Release
-    workflow passed. Left: `pnpm changeset version`, remove the "not on npm yet" lines, push, then the owner
-    runs Release with dry-run off.
+    workflow passed. Versions are set to 0.1.0 with changelogs (`pnpm changeset version` consumed the
+    changeset). Left: the owner runs Release with dry-run off; then tag `v0.1.0` and check an install from
+    npm. For the next release: add a changeset (`pnpm changeset`), then version, then Release.
 25. Next after that: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
     reading PDFs, HTML subset). Open follow-ups: long-table speed; a hyphen added
     by hyphenation is read as a real hyphen in tagged files; tagged output and encryption are not in the
@@ -126,7 +127,7 @@ things do need them, all part of the M4 exit:
 - Checks: lint, typecheck, build, size and 565 tests green. The two speed assertions (5,000 bibs under
   60 s, 1,000 rows under 5 s) fail on this laptop when another project is loading it; they pass otherwise
   and in CI. Runtime digests match on Node, Deno, Chromium and in a Web Worker (11 samples).
-- Published: not published.
+- Published: 0.1.0 prepared, not yet published (check `npm view mbingpdf version`).
 
 ## Gotchas / don't redo
 - The repo is public; the two reference apps are private. Keep their details generic in committed files.

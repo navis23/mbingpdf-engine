@@ -1,6 +1,6 @@
 {
   "name": "@mbingpdf/react",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "React components and hooks for previewing and downloading mbingpdf documents.",
   "license": "MIT",
   "author": "Navis Zarkasy",
@@ -20,7 +20,8 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -2,7 +2,11 @@
 
 A TypeScript library for generating production-grade PDF documents in any JavaScript runtime: browsers, Node, Bun, Deno and edge functions.
 
-**Status: early development.** Nothing is published to npm yet, and the API may still change.
+**Status: 0.1, early.** On npm as [`mbingpdf`](https://www.npmjs.com/package/mbingpdf). The API may still change before 1.0; changes are listed in each package's `CHANGELOG.md`.
+
+```sh
+npm install mbingpdf
+```
 
 ```ts
 import { Document, Page, Row, Stack, Text, Image, render, mm } from "mbingpdf";
@@ -33,7 +37,7 @@ What works today:
 - **Images** (`mbingpdf/image`) — JPEG and PNG, embedded without re-encoding where possible.
 - **The PDF writer** (`mbingpdf/core`) — pages, vector graphics, RGB and CMYK colour, opacity, print boxes, the 14 standard fonts.
 
-[`@mbingpdf/dev`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/dev) adds a preview server that redraws a document on every save. The first npm release comes next.
+[`@mbingpdf/dev`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/dev) adds a preview server that redraws a document on every save.
 
 ## Documentation
 

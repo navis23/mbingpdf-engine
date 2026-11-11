@@ -11,10 +11,10 @@ npm install mbingpdf                    # the library; no dependencies
 npm install @mbingpdf/react             # or @mbingpdf/vue: the on-screen preview
 ```
 
-To try a build that is not on npm yet, install the packed files instead. Copy them into the app's repository first (a `vendor/` folder): a path outside the repository ends up in the lockfile, where CI and teammates cannot follow it. Install all of them in one command, so the preview package finds the library it depends on:
+To try a build that is not on npm (a fix that is not released yet), install packed files instead: `pnpm pack` in each package of the library's repository makes them. Copy them into the app's repository first (a `vendor/` folder): a path outside the repository ends up in the lockfile, where CI and teammates cannot follow it. Install all of them in one command, so the preview package finds the library it depends on:
 
 ```sh
-pnpm add ./vendor/mbingpdf-0.0.0.tgz ./vendor/mbingpdf-react-0.0.0.tgz
+pnpm add ./vendor/mbingpdf-0.1.0.tgz ./vendor/mbingpdf-react-0.1.0.tgz
 ```
 
 Needs Node 22 or later on a server; any current browser.
