@@ -42,3 +42,13 @@ Append-only. One short entry per working session; newest at the bottom.
 - 2026-11-11: version 0.1.0 published to npm by the owner through the Release workflow (the first try failed
   on a token without the bypass-2FA setting; nothing was published by it). Tagged `v0.1.0`.
 - 2026-11-11: built the website (`site/`): home, playground, documentation; GitHub Pages workflow. Decision 85.
+
+## Session 3 — 2026-11-11
+- Goal: M5, then what the owner asked for next: barcodes and charts, a first adoption, the release, a website.
+- Done: M5 (PDF/A, tagged PDF, PDF/UA-1, attachments, encryption; veraPDF in CI). Barcodes, charts and text
+  on `Canvas`. The running-event app adopted the library; two rounds of its notes fixed. Version 0.1.0
+  published to npm and tagged. Website live at mbingpdf.enterbiner.com with a playground.
+- Decisions: rows 66–85 in 07-open-decisions.md.
+- Mistakes to learn from: size budgets set from local numbers failed CI twice; a test compared against the
+  file's random identifier; the site was type-checked against a build that CI does not have.
+- Next: the running-event app's report on 0.1.0, then one document in the rental app.

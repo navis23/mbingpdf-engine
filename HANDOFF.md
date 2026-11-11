@@ -1,181 +1,79 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-11 13:40 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps; M6 started · Branch: main_
+_Updated: 2026-11-11 13:30 WIB · Session 3 · Milestone: M6 Advanced (M0–M5 done but for manual checks) · Branch: main_
 
 ## Where we are
-M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
-the document API: `Document`, `Page`, `Stack`, `Row`, `Box`, `Text`, `Span`, `Link`, `Image`, `Grid`,
-`Spacer`, `Absolute`, `Canvas`, `PageBreak` and `render()`. Underneath are `mbingpdf/core` (PDF writer),
-`mbingpdf/font` (TrueType, CFF, WOFF2, shaping, variable fonts), `mbingpdf/text` (line breaking, hyphenation,
-paragraphs) and `mbingpdf/image` (JPEG, PNG). Output is byte-identical on Node, Bun, Deno and Chromium.
-Version 0.1.0 is on npm (published 2026-11-11, tagged `v0.1.0`).
+mbingpdf 0.1.0 is on npm (`mbingpdf`, `@mbingpdf/react`, `@mbingpdf/vue`, `@mbingpdf/dev`) and the website is
+live at https://mbingpdf.enterbiner.com (home, playground, documentation). The running-event app has moved
+its documents to the library; the rental app has not yet. M6 has started with barcodes and charts.
 
 ## Done this session
-- Toolchain: pnpm workspace, TypeScript 7 strict + `isolatedDeclarations`, tsdown (ESM + CJS), Vitest, Biome,
-  Changesets, GitHub Actions.
-- Writer (`packages/mbingpdf/src/core/`): `objects.ts`, `serialize.ts`, `writer.ts` (xref streams + object
-  streams, or classic table), `document.ts`, `hash.ts` (file ID), `bytes.ts`.
-- Pages and drawing: `page.ts`, `content.ts`, `color.ts`, `units.ts`.
-- Standard fonts: `standard-font.ts`, `standard-fonts.ts`, generated `standard-font-data.ts`.
-- Test harness (`packages/mbingpdf/test/harness/`): samples, pdf.js + PDFium rendering, golden images,
-  digests, runtime scripts for Node/Bun/Deno/Chromium.
+- M5: PDF/A-2 and A-3 (b, u, a), tagged PDF and PDF/UA-1, attachments and `facturX()`, AES-256 encryption
+  (`src/core/structure.ts`, `srgb.ts`, `crypto.ts`, `encryption.ts`; tags in `src/layout/`). veraPDF in tests.
+- M6 start: `mbingpdf/barcode`, `Barcode`, `BarChart`, `LineChart`, `PieChart`, text on `Canvas`
+  (`src/barcode/`, `src/layout/barcode.ts`, `charts.ts`, `canvas.ts`).
+- First adoption by the running-event app, two rounds of notes, fixed: `justify`, growing `Spacer()`,
+  `truncate`, `width: "auto"`, dashed borders, `Svg` cover and `monochrome`, `loadImage()`, lazy `usePdf`,
+  preview labels and text, fixed-height stacks no longer split. Guide: `docs/guide/adopting.md`.
+- Release 0.1.0 (tag `v0.1.0`), published by the owner through the Release workflow.
+- Website in `site/` (generator `site/build/generate.ts`, templates `site/templates/*.js`), deployed by
+  `.github/workflows/site.yml`; DNS and HTTPS set up.
 
 ## In progress (not finished)
-M1 has just started; see `docs/05-roadmap.md`.
+Nothing half-done. `.changeset/website.md` is waiting for the next release (package home page).
 
 ## Next steps (in order)
-1. ~~TrueType parsing and embedding as a CID font with `ToUnicode`~~ done (`src/font/`, `src/core/embedded-font.ts`).
-2. ~~Glyph subsetting for TrueType outlines~~ done.
-3. ~~OpenType/CFF embedding and subsetting~~ done (`src/font/cff.ts`); the class is now `Font`, not
-   `TrueTypeFont`.
-4. ~~Shaping for simple scripts~~ done (`src/font/shaper.ts`, `src/font/layout/`); output equals HarfBuzz on the
-   test corpus. Not covered: GSUB type 8, GPOS cursive, device/variation deltas, fallback mark placement.
-5. ~~Variable-font instancing~~ done (`font.instance({ wght: 700 })` or `font.instance("Bold")`;
-   `src/font/variations.ts`, `gvar.ts`, `glyf.ts`). Instances are written unhinted (no `cvar` support).
-6. ~~WOFF2 decoding~~ done (`src/font/woff2.ts`, `loadFont()`); Brotli comes from the runtime (row 24).
-7. ~~Line breaking, justification, fit-to-width, hyphenation, fallback~~ done (`src/text/`, exported as
-   `mbingpdf/text`): `layoutParagraph`, `drawParagraph`, `fitText`, `lineBreaks`, `graphemes`,
-   `hyphenateEnglish`, `hyphenateIndonesian`.
-8. ~~M1 exit test, automated half~~ done: subsets within 10% of `hb-subset`. The Acrobat copy check is manual
-   and still open; text extraction is checked with pdf.js meanwhile.
-9. ~~M2 layout engine~~ done (`src/layout/`, exported from the root `mbingpdf` entry): elements, flex,
-   fragmentation, headers/footers, `render()`. Images are in `src/image/` (`mbingpdf/image`).
-10. ~~M2 leftovers~~ done: `mbingpdf/svg` (`renderSvg`), Web Worker check in `test/harness/browser.mjs`.
-11. M3 done so far: tables (`src/layout/table.ts`), lists, `fit` on Text, QR codes (`src/qr/`), print
-    (bleed, marks, spot colours, output intent, PDF/X-4, XMP, DPI warnings). Samples `invoice` and
-    `certificate` are the two M3 acceptance documents.
-12. Also done in M3: `Heading` with bookmarks, `id` + `Link({ to })`, `TableOfContents`, `Columns`, and the
-    5,000-bib benchmark (now a test). Themes (`src/layout/theme.ts`) and SVG input (`src/layout/svg-input.ts`, the `Svg` element) are done.
-    M3 is closed; deferred to M4:
-    shared graphics (Form XObjects; less urgent now that batches are fast and small).
-13. M4 done so far: JSX runtime (`src/jsx-runtime.ts`), `inspect()`, warning paths, `strict`, `debug`.
-14. Also done in M4: the `agreement` sample (third acceptance document); starter templates in `examples/`
-    with a test; `docs/guide/quick-start.md` and `docs/guide/elements.md`; `pnpm size` with
-    `size-budget.json`, run in CI.
-15. Release preparation is done: `packages/mbingpdf/README.md` and `LICENSE`, package metadata with
-    `types` conditions and provenance, `.changeset/first-release.md`, `.github/workflows/release.yml`
-    (manual, dry run by default). To release: `pnpm changeset version`, commit, then run the workflow with
-    dry-run off. Nothing has been published.
-16. Also done in M4: `@mbingpdf/react` and `@mbingpdf/vue` (`packages/react`, `packages/vue`): `PdfPreview`,
-    `usePdf`, `downloadPdf`, built on `previewPages()` in `mbingpdf/svg`. Tested with happy-dom; the Vue one
-    was also checked by hand in Chromium.
-17. Also done in M4: `@mbingpdf/dev` (`packages/dev`): the `mbingpdf` command (`dev <file>` preview server
-    with redraw on save, outlines, warnings; `build <file>`), `loadDocument`, `startPreview`. Every example
-    has a default export, so `pnpm --filter mbingpdf-examples dev invoice.ts` works after a
-    build.
-18. Also done in M4: shared graphics. An `Svg` becomes a Form XObject (`PdfDocument.createForm`,
-    `ContentStream.form`, the `shared` display item), stored once per file per source and colour.
-19. Also done in M4: benchmarks (`benchmarks/run.mjs`, results in `docs/benchmarks.md`). mbingpdf is
-    fastest on the invoice and smallest everywhere; pdfmake is about twice as fast on a 2,000-row table and
-    PDFKit on plain paragraphs. Speeding up long tables is the open follow-up.
-20. M4 has nothing left that can be done without the owner (see below).
-21. M5 is done except Acrobat's accessibility checker by hand:
-    - `conformance` takes a list; PDF/A-2b/2u/2a and 3b/3u/3a (`src/core/document.ts`, built-in sRGB in
-      `src/core/srgb.ts`);
-    - tagged PDF (`tagged: true`) and PDF/UA-1: `src/core/structure.ts`, tags set in `layout/engine.ts`
-      (`tagOf`) and `layout/table.ts`, wrapped in `layout/paint.ts`, written in `layout/pdf.ts` (`Marker`);
-      new element properties `alt`, `decorative`, `role`;
-    - attachments and `facturX()` (`Document({ attachments, metadata })`, `src/layout/factur-x.ts`);
-    - AES-256 encryption (`render(doc, { encryption })`; `src/core/crypto.ts`, `src/core/encryption.ts`);
-    - veraPDF validates the samples at every level in `test/conformance.test.ts` (Docker image
-      `verapdf/cli` or a local `verapdf`; required on the Node 24 CI job).
-22. M6, first items (the owner asked for these): barcodes and charts.
-    - `mbingpdf/barcode` (`src/barcode/index.ts`): Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF, ITF-14;
-      `Barcode` element in `src/layout/barcode.ts`;
-    - `BarChart`, `LineChart`, `PieChart` in `src/layout/charts.ts`, each a function returning a `Canvas`;
-    - `Canvas` text: `g.text()` and `g.measureText()` in `src/layout/canvas.ts`;
-    - the `charts` sample covers all of it in the golden images and runtime digests.
-23. First adoption: the running-event app moved its documents to the library from `docs/guide/adopting.md`
-    and the packed files in `.tmp-pack/` (not in git; rebuild with `pnpm build` then `pnpm pack` in each
-    package). Its notes are in that app's `docs/16-mbingpdf.md`. Fixed from them (decisions 78–83):
-    `justify` on `Stack` and `Page`, growing `Spacer()` in a stack, `Text({ truncate })`, `width: "auto"`,
-    dashed borders, `Svg({ fit: "cover", monochrome })`, `loadImage()` for WebP in browsers, lazy `usePdf`,
-    `pageLabel` and page text in `PdfPreview`, and the guides (WOFF2 does not load in browsers: use TTF).
-    Not done from the notes: a Brotli decoder for WOFF2 in browsers, WebP on servers, `maxLines`.
-    Second round (decision 84): a fixed-height stack no longer splits when its content is slightly too
-    tall; preview text includes pictures' `alt`.
-24. Publishing: the owner has created the npm organisation and added `NPM_TOKEN`; a dry run of the Release
-    workflow passed. Versions are set to 0.1.0 with changelogs (`pnpm changeset version` consumed the
-    changeset). Published and tagged `v0.1.0`; an install from npm was checked (ESM, CJS, types, CLI).
-    The token must be a granular one with "bypass 2FA" ticked; npm says such tokens will be restricted,
-    so move the workflow to trusted publishing (OIDC) before the next release. For the next release: add a changeset (`pnpm changeset`), then version, then Release.
-25. Website (decision 85): `site/`, built with `pnpm site`, previewed with `pnpm site:dev`, deployed to GitHub
-    Pages by the Site workflow. Showcase documents and playground templates are the same files,
-    `site/templates/*.js`. Live at https://mbingpdf.enterbiner.com since 2026-11-11: Cloudflare CNAME
-    `mbingpdf` → `navis23.github.io` (DNS only), certificate from GitHub, HTTPS enforced. If GitHub does
-    not issue a certificate for a new domain, clear the custom domain and set it again: it only checks
-    DNS when the domain is saved.
-26. Trusted publishing for npm (no stored token) is to be set up just before the next release: the owner
-    adds a trusted publisher per package on npmjs.com (repository `navis23/mbingpdf-engine`, workflow
-    `release.yml`), and the workflow changes to `npm publish` with npm 11.5.1 or later.
-27. Next after that: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
-    reading PDFs, HTML subset). Open follow-ups: long-table speed; a hyphen added
-    by hyphenation is read as a real hyphen in tagged files; tagged output and encryption are not in the
-    benchmarks.
+1. Ask the owner for the running-event app's report after it switched from vendored files to npm 0.1.0
+   (it should confirm round-2 notes A and C are gone), and fix anything it found.
+2. Help move one document of the rental app (React) with `docs/guide/adopting.md`; collect its notes.
+3. Before the next release, set up npm trusted publishing: the owner adds a trusted publisher per package
+   on npmjs.com (user `navis23`, repository `mbingpdf-engine`, workflow `release.yml`, allow `npm publish`);
+   change `release.yml` to publish with npm 11.5.1+ and no token. A new setting expires after 2 days
+   without a publish, so do both together. Then `pnpm changeset version` and release 0.1.1.
+4. Open follow-ups, by demand: WebP on servers; WOFF2 in browsers (needs a Brotli decoder, ~50 kB);
+   `maxLines`; long-table speed (half of pdfmake's); crop marks in the SVG preview; a hyphen added by
+   hyphenation is read as a real hyphen in tagged files; GS1-128, Data Matrix, PDF417.
+5. Rest of M6 in `docs/05-roadmap.md`, in the order the owner asks: forms, signatures, complex scripts,
+   reading PDFs, HTML subset.
 
 ## Waiting on the owner
-The owner asked for autonomous work: decide, commit and push without asking, and report afterwards. Three
-things do need them, all part of the M4 exit:
-- publishing `0.1.0` to npm: create the `@mbingpdf` organisation on npm (for the scoped packages), add the
-  `NPM_TOKEN` secret, run `pnpm changeset version`, commit, then start
-  the Release workflow with dry-run off (their account and their decision);
-- switching one document type in each of the two private apps to mbingpdf;
-- the manual checks: Acrobat PDF/X-4 preflight of the certificate, copying text out of Acrobat, comparing
-  the acceptance documents with the current printed versions, and (M5) Acrobat's accessibility checker on a
-  file rendered with `conformance: "PDF/UA-1"`.
+- The running-event app's report on 0.1.0; choosing the rental app's first document.
+- Manual checks with Acrobat: PDF/X-4 preflight, copying text, the accessibility checker on a PDF/UA file.
+- Which M6 item comes next.
 
 ## Decisions this session
-- Row 14: fflate, pinned and compiled into the build; zero runtime dependencies.
-- `mbingpdf/core` uses PDF-native coordinates (origin bottom-left, y up). The top-left flip belongs to the
-  layer that paints the display list.
-- Text a standard font cannot encode throws instead of being replaced.
-- Standard-font kerning pairs are not bundled (size); real kerning arrives with embedded fonts in M1.
-- Rows 16–23 in `docs/07-open-decisions.md` (shaping oracle, own UAX #14/#29, hyphenation licensing, greedy
-  line filling).
+- Standards, tagging, attachments, encryption → rows 66–74 in docs/07-open-decisions.md
+- Canvas text, barcodes, charts → rows 75–77
+- First adoption and what came of it → rows 78–84
+- Website → row 85
 
 ## Health
-- Git: clean after this commit, pushed to origin/main.
-- Checks: lint, typecheck, build, size and 565 tests green. The two speed assertions (5,000 bibs under
-  60 s, 1,000 rows under 5 s) fail on this laptop when another project is loading it; they pass otherwise
-  and in CI. Runtime digests match on Node, Deno, Chromium and in a Web Worker (11 samples).
-- Published: 0.1.0 of `mbingpdf`, `@mbingpdf/react`, `@mbingpdf/vue`, `@mbingpdf/dev`, with provenance.
+- Git: clean · last commit 712a23e Record that the website is live · in sync with origin
+- Checks: typecheck pass · lint pass (5 old warnings) · build pass · size pass · tests 565 of 566: the
+  5,000-bib speed limit (60 s) failed at 85 s while another project was loading this laptop; it passes
+  when the machine is idle and in CI (last CI run green)
+- Published: 0.1.0 on npm, with provenance
 
 ## Gotchas / don't redo
-- The repo is public; the two reference apps are private. Keep their details generic in committed files.
-- Do not use Yoga for layout: it cannot split a box across pages (see `docs/03-architecture.md`).
-- `changeset init` is interactive-only in v3; the config was written by hand.
-- pdf.js in Node needs `standardFontDataUrl` as a file-system path, not a `file:` URL; with a URL it silently
-  falls back to system fonts.
-- Node's `Buffer.slice()` returns a view, not a copy. Font input is re-wrapped in `parseSfnt`; in tests read
-  fonts with `readFont()` from `test/harness/env.ts`.
-- An object is serialised when it is set on the writer and cannot change afterwards; allocate a ref first for
-  anything that must be completed later.
-- Regenerating data: `scripts/generate-*.mjs` (standard fonts, Unicode tables, en-US hyphenation); inputs are
-  not in the repo, the scripts' headers say where to get them.
-- pdf.js reports wide letter spacing as spaces between letters when extracting text.
-- Run checks as their own step and commit only when they pass; do not chain a commit after a piped check
-  (a failing test was pushed once that way and fixed in the next commit).
-- After an intended output change: review `test/.artifacts/`, then `pnpm test:update`.
-- `UPDATE_GOLDEN=1` rewrites a few unrelated PNGs (certificate, tour) with invisible differences; restore
-  them with `git checkout` and keep only the files you meant to change.
-- veraPDF through Docker takes about 10 s per run; `validate(files, "auto")` checks every PDF/A level in one
-  run by letting each file's own metadata pick the level.
-- pdf.js drops the spaces at line ends when asked for the text of a tagged element; poppler
-  (`pdfinfo -struct-text`) shows them.
-- CI's gzip measures about 1 kB more than this machine's (145.1 against 144.1 kB for the root entry). Set
-  size budgets from the CI figure with a few kB to spare, and look at CI before the next push.
-- Barcode tests decode with `zbarimg` and `ZXingReader` when installed (both are here; CI has zbar only).
-  Reference patterns typed from memory were wrong twice while the encoder was right: trust the scanners.
-- Chart colours must be resolved inside `draw`, not when the element is made: the theme is not active yet.
-- Run `vitest` from the repository root. From `packages/mbingpdf` the root config's aliases are not
-  applied, the examples load the built package beside the source, and fonts fail with "undefined does not
-  permit embedding".
-- In the playground and the site's templates the code is wrapped in a block before it becomes a function, so
-  that it may declare `const spot` or `const rgb` although those are also names of exports.
-- `history` imported from CodeMirror hides `window.history`; the site's typecheck caught it.
-- Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
+- The repo is public; the two apps are private. Keep their details generic in committed files.
+- Run `vitest` from the repository root; from `packages/mbingpdf` the examples load a second copy of the
+  library and fonts fail with "undefined does not permit embedding".
+- Run checks as their own step before committing; look at CI before the next push.
+- CI's gzip measures about 1 kB more than this machine's: leave size budgets a few kB of room.
+- `UPDATE_GOLDEN=1` also rewrites certificate and tour PNGs with invisible differences: `git checkout` them.
+- CI type-checks before it builds: nothing may depend on `dist/` existing (the site maps to source).
+- npm: publishing needs a granular token with "bypass 2FA" ticked, in the `NPM_TOKEN` secret, until
+  trusted publishing replaces it. A version number can never be reused.
+- GitHub Pages only checks DNS when the custom domain is saved: if no certificate comes, clear the domain
+  and set it again.
+- Chart colours and anything from the theme must be resolved inside `draw`, not when the element is made.
+- Site templates and playground code run inside a block, so they may declare `const spot` or `const rgb`.
+- Barcode reference patterns typed from memory were wrong twice; the scanners (zbar, ZXing) are the judge.
+- veraPDF runs from Docker image `verapdf/cli` (about 10 s a run); `validate(files, "auto")` covers every
+  PDF/A level at once.
+- Do not use Yoga for layout; do not bundle a Brotli decoder without a decision (row 79).
+- Toolchain here: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler, zbar, ZXing, Docker. No Bun.
 
 ## Resume checklist
-1. Read this file, then M1 in `docs/05-roadmap.md`.
+1. Read this file, then `CLAUDE.md` if it exists, then M6 in `docs/05-roadmap.md`.
 2. `git status` / `git log -5` — confirm it matches "Health" above.
-3. `pnpm install && pnpm check`.
-4. Start "Next steps" #1.
+3. Start "Next steps" #1.
