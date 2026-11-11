@@ -36,6 +36,11 @@ export interface BorderSide {
   readonly width: number;
   /** Default: the text colour. */
   readonly color?: ColorInput;
+  /**
+   * Draws the line in dashes: the lengths of dash and gap in points, such as `[3, 2]`. A cut
+   * line on a sheet of labels, a "tear here".
+   */
+  readonly dash?: readonly number[];
 }
 
 /** One border for all sides, or a border per side. */
@@ -98,8 +103,14 @@ export interface BoxProps extends TextProps {
   background?: ColorInput;
   /** Corner radius of the background and border. */
   radius?: number;
-  width?: Length;
-  height?: Length;
+  /**
+   * A number of points or a share of the container (`"50%"`). `"auto"`, the default, lets the
+   * layout decide: as wide as the container in a `Stack` or on a page, as wide as the content
+   * in a `Row`.
+   */
+  width?: Length | "auto";
+  /** As `width`; `"auto"`, the default, is as tall as the content. */
+  height?: Length | "auto";
   minWidth?: Length;
   maxWidth?: Length;
   minHeight?: Length;
@@ -147,6 +158,13 @@ export interface StackProps extends BoxProps {
   gap?: number;
   /** How children sit across the stack. Default `"stretch"`: each fills the width. */
   align?: Align;
+  /**
+   * Where the children sit down the stack when it is taller than they are (it has a `height`
+   * or a `minHeight`): `"center"` puts a block in the middle of a page, `"space-between"`
+   * pushes the last child to the bottom. A `Spacer()` among the children does the same by
+   * taking all the spare height. Has no effect on a stack that runs over several pages.
+   */
+  justify?: Justify;
 }
 
 export interface RowProps extends BoxProps {
@@ -167,6 +185,11 @@ export interface TextElementProps extends BoxProps {
    * size only when needed. Text that is still too wide at `min` overflows.
    */
   fit?: boolean | { readonly min?: number; readonly max?: number };
+  /**
+   * Keeps the text on one line at its own size and cuts it short with "…" where it would
+   * not fit: a long name in a narrow column.
+   */
+  truncate?: boolean;
 }
 
 export type ListMarker =
@@ -268,6 +291,18 @@ export interface ImageProps extends BoxProps {
 export interface SvgProps extends BoxProps {
   /** The SVG document: its markup, or the bytes of an `.svg` file. */
   src: string | Uint8Array;
+  /**
+   * How the drawing fills a box whose proportions differ from its own, when both width and
+   * height are given: `"contain"` (default) fits it inside, `"cover"` fills the box and cuts
+   * off what sticks out, as a background does.
+   */
+  fit?: "contain" | "cover";
+  /**
+   * Draw every shape in the element's `color`, whatever colours the file gives them: for a
+   * one-colour logo or pattern that has to take a brand colour. Without it only shapes
+   * painted `currentColor` follow `color`.
+   */
+  monochrome?: boolean;
 }
 
 export interface SpacerProps {
@@ -429,6 +464,12 @@ export interface PageProps extends Omit<TextProps, "size"> {
   marks?: boolean | { readonly crop?: boolean; readonly registration?: boolean };
   /** Space between children. */
   gap?: number;
+  /**
+   * Where the content sits down the page when it does not fill it: `"center"` for a
+   * certificate or a cover. A `Spacer()` among the children takes all the spare height instead.
+   * Only for content that fits on one page.
+   */
+  justify?: Justify;
 }
 
 export interface DocumentProps extends TextProps {

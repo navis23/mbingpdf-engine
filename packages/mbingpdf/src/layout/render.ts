@@ -217,9 +217,20 @@ function layoutPass(
     const bodyHeight = contentHeight - headerHeight - footerHeight;
     if (!(bodyHeight > 0)) throw new LayoutError("The header and footer leave no room for content");
 
+    // Content that is to be centred, or pushed apart by a spacer, needs a body as tall as
+    // the page; otherwise the body is as tall as its content.
+    const stretches =
+      props.justify !== undefined ||
+      normalize(page.children).some(
+        (child) => child.type === "Spacer" && (child.props as { size?: number }).size === undefined,
+      );
     const body: LayoutNode = {
       type: "Stack",
-      props: props.gap !== undefined ? { gap: props.gap } : {},
+      props: {
+        ...(props.gap !== undefined ? { gap: props.gap } : {}),
+        ...(props.justify !== undefined ? { justify: props.justify } : {}),
+        ...(stretches ? { minHeight: bodyHeight } : {}),
+      },
       children: page.children,
     };
     let state: unknown;

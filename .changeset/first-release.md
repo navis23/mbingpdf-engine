@@ -15,6 +15,8 @@ First release.
 - SVG artwork used many times (a logo on every page) is stored once in the file.
 - Print: CMYK and spot colours, bleed, crop and registration marks, ICC output intent, PDF/X-4.
 - `Barcode` (Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF), `BarChart`, `LineChart`, `PieChart`, and text on a `Canvas`; `mbingpdf/barcode` for barcode patterns alone.
+- Layout: `justify` on `Stack` and `Page`, a `Spacer()` that takes spare height, `Text({ truncate })`, dashed borders, `Svg({ fit: "cover", monochrome })`, `width: "auto"`.
+- `loadImage()` reads WebP, AVIF and GIF in a browser.
 - Standards: PDF/A-2 and PDF/A-3 (levels b, u, a) and PDF/UA-1 through `conformance`; tagged PDF with `tagged: true`, with `alt`, `decorative` and `role` on elements.
 - Attached files with `Document({ attachments })`, and `facturX()` for Factur-X e-invoices.
 - Password protection with AES-256 and permissions through `encryption`.

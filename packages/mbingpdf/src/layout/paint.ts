@@ -4,20 +4,19 @@ import type { TextFont } from "../text/index.ts";
 import { CanvasContext, roundedRectPath } from "./canvas.ts";
 import type { DisplayItem, PathCommand } from "./display.ts";
 import type { Box } from "./engine.ts";
+import type { ResolvedSide } from "./style.ts";
 
 const rectPath = (x: number, y: number, width: number, height: number): PathCommand[] => [
   ["R", x, y, width, height],
 ];
 
-function sameSide(
-  a: { width: number; color: Color } | undefined,
-  b: { width: number; color: Color } | undefined,
-): boolean {
+function sameSide(a: ResolvedSide | undefined, b: ResolvedSide | undefined): boolean {
   return (
     a !== undefined &&
     b !== undefined &&
     a.width === b.width &&
-    JSON.stringify(a.color) === JSON.stringify(b.color)
+    JSON.stringify(a.color) === JSON.stringify(b.color) &&
+    JSON.stringify(a.dash) === JSON.stringify(b.dash)
   );
 }
 
@@ -41,7 +40,14 @@ export function shiftItems(items: readonly DisplayItem[], dx: number, dy: number
           }),
         };
       case "shared":
-        return { ...item, x: item.x + dx, y: item.y + dy };
+        return {
+          ...item,
+          x: item.x + dx,
+          y: item.y + dy,
+          ...(item.clip
+            ? { clip: { ...item.clip, x: item.clip.x + dx, y: item.clip.y + dy } }
+            : {}),
+        };
       case "tagged":
         return { ...item, items: shiftItems(item.items, dx, dy) };
       case "group":
@@ -147,31 +153,40 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
           height - top.width,
           Math.max(0, (box.radius ?? 0) - inset),
         ),
-        stroke: { color: top.color, width: top.width },
+        stroke: { color: top.color, width: top.width, ...(top.dash ? { dash: top.dash } : {}) },
       });
     } else {
-      if (top)
-        target.push({ type: "path", commands: rectPath(x, y, width, top.width), fill: top.color });
-      if (bottom) {
+      // One side: a filled strip, or for a dashed side a line down the strip's middle.
+      const side = (
+        line: ResolvedSide,
+        sx: number,
+        sy: number,
+        sw: number,
+        sh: number,
+        across: boolean,
+      ): void => {
+        if (!line.dash) {
+          target.push({ type: "path", commands: rectPath(sx, sy, sw, sh), fill: line.color });
+          return;
+        }
         target.push({
           type: "path",
-          commands: rectPath(x, y + height - bottom.width, width, bottom.width),
-          fill: bottom.color,
+          commands: across
+            ? [
+                ["M", sx, sy + sh / 2],
+                ["L", sx + sw, sy + sh / 2],
+              ]
+            : [
+                ["M", sx + sw / 2, sy],
+                ["L", sx + sw / 2, sy + sh],
+              ],
+          stroke: { color: line.color, width: line.width, dash: line.dash },
         });
-      }
-      if (left)
-        target.push({
-          type: "path",
-          commands: rectPath(x, y, left.width, height),
-          fill: left.color,
-        });
-      if (right) {
-        target.push({
-          type: "path",
-          commands: rectPath(x + width - right.width, y, right.width, height),
-          fill: right.color,
-        });
-      }
+      };
+      if (top) side(top, x, y, width, top.width, true);
+      if (bottom) side(bottom, x, y + height - bottom.width, width, bottom.width, true);
+      if (left) side(left, x, y, left.width, height, false);
+      if (right) side(right, x + width - right.width, y, right.width, height, false);
     }
   }
 
@@ -290,6 +305,16 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
       x: x + vector.x,
       y: y + vector.y,
       scale: vector.scale,
+      ...(vector.clip
+        ? {
+            clip: {
+              x: x + vector.clip.x,
+              y: y + vector.clip.y,
+              width: vector.clip.width,
+              height: vector.clip.height,
+            },
+          }
+        : {}),
     });
   }
 

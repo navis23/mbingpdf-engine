@@ -98,6 +98,8 @@ export interface Box {
     x: number;
     y: number;
     scale: number;
+    /** Cut the artwork off at this rectangle of the box (for artwork that covers it). */
+    clip?: { x: number; y: number; width: number; height: number };
   };
   /** The kind of element the box belongs to, for `inspect()` and the debug overlay. */
   kind?: string;
@@ -306,6 +308,62 @@ function paragraphOf(
 }
 
 /**
+ * Lays out a text on one line, cut short with an ellipsis if it is wider than `width`.
+ * Returns the paragraph and where the line starts for its alignment.
+ */
+function truncateParagraph(
+  node: LayoutNode<"Text">,
+  context: TextContext,
+  width: number,
+): { paragraph: ParagraphLayout; offset: number } | undefined {
+  const own = textContext(node, context);
+  const collected: InlineSpan[] = [];
+  collectSpans(node, own, undefined, collected);
+  const spans = collected.map((span) => ({ ...span, text: span.text.replace(/\s*\n\s*/g, " ") }));
+  if (spans.length === 0) return undefined;
+  const total = spans.reduce((sum, span) => sum + span.text.length, 0);
+  /** The first `count` characters, followed by an ellipsis in the style of the last of them. */
+  const cut = (count: number): ParagraphLayout => {
+    if (count >= total) return layoutSpans(spans, {});
+    const kept: InlineSpan[] = [];
+    let left = count;
+    for (const span of spans) {
+      if (left <= 0 && kept.length > 0) break;
+      let text = span.text.slice(0, Math.max(0, left));
+      // Never between the two halves of one character.
+      if (/[\uD800-\uDBFF]$/.test(text)) text = text.slice(0, -1);
+      kept.push({ ...span, text });
+      left -= span.text.length;
+    }
+    const last = kept.at(-1) as InlineSpan;
+    const fonts = Array.isArray(last.style.font) ? last.style.font : [last.style.font];
+    const dots = (fonts as readonly TextFont[]).some((font) => font.hasGlyphsFor("…"))
+      ? "…"
+      : "...";
+    last.text = last.text.trimEnd() + dots;
+    return layoutSpans(
+      kept.filter((span) => span.text !== ""),
+      {},
+    );
+  };
+  let paragraph = cut(total);
+  if (paragraph.width > width + 1e-6) {
+    // The longest beginning that fits with its ellipsis.
+    let low = 0;
+    let high = total - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (cut(middle).width <= width + 1e-6) low = middle;
+      else high = middle - 1;
+    }
+    paragraph = cut(low);
+  }
+  const slack = Math.max(0, width - paragraph.width);
+  const offset = own.textAlign === "center" ? slack / 2 : own.textAlign === "right" ? slack : 0;
+  return { paragraph, offset };
+}
+
+/**
  * Lays out a text on one line at the size that makes it fill `width`, within the limits its
  * `fit` property gives. Returns the paragraph and where the line starts for its alignment.
  */
@@ -362,6 +420,15 @@ export function measure(node: LayoutNode, context: TextContext): { min: number; 
       if (paragraph) {
         min = paragraph.minContentWidth;
         max = paragraph.width;
+        const text = (node as LayoutNode<"Text">).props;
+        // Text that is cut short or shrunk to fit can give up room that wrapping text cannot.
+        if (text.truncate) min = 0;
+        else if (text.fit) {
+          const size = inherit(context, text).size;
+          const limits = typeof text.fit === "object" ? text.fit : {};
+          const largest = limits.max ?? size;
+          min = (max * Math.min(limits.min ?? largest / 10, largest)) / size;
+        }
       }
       break;
     }
@@ -611,6 +678,43 @@ function layoutStack(
       height = area.height;
   }
   box.height = height;
+  // A stack taller than its content, all on one page, can say where the content sits in it.
+  const spare = height - decoration.inset.bottom - y;
+  if (first && finished && spare > 1e-6 && placed.length > 0) {
+    // A spacer without a size takes the spare height, shared among all such spacers.
+    const growers = placed.filter((item) => {
+      const child = children[item.index] as LayoutNode;
+      return child.type === "Spacer" && (child.props as SpacerProps).size === undefined;
+    });
+    const justify = props.justify ?? "start";
+    const count = placed.length;
+    let shift =
+      growers.length > 0
+        ? 0
+        : justify === "center"
+          ? spare / 2
+          : justify === "end"
+            ? spare
+            : justify === "space-around"
+              ? spare / count / 2
+              : 0;
+    const between =
+      growers.length > 0
+        ? 0
+        : justify === "space-between" && count > 1
+          ? spare / (count - 1)
+          : justify === "space-around"
+            ? spare / count
+            : 0;
+    for (const item of placed) {
+      item.box.y += shift;
+      if (growers.includes(item)) {
+        item.box.height += spare / growers.length;
+        shift += spare / growers.length;
+      }
+      shift += between;
+    }
+  }
   decorate(box, node, decoration, { top: !first, bottom: !finished });
   for (const absolute of absolutes) {
     box.children.push(layoutAbsolute(absolute, own, { width, height }, sink));
@@ -628,7 +732,10 @@ function layoutAbsolute(
   if (props.anchor === "page") container = sink.page;
   const left = props.left;
   const right = props.right;
-  const stretched = left !== undefined && right !== undefined && props.width === undefined;
+  const stretched =
+    left !== undefined &&
+    right !== undefined &&
+    (props.width === undefined || props.width === "auto");
   const room = container.width - (left ?? 0) - (right ?? 0);
   const result = layoutStack(
     stretched ? { ...node, props: { ...props, width: room } } : node,
@@ -849,7 +956,13 @@ function layoutText(
   const width = widthIn(node, context, area);
   const innerWidth = Math.max(0, width - decoration.inset.left - decoration.inset.right);
 
-  const fitted = props.fit && !state ? fitParagraph(node, context, innerWidth) : undefined;
+  const fitted = state
+    ? undefined
+    : props.fit
+      ? fitParagraph(node, context, innerWidth)
+      : props.truncate
+        ? truncateParagraph(node, context, innerWidth)
+        : undefined;
   const paragraph = state?.paragraph ?? fitted?.paragraph ?? paragraphOf(node, context, innerWidth);
   const box: Box = { x: 0, y: 0, width, height: 0, children: [] };
   if (!paragraph) {
@@ -1392,8 +1505,12 @@ function layoutSvg(node: LayoutNode<"Svg">, context: TextContext, area: Area): L
     boxHeight *= shrink;
     boxWidth *= shrink;
   }
-  // The drawing keeps its proportions and is centred in the box.
-  const scale = Math.min(boxWidth / drawing.width, boxHeight / drawing.height);
+  // The drawing keeps its proportions and is centred in the box: fitted inside it, or with
+  // `cover` filling it and cut off where it sticks out.
+  const cover = props.fit === "cover";
+  const scale = cover
+    ? Math.max(boxWidth / drawing.width, boxHeight / drawing.height)
+    : Math.min(boxWidth / drawing.width, boxHeight / drawing.height);
   const box: Box = {
     x: 0,
     y: 0,
@@ -1401,12 +1518,22 @@ function layoutSvg(node: LayoutNode<"Svg">, context: TextContext, area: Area): L
     height: boxHeight + vertical,
     children: [],
     vector: {
-      items: drawing.items(inherit(context, props).color),
+      items: drawing.items(inherit(context, props).color, props.monochrome === true),
       width: drawing.width,
       height: drawing.height,
       x: decoration.inset.left + (boxWidth - drawing.width * scale) / 2,
       y: decoration.inset.top + (boxHeight - drawing.height * scale) / 2,
       scale,
+      ...(cover
+        ? {
+            clip: {
+              x: decoration.inset.left,
+              y: decoration.inset.top,
+              width: boxWidth,
+              height: boxHeight,
+            },
+          }
+        : {}),
     },
   };
   decorate(box, node, decoration, { top: false, bottom: false });

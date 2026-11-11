@@ -37,6 +37,11 @@ export interface PdfPreviewProps {
   /** Class and style of each page. The default style is a white sheet with a light shadow. */
   pageClass?: unknown;
   pageStyle?: StyleValue;
+  /**
+   * What a screen reader calls each page: `(page, pages) => \`Halaman ${page} dari ${pages}\``.
+   * Default `"Page 1 of 3"`. The page's text follows it.
+   */
+  pageLabel?: (page: number, pages: number) => string;
 }
 
 export type PdfPreviewEmits = {
@@ -62,9 +67,20 @@ function follow(event: MouseEvent): void {
   target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/** On the page for screen readers, out of sight for everyone else. */
+const HIDDEN = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clipPath: "inset(50%)",
+  whiteSpace: "pre-wrap",
+} as const;
+
 interface PageViewProps {
   page: PreviewPage;
   index: number;
+  label: string;
   prefix: string;
   pageClass?: unknown;
   pageStyle?: StyleValue;
@@ -125,7 +141,7 @@ const PageView = defineComponent(
           src.value &&
             h("img", {
               src: src.value,
-              alt: `Page ${index + 1}`,
+              alt: props.label,
               draggable: false,
               style: {
                 position: "absolute",
@@ -135,6 +151,8 @@ const PageView = defineComponent(
                 display: "block",
               },
             }),
+          // The picture has no text in it; this gives a screen reader the page's words.
+          src.value && h("div", { style: HIDDEN }, page.text()),
           ...page.anchors.map((anchor) =>
             h("span", {
               id: prefix + anchor.id,
@@ -163,7 +181,7 @@ const PageView = defineComponent(
       );
     };
   },
-  { name: "PdfPreviewPage", props: ["page", "index", "prefix", "pageClass", "pageStyle"] },
+  { name: "PdfPreviewPage", props: ["page", "index", "label", "prefix", "pageClass", "pageStyle"] },
 );
 
 /**
@@ -218,6 +236,9 @@ export const PdfPreview: DefineSetupFnComponent<PdfPreviewProps, PdfPreviewEmits
                   key: `${version}-${index}`,
                   page,
                   index,
+                  label: props.pageLabel
+                    ? props.pageLabel(index + 1, pages.value.length)
+                    : `Page ${index + 1} of ${pages.value.length}`,
                   prefix,
                   pageClass: props.pageClass,
                   pageStyle: props.pageStyle,
@@ -227,7 +248,7 @@ export const PdfPreview: DefineSetupFnComponent<PdfPreviewProps, PdfPreviewEmits
     },
     {
       name: "PdfPreview",
-      props: ["document", "gap", "debug", "pageClass", "pageStyle"],
+      props: ["document", "gap", "debug", "pageClass", "pageStyle", "pageLabel"],
       emits: ["layout", "error"],
     },
   );
@@ -241,8 +262,21 @@ export interface PdfResult {
   error: ShallowRef<unknown>;
   /** True while the file is being made. */
   loading: Ref<boolean>;
-  /** Saves the file under this name. Does nothing until the file is made. */
+  /**
+   * Makes the file now and gives its bytes (or `undefined` if it could not be made; see
+   * `error`). With `lazy` this is what starts the work.
+   */
+  make: () => Promise<Uint8Array | undefined>;
+  /** Saves the file under this name, making it first if it has not been made. */
   download: (filename: string) => void;
+}
+
+export interface UsePdfOptions extends RenderOptions {
+  /**
+   * Make the file only when `make()` or `download()` is called, not whenever the document
+   * changes: for a large document behind filters, where rendering on every change is waste.
+   */
+  lazy?: boolean;
 }
 
 /** Saves bytes as a file from the browser. */
@@ -257,57 +291,69 @@ export function downloadPdf(bytes: Uint8Array, filename: string): void {
 }
 
 /**
- * Makes the PDF file of a document, again whenever the document changes. Pass a ref, a
- * `computed` or a function; while it gives `undefined`, nothing is made. Runs in the browser
- * only.
+ * Makes the PDF file of a document, again whenever the document changes (or, with `lazy`,
+ * when asked). Pass a ref, a `computed` or a function; while it gives `undefined`, nothing is
+ * made. Runs in the browser only.
  */
 export function usePdf(
   document: MaybeRefOrGetter<LayoutNode | undefined>,
-  options?: MaybeRefOrGetter<RenderOptions | undefined>,
+  options?: MaybeRefOrGetter<UsePdfOptions | undefined>,
 ): PdfResult {
   const bytes = shallowRef<Uint8Array>();
   const url = ref<string>();
   const error = shallowRef<unknown>();
   const loading = ref(false);
+  /** Counts renders, so that a slow one cannot overwrite the result of a later one. */
   let run = 0;
 
   const release = (): void => {
     if (url.value) URL.revokeObjectURL(url.value);
     url.value = undefined;
   };
+  const clear = (): void => {
+    run++;
+    release();
+    bytes.value = undefined;
+    error.value = undefined;
+    loading.value = false;
+  };
+
+  const make = async (): Promise<Uint8Array | undefined> => {
+    const node = toValue(document);
+    if (!node) {
+      clear();
+      return undefined;
+    }
+    const mine = ++run;
+    loading.value = true;
+    try {
+      const { lazy: _lazy, ...renderOptions } = toValue(options) ?? {};
+      const result = await render(node, renderOptions);
+      if (mine !== run) return result;
+      release();
+      bytes.value = result;
+      url.value = URL.createObjectURL(new Blob([result as BlobPart], { type: "application/pdf" }));
+      error.value = undefined;
+      loading.value = false;
+      return result;
+    } catch (reason) {
+      if (mine === run) {
+        release();
+        bytes.value = undefined;
+        error.value = reason;
+        loading.value = false;
+      }
+      return undefined;
+    }
+  };
 
   onMounted(() => {
     watch(
       () => toValue(document),
-      (node) => {
-        const mine = ++run;
-        if (!node) {
-          release();
-          bytes.value = undefined;
-          error.value = undefined;
-          loading.value = false;
-          return;
-        }
-        loading.value = true;
-        render(node, toValue(options)).then(
-          (result) => {
-            if (mine !== run) return;
-            release();
-            bytes.value = result;
-            url.value = URL.createObjectURL(
-              new Blob([result as BlobPart], { type: "application/pdf" }),
-            );
-            error.value = undefined;
-            loading.value = false;
-          },
-          (reason: unknown) => {
-            if (mine !== run) return;
-            release();
-            bytes.value = undefined;
-            error.value = reason;
-            loading.value = false;
-          },
-        );
+      () => {
+        // In lazy mode a file made from the document as it was is no longer its file.
+        if (toValue(options)?.lazy) clear();
+        else void make();
       },
       { immediate: true },
     );
@@ -323,8 +369,10 @@ export function usePdf(
     url,
     error,
     loading,
+    make,
     download: (filename: string): void => {
       if (bytes.value) downloadPdf(bytes.value, filename);
+      else void make().then((made) => made && downloadPdf(made, filename));
     },
   };
 }

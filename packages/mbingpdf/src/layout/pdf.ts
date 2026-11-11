@@ -223,8 +223,11 @@ function drawItems(
         if (marks) tagging?.marker.enter(marks);
         // Stored once in the file; here it is only placed. The form's origin is its bottom-left
         // corner, which sits `height × scale` below the item's top-left corner.
+        content.save();
+        if (item.clip) {
+          content.rect(item.clip.x, item.clip.y, item.clip.width, item.clip.height).clip();
+        }
         content
-          .save()
           .transform(item.scale, 0, 0, -item.scale, item.x, item.y + item.height * item.scale)
           .form(formFor(document, item))
           .restore();

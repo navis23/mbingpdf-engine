@@ -9,10 +9,10 @@ Every element is called as `Element(properties?, ...children)`. Properties are o
 | Property | Value | Meaning |
 | --- | --- | --- |
 | `margin`, `padding` | number, `[vertical, horizontal]`, `[top, right, bottom, left]`, or `{ top, right, bottom, left }` | Space outside and inside the border |
-| `border` | `{ width, color }`, or `{ top, right, bottom, left }` of those | Lines around the box |
+| `border` | `{ width, color, dash }`, or `{ top, right, bottom, left }` of those | Lines around the box. `dash: [3, 2]` draws dashes of 3 points with gaps of 2 |
 | `background` | colour | Fill behind the content |
 | `radius` | number | Rounded corners |
-| `width`, `height`, `minWidth`, `maxWidth`, `minHeight` | number or `"50%"` | Size; by default an element is as wide as its container and as tall as its content |
+| `width`, `height`, `minWidth`, `maxWidth`, `minHeight` | number or `"50%"`; `width` and `height` also `"auto"` | Size. By default (`"auto"`) an element is as wide as its container and as tall as its content; in a `Row` it is as wide as its content, and shrinks to its narrowest (the longest word of a text) when the row is full |
 | `opacity` | 0–1 | Transparency of the element and everything in it |
 | `id` | string | A name that `Link({ to })` can point to |
 
@@ -68,7 +68,7 @@ Set on any element; inherited by everything inside it.
 | Element | Notes |
 | --- | --- |
 | `Document(props, ...pages)` | `title`, `author`, `subject`, `keywords`, `creator`, `lang`, `theme`, `attachments` (files carried inside the PDF: `{ name, data, mimeType, description, relationship }`), `metadata`, and text properties as defaults. Children that are not pages are put on a default A4 page |
-| `Page(props, ...children)` | `size` (`"A4"`, `"A5"`, `"Letter"`, … or `[width, height]`), `orientation`, `margin` (default 20 mm), `gap`, `header`, `footer`, `background`, `fill`, `bleed`, `marks`, `fontSize` |
+| `Page(props, ...children)` | `size` (`"A4"`, `"A5"`, `"Letter"`, … or `[width, height]`), `orientation`, `margin` (default 20 mm), `gap`, `justify` (where content that does not fill the page sits: `"center"` for a certificate), `header`, `footer`, `background`, `fill`, `bleed`, `marks`, `fontSize` |
 | `PageBreak()` | Ends the page |
 
 `header`, `footer` and `background` take content, or a function of `{ page, pages }`. The background is laid out across the whole sheet, behind everything.
@@ -77,10 +77,10 @@ Set on any element; inherited by everything inside it.
 
 | Element | Notes |
 | --- | --- |
-| `Stack(props, ...children)` | One below another. `gap`; `align`: `"stretch"` (default), `"start"`, `"center"`, `"end"` |
+| `Stack(props, ...children)` | One below another. `gap`; `align`: `"stretch"` (default), `"start"`, `"center"`, `"end"`. `justify` (`"start"`, `"center"`, `"end"`, `"space-between"`, `"space-around"`) places the children down a stack that has a `height` or `minHeight` taller than they are |
 | `Box(props, ...children)` | The same as `Stack`, for when the point is the padding, border or background |
 | `Row(props, ...children)` | Side by side. `gap`; `align` across the height; `justify`: `"start"`, `"center"`, `"end"`, `"space-between"`, `"space-around"` |
-| `Spacer(size?)` | A fixed gap, or in a row all the spare width |
+| `Spacer(size?)` | A fixed gap. Without a size: all the spare width in a row, or all the spare height in a stack that has a height, or on a page |
 | `Columns(props, ...children)` | Newspaper columns. `count` (default 2), `gap`, `rowGap`, `rule`, `balance` |
 | `Grid(props, ...children)` | Cells of a fixed size. `columns` **required**, `cell: { width?, height }` **required**, `gap`, `rows` |
 | `Absolute(props, ...children)` | Out of the flow. `top`, `right`, `bottom`, `left`, `rotate` (degrees), `anchor`: `"parent"` or `"page"` |
@@ -89,7 +89,7 @@ Set on any element; inherited by everything inside it.
 
 | Element | Notes |
 | --- | --- |
-| `Text(props, ...content)` | A paragraph of strings, `Span`s and `Link`s. `align`; `fit`: true or `{ min, max }` keeps it on one line and sizes it to the width |
+| `Text(props, ...content)` | A paragraph of strings, `Span`s and `Link`s. `align`; `fit`: true or `{ min, max }` keeps it on one line and sizes it to the width; `truncate` keeps it on one line at its own size and ends it with "…" where it stops fitting |
 | `Span(props, ...content)` | A stretch of text with its own style |
 | `Link({ href }, ...)` / `Link({ to }, ...)` | A link to a web address, or to the element with that `id` |
 | `Heading({ level }, ...)` | Levels 1–6. Sized by level (or by the theme's `h1`–`h6`), kept with what follows, bookmarked. `bookmark: false` to leave it out, or a string for a shorter title |
@@ -118,8 +118,8 @@ A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is f
 
 | Element | Notes |
 | --- | --- |
-| `Image({ src })` | JPEG or PNG bytes. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
-| `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks. The same artwork used many times (a logo on every page) is stored once in the file |
+| `Image({ src })` | JPEG or PNG bytes, or the result of `await loadImage(bytes)`, which in a browser also reads WebP, AVIF and GIF. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
+| `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks. The same artwork used many times (a logo on every page) is stored once in the file. `fit: "cover"` fills a box of other proportions and cuts off what sticks out. Shapes painted `currentColor` take the element's `color`; `monochrome` paints every shape in it |
 | `QrCode({ value })` | `size` (default 72), `level`: `"L"`, `"M"`, `"Q"`, `"H"`; `quiet` (default 4 modules); `color` |
 | `Barcode({ value })` | `type`: `"code128"` (default; any ASCII text), `"ean13"`, `"ean8"`, `"upca"`, `"code39"`, `"itf"`, `"itf14"`. `moduleWidth` (narrowest bar, default 1), `barHeight` (default 36), `showText` (default true), `textSize`, `quiet` (margin in modules, default 10), `color`. Check digits are added when left out and refused when wrong |
 | `Canvas({ width, height, draw })` | `draw(g, { width, height })` with `g.rect`, `roundedRect`, `circle`, `ellipse`, `line`, `moveTo`, `lineTo`, `curveTo`, `closePath`, then `fill(color)`, `stroke({ color, width, dash, cap, join })` or `fillAndStroke(color, stroke)`. Text: `g.text(text, x, y, { size, color, font, align, baseline, rotate })` draws one line; `g.measureText(text, { size, font })` gives its width |

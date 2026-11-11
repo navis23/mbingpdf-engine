@@ -1,17 +1,9 @@
 // @vitest-environment happy-dom
-import {
-  Document,
-  type LayoutNode,
-  Link,
-  Page,
-  PageBreak,
-  type RenderOptions,
-  Text,
-} from "mbingpdf";
+import { Document, type LayoutNode, Link, Page, PageBreak, Text } from "mbingpdf";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PdfPreview, type PdfResult, usePdf } from "../src/index.ts";
+import { PdfPreview, type PdfResult, type UsePdfOptions, usePdf } from "../src/index.ts";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -79,7 +71,18 @@ describe("PdfPreview", () => {
       const image = page.querySelector("img");
       expect(image?.getAttribute("src")).toMatch(/^blob:/);
     }
-    expect(pages[1]?.querySelector("img")?.getAttribute("alt")).toBe("Page 2");
+    expect(pages[1]?.querySelector("img")?.getAttribute("alt")).toBe("Page 2 of 2");
+  });
+
+  it("gives screen readers a label of your wording and the page's text", () => {
+    const pageLabel = (page: number, pages: number): string => `Halaman ${page} dari ${pages}`;
+    act(() => root.render(createElement(PdfPreview, { document: sample(), pageLabel })));
+    const pages = [...host.querySelectorAll<HTMLElement>("[data-page]")];
+    expect(pages[0]?.querySelector("img")?.getAttribute("alt")).toBe("Halaman 1 dari 2");
+    // The picture holds no text; the words are beside it, out of sight.
+    const words = pages[0]?.querySelector("div");
+    expect(words?.textContent?.length).toBeGreaterThan(5);
+    expect(words?.style.overflow).toBe("hidden");
   });
 
   it("puts working links on top, and leaves out unsafe ones", () => {
@@ -138,7 +141,7 @@ describe("PdfPreview", () => {
 let result: PdfResult | undefined;
 
 /** Calls the hook and keeps what it returned for the test to look at. */
-function Probe({ document, options }: { document: LayoutNode; options?: RenderOptions }): null {
+function Probe({ document, options }: { document: LayoutNode; options?: UsePdfOptions }): null {
   result = usePdf(document, options);
   return null;
 }
@@ -152,6 +155,25 @@ describe("usePdf", () => {
     expect(new TextDecoder().decode(result?.bytes?.subarray(0, 5))).toBe("%PDF-");
     expect(result?.url).toMatch(/^blob:/);
     expect(result?.error).toBeUndefined();
+  });
+
+  it("in lazy mode makes nothing until asked", async () => {
+    const document = sample();
+    const options = { deterministic: true, lazy: true };
+    await act(async () => root.render(createElement(Probe, { document, options })));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(result?.loading).toBe(false);
+    expect(result?.bytes).toBeUndefined();
+    let made: Uint8Array | undefined;
+    await act(async () => {
+      made = await result?.make();
+    });
+    expect(new TextDecoder().decode(made?.subarray(0, 5))).toBe("%PDF-");
+    expect(result?.bytes).toBe(made);
+    expect(result?.url).toMatch(/^blob:/);
+    // A new document makes the old file stale.
+    await act(async () => root.render(createElement(Probe, { document: sample(), options })));
+    await vi.waitFor(() => expect(result?.bytes).toBeUndefined());
   });
 
   it("reports a document that cannot be made", async () => {

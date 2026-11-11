@@ -392,8 +392,9 @@ async function streamBrotli(compressed: Uint8Array): Promise<Uint8Array> {
     stream = new DecompressionStream("brotli" as CompressionFormat);
   } catch {
     throw new Error(
-      "This runtime has no Brotli decoder, so WOFF2 fonts cannot be read here. Use the TTF or " +
-        "OTF version of the font, or pass a decoder to decodeWoff2().",
+      "WOFF2 fonts cannot be read here: this runtime (most browsers) offers no Brotli decoder " +
+        "to scripts. Use the TTF or OTF file of the font instead; a server can make one from " +
+        "the WOFF2 with decodeWoff2(bytes, zlib.brotliDecompressSync).",
     );
   }
   const writer = stream.writable.getWriter();

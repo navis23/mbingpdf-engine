@@ -473,7 +473,7 @@ export interface ParsedSvg {
    * The shapes, with the drawing's top-left corner at the origin. The same colour gives the
    * very same array each time, which is how a backend knows artwork it has drawn before.
    */
-  items(currentColor: Color): readonly DisplayItem[];
+  items(currentColor: Color, monochrome?: boolean): readonly DisplayItem[];
 }
 
 const parsed: Map<string, ParsedSvg> = new Map();
@@ -512,19 +512,20 @@ export function parseSvg(source: string | Uint8Array): ParsedSvg {
   const result: ParsedSvg = {
     width,
     height,
-    items(currentColor) {
-      const colorKey = JSON.stringify(currentColor);
+    items(currentColor, monochrome = false) {
+      const colorKey = JSON.stringify(currentColor) + (monochrome ? "!" : "");
       let made = byColor.get(colorKey);
       if (!made) {
-        made = itemsFor(currentColor);
+        made = itemsFor(currentColor, monochrome);
         byColor.set(colorKey, made);
       }
       return made;
     },
   };
-  const itemsFor = (currentColor: Color): DisplayItem[] => {
+  const itemsFor = (currentColor: Color, monochrome: boolean): DisplayItem[] => {
+    // In one colour, everything that is painted at all is painted in that colour.
     const resolve = (paint: Paint): Color | undefined =>
-      paint === "none" ? undefined : paint === "current" ? currentColor : paint;
+      paint === "none" ? undefined : paint === "current" || monochrome ? currentColor : paint;
 
     const draw = (
       element: Element,

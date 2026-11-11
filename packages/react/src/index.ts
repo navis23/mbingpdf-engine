@@ -33,6 +33,11 @@ export interface PdfPreviewProps {
   /** Class and style of each page. The default style is a white sheet with a light shadow. */
   pageClassName?: string;
   pageStyle?: CSSProperties;
+  /**
+   * What a screen reader calls each page: `(page, pages) => \`Halaman ${page} dari ${pages}\``.
+   * Default `"Page 1 of 3"`. The page's text follows it.
+   */
+  pageLabel?: (page: number, pages: number) => string;
   /** Called after each layout with the number of pages. */
   onLayout?: (info: { pages: number }) => void;
   /** Called when the document cannot be laid out. Without it the error is shown in place. */
@@ -41,16 +46,27 @@ export interface PdfPreviewProps {
 
 const percent = (part: number, whole: number): string => `${(part / whole) * 100}%`;
 
+/** On the page for screen readers, out of sight for everyone else. */
+const HIDDEN: CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  overflow: "hidden",
+  clipPath: "inset(50%)",
+  whiteSpace: "pre-wrap",
+};
+
 interface PageViewProps {
   page: PreviewPage;
   index: number;
+  label: string;
   prefix: string;
   className: string | undefined;
   style: CSSProperties | undefined;
 }
 
 /** One page: a picture of it, with its links laid on top. */
-function PageView({ page, index, prefix, className, style }: PageViewProps): ReactElement {
+function PageView({ page, index, label, prefix, className, style }: PageViewProps): ReactElement {
   const element = useRef<HTMLDivElement>(null);
   const [src, setSrc] = useState<string>();
 
@@ -110,10 +126,12 @@ function PageView({ page, index, prefix, className, style }: PageViewProps): Rea
     src &&
       createElement("img", {
         src,
-        alt: `Page ${index + 1}`,
+        alt: label,
         draggable: false,
         style: { position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" },
       }),
+    // The picture has no text in it; this gives a screen reader the page's words.
+    src && createElement("div", { style: HIDDEN }, page.text()),
     ...page.anchors.map((anchor, i) =>
       createElement("span", {
         key: `a${i}`,
@@ -182,6 +200,9 @@ export function PdfPreview(props: PdfPreviewProps): ReactElement {
             key: index,
             page,
             index,
+            label: props.pageLabel
+              ? props.pageLabel(index + 1, state.pages.length)
+              : `Page ${index + 1} of ${state.pages.length}`,
             prefix,
             className: props.pageClassName,
             style: props.pageStyle,
@@ -199,8 +220,21 @@ export interface PdfResult {
   error: unknown;
   /** True while the file is being made. */
   loading: boolean;
-  /** Saves the file under this name. Does nothing until the file is made. */
+  /**
+   * Makes the file now and gives its bytes (or `undefined` if it could not be made; see
+   * `error`). With `lazy` this is what starts the work.
+   */
+  make: () => Promise<Uint8Array | undefined>;
+  /** Saves the file under this name, making it first if it has not been made. */
   download: (filename: string) => void;
+}
+
+export interface UsePdfOptions extends RenderOptions {
+  /**
+   * Make the file only when `make()` or `download()` is called, not whenever the document
+   * changes: for a large document behind filters, where rendering on every change is waste.
+   */
+  lazy?: boolean;
 }
 
 /** Saves bytes as a file from the browser. */
@@ -215,49 +249,80 @@ export function downloadPdf(bytes: Uint8Array, filename: string): void {
 }
 
 /**
- * Makes the PDF file of a document, again whenever the document changes. Keep the document
- * stable between renders (`useMemo`). Pass `undefined` to make nothing yet.
+ * Makes the PDF file of a document, again whenever the document changes (or, with `lazy`,
+ * when asked). Keep the document stable between renders (`useMemo`). Pass `undefined` to make
+ * nothing yet.
  */
-export function usePdf(document: LayoutNode | undefined, options?: RenderOptions): PdfResult {
+export function usePdf(document: LayoutNode | undefined, options?: UsePdfOptions): PdfResult {
   const [state, setState] = useState<{ bytes?: Uint8Array; url?: string; error?: unknown }>({});
-  const [loading, setLoading] = useState(document !== undefined);
+  const lazy = options?.lazy === true;
+  const [loading, setLoading] = useState(document !== undefined && !lazy);
   const latest = useRef(options);
   latest.current = options;
+  /** Counts renders, so that a slow one cannot overwrite the result of a later one. */
+  const run = useRef(0);
+  const address = useRef<string | undefined>(undefined);
 
-  useEffect(() => {
+  const make = useCallback(async (): Promise<Uint8Array | undefined> => {
+    const mine = ++run.current;
+    const release = (): void => {
+      if (address.current) URL.revokeObjectURL(address.current);
+      address.current = undefined;
+    };
     if (!document) {
+      release();
       setState({});
       setLoading(false);
-      return;
+      return undefined;
     }
-    let current = true;
-    let url: string | undefined;
     setLoading(true);
-    render(document, latest.current).then(
-      (bytes) => {
-        if (!current) return;
-        url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
-        setState({ bytes, url });
-        setLoading(false);
-      },
-      (error: unknown) => {
-        if (!current) return;
+    try {
+      const { lazy: _lazy, ...renderOptions } = latest.current ?? {};
+      const bytes = await render(document, renderOptions);
+      if (mine !== run.current) return bytes;
+      release();
+      address.current = URL.createObjectURL(
+        new Blob([bytes as BlobPart], { type: "application/pdf" }),
+      );
+      setState({ bytes, url: address.current });
+      setLoading(false);
+      return bytes;
+    } catch (error) {
+      if (mine === run.current) {
+        release();
         setState({ error });
         setLoading(false);
-      },
-    );
-    return () => {
-      current = false;
-      if (url) URL.revokeObjectURL(url);
-    };
+      }
+      return undefined;
+    }
   }, [document]);
+
+  useEffect(() => {
+    if (lazy) {
+      // A file made from the document as it was is no longer the document's file.
+      run.current++;
+      if (address.current) URL.revokeObjectURL(address.current);
+      address.current = undefined;
+      setState({});
+      setLoading(false);
+    } else void make();
+  }, [make, lazy]);
+
+  useEffect(
+    () => () => {
+      run.current++;
+      if (address.current) URL.revokeObjectURL(address.current);
+    },
+    [],
+  );
 
   const { bytes } = state;
   const download = useCallback(
     (filename: string): void => {
       if (bytes) downloadPdf(bytes, filename);
+      else void make().then((made) => made && downloadPdf(made, filename));
     },
-    [bytes],
+    [bytes, make],
   );
-  return { bytes, url: state.url, error: state.error, loading, download };
+  return { bytes, url: state.url, error: state.error, loading, make, download };
 }

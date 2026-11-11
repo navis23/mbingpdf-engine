@@ -35,3 +35,7 @@ Append-only. One short entry per working session; newest at the bottom.
 - Next: M6, by demand; the owner's steps for M4 and the Acrobat checks are unchanged.
 - Later on 2026-11-11: M6 started with what the owner asked for first: barcodes (six symbologies, checked
   by decoding with zbar and ZXing), bar, line and pie charts, and text on `Canvas`. Decisions: rows 75–77.
+- Still 2026-11-11: the running-event app adopted the library before release and sent fourteen notes. Fixed
+  the real bug (the guide told browsers to load WOFF2, which they cannot) and most of the gaps: vertical
+  placement, truncation, dashed borders, SVG cover and recolouring, WebP through the browser, lazy `usePdf`,
+  preview accessibility. Decisions: rows 78–83. npm organisation and token are in place; release dry run passed.

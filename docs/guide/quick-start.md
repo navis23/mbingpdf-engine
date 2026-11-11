@@ -66,13 +66,13 @@ A line feed in a string starts a new line.
 
 Without a font, text is set in Helvetica, one of fourteen fonts every PDF viewer has built in (`StandardFonts`). They cover Western European languages, including English and Indonesian, and add nothing to the file.
 
-For your own typeface, load the font file. TrueType, OpenType and WOFF2 are supported; only the glyphs you use are embedded.
+For your own typeface, load the font file. TrueType and OpenType files (`.ttf`, `.otf`) work everywhere; WOFF2 works on a server (Node, Bun, Deno) but not in a browser, which has no way to unpack it for a script. Only the glyphs you use are embedded.
 
 ```ts
 import { Font, loadFont } from "mbingpdf";
 
 const inter = new Font(await readFile("Inter-Variable.ttf"));     // .ttf or .otf
-const brand = await loadFont(woff2Bytes);                         // also reads .woff2
+const brand = await loadFont(woff2Bytes);                         // also reads .woff2, on a server
 
 Document({ font: inter, size: 10 }, ...);
 Text({ font: inter.instance("Bold") }, "A style cut from a variable font");
@@ -82,9 +82,10 @@ Text({ font: [inter, StandardFonts.ZapfDingbats] }, "Paid ✔");    // falls bac
 ## Images, vector art and QR codes
 
 ```ts
-import { Image, QrCode, Svg } from "mbingpdf";
+import { Image, QrCode, Svg, loadImage } from "mbingpdf";
 
 Image({ src: jpegOrPngBytes, width: mm(40) });        // height follows from the proportions
+Image({ src: await loadImage(webpBytes), width: mm(40) });   // WebP and others, in a browser
 Svg({ src: svgMarkup, width: 120 });                  // drawn as vectors, sharp at any size
 QrCode({ value: "https://example.com/t/0421", size: mm(25) });
 ```

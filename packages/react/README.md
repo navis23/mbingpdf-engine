@@ -31,6 +31,7 @@ The document is laid out again whenever the `document` prop changes. Build it wi
 | `document` | The document to show |
 | `gap` | Space between pages in CSS pixels; default 16 |
 | `debug` | Outline every element's box |
+| `pageLabel` | What a screen reader calls each page: `(page, pages) => string`; default `Page 1 of 3`. The page's text follows it |
 | `className`, `style` | For the element around all pages |
 | `pageClassName`, `pageStyle` | For each page; the default is a white sheet with a light shadow |
 | `onLayout` | Called with `{ pages }` after each layout |
@@ -51,14 +52,16 @@ function DownloadButton({ document }) {
 }
 ```
 
-`usePdf(document, options?)` returns `{ bytes, url, error, loading, download }`. `url` can be the `href` of a link or the `src` of an `<iframe>`; `bytes` can be uploaded to a server. The options are those of `render()`.
+`usePdf(document, options?)` returns `{ bytes, url, error, loading, make, download }`. `url` can be the `href` of a link or the `src` of an `<iframe>`; `bytes` can be uploaded to a server. The options are those of `render()`.
 
 To make a file without a hook, call `render()` from `mbingpdf` and pass the bytes to `downloadPdf(bytes, filename)`.
+
+With `usePdf(document, { lazy: true })` nothing is made until `pdf.download(name)` or `pdf.make()` is called: for a large document that should not be rendered again on every change. `make()` gives the bytes.
 
 ## Notes
 
 - Text in embedded fonts is drawn as shapes, so the preview needs no web fonts. Text in the 14 standard PDF fonts uses the closest font on the device and may differ slightly from the PDF.
-- Text in the preview cannot be selected; the PDF's text can.
+- Text in the preview cannot be selected; the PDF's text can. Screen readers are given each page's text.
 - Layout happens in the browser. During server rendering the component gives an empty element.
 
 MIT licence.

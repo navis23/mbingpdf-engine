@@ -139,6 +139,13 @@ export interface SharedItem {
   readonly x: number;
   readonly y: number;
   readonly scale: number;
+  /** Draw only the part inside this rectangle of the page (for artwork that covers a box). */
+  readonly clip?: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 
 export interface DisplayPage {

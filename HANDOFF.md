@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-11 05:20 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps; M6 started · Branch: main_
+_Updated: 2026-11-11 10:25 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps; M6 started · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -84,7 +84,17 @@ M1 has just started; see `docs/05-roadmap.md`.
     - `BarChart`, `LineChart`, `PieChart` in `src/layout/charts.ts`, each a function returning a `Canvas`;
     - `Canvas` text: `g.text()` and `g.measureText()` in `src/layout/canvas.ts`;
     - the `charts` sample covers all of it in the golden images and runtime digests.
-23. Next: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
+23. First adoption: the running-event app moved its documents to the library from `docs/guide/adopting.md`
+    and the packed files in `.tmp-pack/` (not in git; rebuild with `pnpm build` then `pnpm pack` in each
+    package). Its notes are in that app's `docs/16-mbingpdf.md`. Fixed from them (decisions 78–83):
+    `justify` on `Stack` and `Page`, growing `Spacer()` in a stack, `Text({ truncate })`, `width: "auto"`,
+    dashed borders, `Svg({ fit: "cover", monochrome })`, `loadImage()` for WebP in browsers, lazy `usePdf`,
+    `pageLabel` and page text in `PdfPreview`, and the guides (WOFF2 does not load in browsers: use TTF).
+    Not done from the notes: a Brotli decoder for WOFF2 in browsers, WebP on servers, `maxLines`.
+24. Publishing: the owner has created the npm organisation and added `NPM_TOKEN`; a dry run of the Release
+    workflow passed. Left: `pnpm changeset version`, remove the "not on npm yet" lines, push, then the owner
+    runs Release with dry-run off.
+25. Next after that: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
     reading PDFs, HTML subset). Open follow-ups: long-table speed; a hyphen added
     by hyphenation is read as a real hyphen in tagged files; tagged output and encryption are not in the
     benchmarks.
@@ -111,7 +121,7 @@ things do need them, all part of the M4 exit:
 
 ## Health
 - Git: clean after this commit, pushed to origin/main.
-- Checks: lint, typecheck, build, size and 548 tests green. The two speed assertions (5,000 bibs under
+- Checks: lint, typecheck, build, size and 565 tests green. The two speed assertions (5,000 bibs under
   60 s, 1,000 rows under 5 s) fail on this laptop when another project is loading it; they pass otherwise
   and in CI. Runtime digests match on Node, Deno, Chromium and in a Web Worker (11 samples).
 - Published: not published.

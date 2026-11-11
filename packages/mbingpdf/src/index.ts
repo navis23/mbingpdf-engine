@@ -27,7 +27,7 @@ export {
   spot,
 } from "./core/index.ts";
 export { Font, loadFont } from "./font/index.ts";
-export { decodeImage } from "./image/index.ts";
+export { decodeImage, loadImage } from "./image/index.ts";
 export * from "./layout/index.ts";
 export {
   fitText,

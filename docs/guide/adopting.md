@@ -11,10 +11,10 @@ npm install mbingpdf                    # the library; no dependencies
 npm install @mbingpdf/react             # or @mbingpdf/vue: the on-screen preview
 ```
 
-To try a build that is not on npm yet, install the packed files instead. Install all of them in one command, so the preview package finds the library it depends on:
+To try a build that is not on npm yet, install the packed files instead. Copy them into the app's repository first (a `vendor/` folder): a path outside the repository ends up in the lockfile, where CI and teammates cannot follow it. Install all of them in one command, so the preview package finds the library it depends on:
 
 ```sh
-pnpm add /path/to/mbingpdf-0.0.0.tgz /path/to/mbingpdf-react-0.0.0.tgz
+pnpm add ./vendor/mbingpdf-0.0.0.tgz ./vendor/mbingpdf-react-0.0.0.tgz
 ```
 
 Needs Node 22 or later on a server; any current browser.
@@ -55,30 +55,41 @@ How the pieces of a print stylesheet translate:
 | a fixed header or footer, page numbers | `Page({ header, footer: ({ page, pages }) => … })` |
 | `position: absolute` | `Absolute({ top, left, … })` |
 | text shrunk by script to fit a box | `Text({ fit: true })` |
+| `text-overflow: ellipsis` on one line | `Text({ truncate: true })` |
+| centring a block down the page, or a footer pushed to the bottom | `Page({ justify: "center" })`; `Stack({ height, justify })`; a `Spacer()` between the blocks |
+| `border-style: dashed` | `border: { width, color, dash: [3, 2] }` |
+| a background image with `object-fit: cover` | `Image` or `Svg` with `width`, `height` and `fit: "cover"` |
+| an SVG recoloured with `currentColor` or a CSS filter | `Svg({ color })`; `monochrome: true` if the file has fixed colours |
 | a QR code or barcode drawn by another library | `QrCode({ value })`, `Barcode({ value })` |
 | sizes in `mm` or `px` | points; `mm(20)` converts. A CSS pixel is 0.75 pt |
 
 Text properties (`font`, `size`, `color`, `lineHeight`, `align`) set on any element apply to everything inside it, as in CSS.
 
+Two things differ from CSS. A child of a `Row` is as wide as its content unless it has a `width` or `grow`, and it will not shrink below its longest word, so give a long text in a row `grow: 1, basis: 0`, or `truncate` or `fit`. And there is no `min-width: 0` to remember: text with `truncate` or `fit` gives way by itself.
+
 ## 3. Fonts and images
 
 The PDF embeds the font files themselves, so the app must hand over their bytes: a web font loaded by CSS is not enough. Load each file once and keep the result.
+
+Use the `.ttf` or `.otf` file. WOFF2, the format web fonts are served in, can be read on a server but not in a browser. If WOFF2 is all you have, unpack it once on Node: `decodeWoff2(bytes, zlib.brotliDecompressSync)` from `mbingpdf/font` gives the TTF.
 
 ```ts
 import { loadFont, type Font } from "mbingpdf";
 
 let cached: Promise<Font> | undefined;
 export function brandFont(): Promise<Font> {
-  cached ??= fetch("/fonts/Inter-Variable.woff2")          // .ttf, .otf and .woff2 all work
+  cached ??= fetch("/fonts/Inter-Variable.ttf")            // .ttf or .otf
     .then((response) => response.arrayBuffer())
     .then((buffer) => loadFont(new Uint8Array(buffer)));
   return cached;
 }
 ```
 
-With a bundler, import the file's address instead of hard-coding it (`import url from "./Inter.woff2?url"` in Vite). A variable font gives every weight from one file: `font.instance({ wght: 700 })`.
+With a bundler, import the file's address instead of hard-coding it (`import url from "./Inter.ttf?url"` in Vite). A variable font gives every weight from one file: `font.instance({ wght: 700 })`.
 
-Images are bytes too: `new Uint8Array(await (await fetch(url)).arrayBuffer())`. JPEG and PNG are supported. Images from another origin need that origin to allow the request (CORS).
+Images are bytes too: `new Uint8Array(await (await fetch(url)).arrayBuffer())`. JPEG and PNG are read directly. Uploads are often WebP: in a browser, `await loadImage(bytes)` reads those (and AVIF and GIF) with the browser's own decoder and gives something `Image` accepts. On a server, convert them to PNG or JPEG first. Images from another origin need that origin to allow the request (CORS).
+
+In Nuxt, `@nuxt/fonts` serves CSS web fonts, not bytes, and server assets are kept from the browser. What works: put the TTF files in `server/assets/fonts`, read them on the server with `useStorage("assets:server")`, and add a server route that serves an allow-listed file with a long cache for the browser to fetch.
 
 Without a font, text is set in Helvetica, which covers English and Indonesian and adds nothing to the file. That is fine for a first version.
 
@@ -95,6 +106,10 @@ const pdf = usePdf(document);
 ```
 
 The preview is the PDF's own layout, so what is on screen is what is in the file. To print, open the file and let the browser's viewer print it: `window.open(pdf.url)`.
+
+`usePdf` makes the file again whenever the document changes. For a big document behind filters (a sheet of hundreds of labels) that is waste: pass `{ lazy: true }`, and the file is made when `pdf.download(name)` or `pdf.make()` is called.
+
+Give the preview a `pageLabel` in the app's language, `(page, pages) => \`Halaman ${page} dari ${pages}\``; screen readers are given that and the page's text.
 
 Where the old print button was, keep it until the new document has been compared with the old one (step 6), then remove the print stylesheet for that document.
 
@@ -117,7 +132,7 @@ Read fonts and images from disk or storage there instead of fetching them by add
 
 - Put the new PDF beside the old printed page. Check every field with real data: the longest name, an empty optional field, a list long enough to need a second page.
 - Render with `strict: true` in a test. It turns warnings into errors: a character the font lacks, an image too small for print.
-- `inspect(document)` returns every box on every page as plain data, for tests such as "the total is on the last page".
+- `inspect(document)` returns an array with one `{ page, boxes }` per page, every box as plain data with its position, size, text and children, for tests such as "the total is on the last page".
 - Many documents at once (a sheet of labels, a batch of certificates) belong in one `Document` with many pages, not many files. If making it freezes the page, do it in a Web Worker: the library has no dependency on the DOM.
 
 ## 7. Write down what was awkward

@@ -64,18 +64,28 @@ export function toSides(edges: Edges | undefined): Sides {
   };
 }
 
+export interface ResolvedSide {
+  width: number;
+  color: Color;
+  dash?: readonly number[];
+}
+
 export interface ResolvedBorder {
-  top?: { width: number; color: Color };
-  right?: { width: number; color: Color };
-  bottom?: { width: number; color: Color };
-  left?: { width: number; color: Color };
+  top?: ResolvedSide;
+  right?: ResolvedSide;
+  bottom?: ResolvedSide;
+  left?: ResolvedSide;
 }
 
 export function toBorder(border: Border | undefined, fallback: Color): ResolvedBorder {
   if (!border) return {};
-  const side = (value: BorderSide | undefined): { width: number; color: Color } | undefined =>
+  const side = (value: BorderSide | undefined): ResolvedSide | undefined =>
     value && value.width > 0
-      ? { width: value.width, color: value.color === undefined ? fallback : toColor(value.color) }
+      ? {
+          width: value.width,
+          color: value.color === undefined ? fallback : toColor(value.color),
+          ...(value.dash && value.dash.length > 0 ? { dash: value.dash } : {}),
+        }
       : undefined;
   if ("width" in border) {
     const all = side(border);
@@ -99,8 +109,11 @@ export function borderWidths(border: ResolvedBorder): Sides {
 }
 
 /** Resolves a length against the space available; undefined stays undefined. */
-export function toPoints(length: Length | undefined, available: number): number | undefined {
-  if (length === undefined) return undefined;
+export function toPoints(
+  length: Length | "auto" | undefined,
+  available: number,
+): number | undefined {
+  if (length === undefined || length === "auto") return undefined;
   if (typeof length === "number") return length;
   const percent = Number.parseFloat(length);
   if (!length.endsWith("%") || Number.isNaN(percent)) {

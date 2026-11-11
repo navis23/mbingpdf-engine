@@ -75,7 +75,20 @@ describe("PdfPreview", () => {
     for (const page of pages) {
       expect(page.querySelector("img")?.getAttribute("src")).toMatch(/^blob:/);
     }
-    expect(pages[1]?.querySelector("img")?.getAttribute("alt")).toBe("Page 2");
+    expect(pages[1]?.querySelector("img")?.getAttribute("alt")).toBe("Page 2 of 2");
+  });
+
+  it("gives screen readers a label of your wording and the page's text", async () => {
+    const document = sample();
+    const pageLabel = (page: number, pages: number): string => `Halaman ${page} dari ${pages}`;
+    mount(() => h(PdfPreview, { document, pageLabel }));
+    await nextTick();
+    await nextTick();
+    const pages = [...host.querySelectorAll<HTMLElement>("[data-page]")];
+    expect(pages[0]?.querySelector("img")?.getAttribute("alt")).toBe("Halaman 1 dari 2");
+    const words = pages[0]?.querySelector("div");
+    expect(words?.textContent?.length).toBeGreaterThan(5);
+    expect(words?.style.overflow).toBe("hidden");
   });
 
   it("puts working links on top, and leaves out unsafe ones", async () => {
@@ -162,6 +175,28 @@ describe("usePdf", () => {
     expect(new TextDecoder().decode(result?.bytes.value?.subarray(0, 5))).toBe("%PDF-");
     expect(result?.url.value).toMatch(/^blob:/);
     expect(result?.loading.value).toBe(false);
+  });
+
+  it("in lazy mode makes nothing until asked", async () => {
+    const document = shallowRef(sample());
+    let result: PdfResult | undefined;
+    const Probe = defineComponent(() => {
+      result = usePdf(document, { deterministic: true, lazy: true });
+      return () => null;
+    });
+    mount(() => h(Probe));
+    await nextTick();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(result?.loading.value).toBe(false);
+    expect(result?.bytes.value).toBeUndefined();
+    const made = await result?.make();
+    expect(new TextDecoder().decode(made?.subarray(0, 5))).toBe("%PDF-");
+    expect(result?.bytes.value).toBe(made);
+    expect(result?.url.value).toMatch(/^blob:/);
+    // A new document makes the old file stale.
+    document.value = sample();
+    await nextTick();
+    expect(result?.bytes.value).toBeUndefined();
   });
 
   it("reports a document that cannot be made", async () => {

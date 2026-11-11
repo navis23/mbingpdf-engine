@@ -212,7 +212,15 @@ class PageWriter {
               `<symbol id="${id}" viewBox="0 0 ${n(item.width)} ${n(item.height)}">${body}</symbol>`,
             );
           }
-          out += `<use href="#${id}" x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width * item.scale)}" height="${n(item.height * item.scale)}"/>`;
+          let clip = "";
+          if (item.clip) {
+            const clipId = `c${++this.#clips}`;
+            this.defs.push(
+              `<clipPath id="${clipId}"><rect x="${n(item.clip.x)}" y="${n(item.clip.y)}" width="${n(item.clip.width)}" height="${n(item.clip.height)}"/></clipPath>`,
+            );
+            clip = ` clip-path="url(#${clipId})"`;
+          }
+          out += `<use href="#${id}" x="${n(item.x)}" y="${n(item.y)}" width="${n(item.width * item.scale)}" height="${n(item.height * item.scale)}"${clip}/>`;
           break;
         }
       }
@@ -271,8 +279,31 @@ export interface PreviewPage {
   readonly height: number;
   /** The page as an SVG image. Made on first use and kept, so unseen pages cost nothing. */
   svg(): string;
+  /**
+   * The page's text in the order it is drawn, one line of the page per line: what a screen
+   * reader should be given in place of the picture.
+   */
+  text(): string;
   readonly links: readonly PreviewLink[];
   readonly anchors: readonly PreviewAnchor[];
+}
+
+/** The text of a page's items, with a line feed wherever the baseline changes. */
+function pageText(items: readonly DisplayItem[]): string {
+  let out = "";
+  let baseline: number | undefined;
+  const visit = (list: readonly DisplayItem[]): void => {
+    for (const item of list) {
+      if (item.type === "group" || item.type === "tagged") visit(item.items);
+      else if (item.type === "text") {
+        if (baseline !== undefined) out += Math.abs(item.y - baseline) > 0.5 ? "\n" : " ";
+        out += item.text;
+        baseline = item.y;
+      }
+    }
+  };
+  visit(items);
+  return out.replace(/ +/g, " ");
 }
 
 type Point = readonly [number, number];
@@ -345,12 +376,17 @@ export function previewPages(
     const anchors: PreviewAnchor[] = [];
     collectAreas(page.items, (point) => point, links, anchors);
     let svg: string | undefined;
+    let text: string | undefined;
     return {
       width: page.width,
       height: page.height,
       svg: () => {
         svg ??= pageToSvg(page);
         return svg;
+      },
+      text: () => {
+        text ??= pageText(page.items);
+        return text;
       },
       links,
       anchors,
