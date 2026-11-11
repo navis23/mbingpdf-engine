@@ -52,3 +52,14 @@ Append-only. One short entry per working session; newest at the bottom.
 - Mistakes to learn from: size budgets set from local numbers failed CI twice; a test compared against the
   file's random identifier; the site was type-checked against a build that CI does not have.
 - Next: the running-event app's report on 0.1.0, then one document in the rental app.
+
+## Session 4 — 2026-11-11
+- Goal: answer the running-event app's round-4 report, then release.
+- Done: a WebP decoder of our own (`mbingpdf/webp`; `loadImage` reads WebP on servers too), exact to libwebp's
+  pixels on Node, Deno, Bun, Chromium and a Web Worker. Hyphens added at line breaks read as soft hyphens.
+  Answer to round 4 written into the app's notes. Release 0.2.0 (`mbingpdf`) and 0.1.1 (adapters, dev) through
+  npm trusted publishing, no token; tagged `v0.2.0`. Quieter home-page hero.
+- Decisions: rows 86–89 in 07-open-decisions.md.
+- Mistakes to learn from: `setup-node`'s `registry-url` wrote a placeholder token that blocked OIDC; a
+  trusted publisher that was never saved gives "OIDC token exchange error - package not found".
+- Next: the running-event app's round-5 report on 0.2.0.

@@ -90,14 +90,16 @@ _Status: done except the manual check. PDF/A-2b, 2u, 2a and PDF/A-3b, 3u, 3a; ta
 
 ## M6 — Advanced
 
-_Status: in progress. Done: barcodes (Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF, ITF-14) and the chart kit (bar, line, pie) with text on `Canvas`. The rest waits for demand._
+_Status: in progress. Done: barcodes (Code 128, EAN-13, EAN-8, UPC-A, Code 39, ITF, ITF-14) and the chart kit (bar, line, pie) with text on `Canvas`; WebP decoding of our own (`mbingpdf/webp`, 2026-11-11, released in 0.2.0). The rest waits for demand._
 
 Order within this milestone follows user demand.
 
 - Complex scripts through `@mbingpdf/harfbuzz`; bidirectional text; more hyphenation packs.
 - Interactive forms (AcroForm).
 - Digital signatures (PAdES).
-- Barcodes; a small chart kit on `Canvas`.
+- [x] Barcodes; a small chart kit on `Canvas`.
+- [x] WebP images decoded without the platform (lossy, lossless, alpha), on every runtime.
+- [ ] Follow-ups by demand: `maxLines`; long-table speed; crop marks in the SVG preview; GS1-128, Data Matrix, PDF417; WOFF2 in browsers (needs a Brotli decision, row 79).
 - Reading existing PDFs: merge, split, stamp, fill forms (after 1.0).
 - A constrained HTML subset importer for rich-text fields.
 
