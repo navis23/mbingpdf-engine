@@ -7,6 +7,7 @@ import {
   Document,
   Font,
   Heading,
+  hyphenateEnglish,
   Image,
   type LayoutWarning,
   Link,
@@ -175,6 +176,31 @@ describe("tagged PDF", () => {
     expect(latin1(pdf).match(/\/S\/P\b/g)).toHaveLength(1);
     // Content on later pages is tied to the element by page and number.
     expect(latin1(pdf)).toMatch(/\/Type\/MCR\/Pg \d+ 0 R\/MCID 0/);
+  });
+
+  test("a hyphen added at a line break reads as a soft hyphen; a real one stays", async () => {
+    const document = Document(
+      { font: inter },
+      Page(
+        { size: [120, 300], margin: 10 },
+        Text(
+          { hyphenate: hyphenateEnglish, size: 11 },
+          "An e-mail about internationalization and extraordinarily long words.",
+        ),
+      ),
+    );
+    const pdf = await render(document, { tagged: true, compress: false });
+    // The added hyphen is drawn, but stands for U+00AD (ISO 32000-1, 14.8.2.2.3), which
+    // readers leave out: the structure has the word whole, and the real hyphen stays.
+    const soft = latin1(pdf).match(/<([0-9A-F]{4})> <00AD>/)?.[1];
+    expect(soft).toBeDefined();
+    // It is still drawn: its glyph is shown in the content.
+    expect(latin1(pdf)).toMatch(
+      new RegExp(`<(?:[0-9a-f]{4})*${soft}(?:[0-9a-f]{4})*>[^\\]]*\\] TJ`, "i"),
+    );
+    const text = (await structureOutline(pdf))[0]?.join(" ") ?? "";
+    expect(text).toContain("internationalization");
+    expect(text).toContain("e-mail");
   });
 
   test("a link is a Link element that owns its annotation, with a description", async () => {

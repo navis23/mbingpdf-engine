@@ -217,6 +217,12 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             tagged && run === line.runs.at(-1) && !line.hyphenated && !/\s$/.test(run.text)
               ? spaceOf(run.font)
               : undefined;
+          // A hyphen the layout added at a line break is no part of the text: it stands for a
+          // soft hyphen (ISO 32000-1, 14.8.2.2.3), so copied or read text has the word whole.
+          const text =
+            line.hyphenated && run === line.runs.at(-1) && run.text.endsWith("-")
+              ? `${run.text.slice(0, -1)}\u00ad`
+              : run.text;
           target.push({
             type: "text",
             x: runX,
@@ -225,7 +231,7 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             size: run.size,
             color,
             glyphs: spaced ? [...run.glyphs, { ...spaced, cluster: run.text.length }] : run.glyphs,
-            text: spaced ? `${run.text} ` : run.text,
+            text: spaced ? `${text} ` : text,
           });
         }
         // Underline and strike-through follow the font's own metrics where it has them.
