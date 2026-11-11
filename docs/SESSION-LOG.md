@@ -39,3 +39,5 @@ Append-only. One short entry per working session; newest at the bottom.
   the real bug (the guide told browsers to load WOFF2, which they cannot) and most of the gaps: vertical
   placement, truncation, dashed borders, SVG cover and recolouring, WebP through the browser, lazy `usePdf`,
   preview accessibility. Decisions: rows 78–83. npm organisation and token are in place; release dry run passed.
+- 2026-11-11: version 0.1.0 published to npm by the owner through the Release workflow (the first try failed
+  on a token without the bypass-2FA setting; nothing was published by it). Tagged `v0.1.0`.
