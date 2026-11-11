@@ -78,7 +78,8 @@ describe("tagged PDF", () => {
     const document = Document({ font: inter }, Page(Text("biasa")));
     const plain = latin1(await render(document, { compress: false }));
     expect(plain).not.toContain("StructTreeRoot");
-    expect(plain).not.toContain("BDC");
+    // The operator itself, not the letters: the file's identifier is random hex.
+    expect(plain).not.toMatch(/ (BDC|BMC)\n/);
     expect(plain).not.toContain("/Tabs");
     expect(await structureOutline(await render(document))).toEqual([[]]);
   });
