@@ -285,7 +285,6 @@ export function homePage(data: {
   const body = `<main id="main">
 <section class="hero">
   <div class="hero-copy">
-    <p class="eyebrow"><span>TypeScript</span><span>MIT</span><span>0 dependencies</span></p>
     <h1>Documents,<br>typeset<br>in code<span class="dot">.</span></h1>
     <p class="lead">mbingpdf turns a description of a document into a print-ready PDF: in the browser, on a server, at the edge. It measures every glyph itself, so the same input gives the same file everywhere.</p>
     ${install("npm install mbingpdf")}
