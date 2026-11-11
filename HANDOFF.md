@@ -100,8 +100,10 @@ M1 has just started; see `docs/05-roadmap.md`.
     so move the workflow to trusted publishing (OIDC) before the next release. For the next release: add a changeset (`pnpm changeset`), then version, then Release.
 25. Website (decision 85): `site/`, built with `pnpm site`, previewed with `pnpm site:dev`, deployed to GitHub
     Pages by the Site workflow. Showcase documents and playground templates are the same files,
-    `site/templates/*.js`. The owner adds the DNS record for mbingpdf.enterbiner.com (CNAME to
-    `navis23.github.io`, DNS only); until then the address does not resolve.
+    `site/templates/*.js`. Live at https://mbingpdf.enterbiner.com since 2026-11-11: Cloudflare CNAME
+    `mbingpdf` → `navis23.github.io` (DNS only), certificate from GitHub, HTTPS enforced. If GitHub does
+    not issue a certificate for a new domain, clear the custom domain and set it again: it only checks
+    DNS when the domain is saved.
 26. Trusted publishing for npm (no stored token) is to be set up just before the next release: the owner
     adds a trusted publisher per package on npmjs.com (repository `navis23/mbingpdf-engine`, workflow
     `release.yml`), and the workflow changes to `npm publish` with npm 11.5.1 or later.
