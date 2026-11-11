@@ -321,4 +321,5 @@ Warnings tell you about characters no font could show and images that would prin
 ## Next
 
 - [Element reference](./elements.md) — every element and its properties.
+- [Moving a printed page to mbingpdf](./adopting.md) — for an app that prints HTML today.
 - [`examples/`](../../examples) — starter templates: invoice, report, letter, certificate, label sheet.
