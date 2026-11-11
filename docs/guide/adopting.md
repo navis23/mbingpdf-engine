@@ -87,9 +87,9 @@ export function brandFont(): Promise<Font> {
 
 With a bundler, import the file's address instead of hard-coding it (`import url from "./Inter.ttf?url"` in Vite). A variable font gives every weight from one file: `font.instance({ wght: 700 })`.
 
-Images are bytes too: `new Uint8Array(await (await fetch(url)).arrayBuffer())`. JPEG and PNG are read directly. Uploads are often WebP: in a browser, `await loadImage(bytes)` reads those (and AVIF and GIF) with the browser's own decoder and gives something `Image` accepts. On a server, convert them to PNG or JPEG first. Images from another origin need that origin to allow the request (CORS).
+Images are bytes too: `new Uint8Array(await (await fetch(url)).arrayBuffer())`. JPEG and PNG are read directly. Uploads are often WebP: in a browser, `await loadImage(bytes)` reads those (and AVIF and GIF) with the browser's own decoder and gives something `Image` accepts. On a server, convert them to PNG or JPEG first, for example with sharp: `new Uint8Array(await sharp(bytes).png().toBuffer())`. Do it wherever the document is made on both sides, or the file from the server will lack a picture the file from the browser has. Images from another origin need that origin to allow the request (CORS).
 
-In Nuxt, `@nuxt/fonts` serves CSS web fonts, not bytes, and server assets are kept from the browser. What works: put the TTF files in `server/assets/fonts`, read them on the server with `useStorage("assets:server")`, and add a server route that serves an allow-listed file with a long cache for the browser to fetch.
+In Nuxt, `@nuxt/fonts` serves CSS web fonts, not bytes, and server assets are kept from the browser. What works: put the TTF files in `server/assets/fonts`, read them on the server with `useStorage("assets:server")`, and add a server route that serves an allow-listed file with a long cache for the browser to fetch. List `mbingpdf`, `mbingpdf/svg` and `@mbingpdf/vue` in `vite.optimizeDeps.include`, or the dev server finds them on the first page that uses them and reloads it.
 
 Without a font, text is set in Helvetica, which covers English and Indonesian and adds nothing to the file. That is fine for a first version.
 

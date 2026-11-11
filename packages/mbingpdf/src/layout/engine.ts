@@ -562,7 +562,10 @@ function layoutStack(
   }
   const limit = fixedHeight !== undefined ? Math.min(fixedHeight, area.height) : area.height;
   // Room for the bottom padding and border is held back, since the content may end here.
-  const available = limit - decoration.inset.bottom;
+  // Children of a box with a fixed height are not held to that height: what does not fit
+  // sticks out below, as in CSS. Only the end of the page makes them break, so a box that
+  // fits on the page is never split because its content is a little too tall for it.
+  const available = (fixedHeight !== undefined ? area.height : limit) - decoration.inset.bottom;
 
   const box: Box = { x: 0, y: 0, width, height: 0, children: [] };
   const placed: { index: number; box: Box; y: number; whole: boolean }[] = [];

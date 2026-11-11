@@ -262,10 +262,56 @@ describe("small things", () => {
   });
 
   test("a preview page knows its text, for screen readers", () => {
+    const logo =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
     const pages = previewPages(
-      Document(Page(Text("Baris pertama"), Row(Text("kiri"), Text("kanan")), Text("Baris ketiga"))),
+      Document(
+        Page(
+          Text("Baris pertama"),
+          Row(Text("kiri"), Text("kanan")),
+          // A picture is read as its description; one without a description is not read.
+          Row({ gap: 4 }, Text("Penyelenggara ·"), Svg({ src: logo, width: 10, alt: "Derap" })),
+          Svg({ src: logo, width: 10 }),
+          Text("Baris terakhir"),
+        ),
+      ),
     );
-    expect(pages[0]?.text()).toBe("Baris pertama\nkiri kanan\nBaris ketiga");
+    expect(pages[0]?.text()).toBe(
+      "Baris pertama\nkiri kanan\nPenyelenggara · Derap\nBaris terakhir",
+    );
+  });
+
+  test("content a little too tall for a fixed height sticks out; the box is not split", () => {
+    // Two plates of half a page each. A border takes half a point of the first one's height,
+    // so its three parts no longer quite fit inside it.
+    const half = 421;
+    const plate = (border?: { bottom: { width: number } }) =>
+      Stack(
+        { height: half, keepTogether: true, ...(border ? { border } : {}) },
+        Box({ height: 63 }),
+        Box({ height: half - 152 }),
+        Box({ height: 89 }, Text("kaki")),
+      );
+    const page = { size: [595, 842] as [number, number], margin: 0 };
+    expect(inspect(Document(Page(page, plate(), plate())))).toHaveLength(1);
+    const bordered = inspect(Document(Page(page, plate({ bottom: { width: 0.5 } }), plate())));
+    expect(bordered).toHaveLength(1);
+    const [first, second] = bordered[0]?.boxes[0]?.children ?? [];
+    // The plate keeps its height, with all three parts in it; the next starts where it ends.
+    expect(first).toMatchObject({ y: 0, height: half });
+    expect(first?.children).toHaveLength(3);
+    expect(second).toMatchObject({ y: half });
+    // Content too tall for the page itself still breaks at the page.
+    const tall = Document(
+      Page(
+        { size: [200, 200], margin: 0 },
+        Stack(
+          { height: 150 },
+          Array.from({ length: 30 }, (_line, i) => Text(`baris ${i}`)),
+        ),
+      ),
+    );
+    expect(inspect(tall).length).toBeGreaterThan(1);
   });
 
   test("images the library cannot read say what to do about it", async () => {

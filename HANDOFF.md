@@ -91,6 +91,8 @@ M1 has just started; see `docs/05-roadmap.md`.
     dashed borders, `Svg({ fit: "cover", monochrome })`, `loadImage()` for WebP in browsers, lazy `usePdf`,
     `pageLabel` and page text in `PdfPreview`, and the guides (WOFF2 does not load in browsers: use TTF).
     Not done from the notes: a Brotli decoder for WOFF2 in browsers, WebP on servers, `maxLines`.
+    Second round (decision 84): a fixed-height stack no longer splits when its content is slightly too
+    tall; preview text includes pictures' `alt`.
 24. Publishing: the owner has created the npm organisation and added `NPM_TOKEN`; a dry run of the Release
     workflow passed. Left: `pnpm changeset version`, remove the "not on npm yet" lines, push, then the owner
     runs Release with dry-run off.
@@ -153,6 +155,9 @@ things do need them, all part of the M4 exit:
 - Barcode tests decode with `zbarimg` and `ZXingReader` when installed (both are here; CI has zbar only).
   Reference patterns typed from memory were wrong twice while the encoder was right: trust the scanners.
 - Chart colours must be resolved inside `draw`, not when the element is made: the theme is not active yet.
+- Run `vitest` from the repository root. From `packages/mbingpdf` the root config's aliases are not
+  applied, the examples load the built package beside the source, and fonts fail with "undefined does not
+  permit embedding".
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 
 ## Resume checklist

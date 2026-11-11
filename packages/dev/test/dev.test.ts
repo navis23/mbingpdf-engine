@@ -3,7 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { loadDocument, type PreviewServer, startPreview } from "../src/index.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -123,7 +123,8 @@ describe("startPreview", () => {
       source.replace("<PageBreak />", "<PageBreak /><Text>More</Text><PageBreak />"),
     );
     await change;
-    expect(changes.at(-1)).toEqual({ pages: 3, ms: expect.any(Number) });
+    // A save can be reported twice by the file system; wait for the result of the last one.
+    await vi.waitFor(() => expect(changes.at(-1)).toEqual({ pages: 3, ms: expect.any(Number) }));
     expect(new TextDecoder().decode((await reader.read()).value)).toContain("event: change");
     const state = await (await get("/state")).json();
     expect(state.pages).toHaveLength(3);
@@ -133,13 +134,15 @@ describe("startPreview", () => {
     change = nextChange();
     writeFileSync(file, `${source}\nconst broken = ;\n`);
     await change;
-    expect(changes.at(-1)).toEqual({ error: expect.anything() });
+    // A save can be reported twice by the file system; wait for the result of the last one.
+    await vi.waitFor(() => expect(changes.at(-1)).toEqual({ error: expect.anything() }));
     expect((await (await get("/state")).json()).error).toEqual(expect.any(String));
 
     change = nextChange();
     writeFileSync(file, source);
     await change;
-    expect(changes.at(-1)).toEqual({ pages: 2, ms: expect.any(Number) });
+    // A save can be reported twice by the file system; wait for the result of the last one.
+    await vi.waitFor(() => expect(changes.at(-1)).toEqual({ pages: 2, ms: expect.any(Number) }));
     expect((await (await get("/state")).json()).error).toBeUndefined();
     await reader.cancel();
     changes = [];

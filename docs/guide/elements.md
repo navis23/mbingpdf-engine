@@ -12,7 +12,7 @@ Every element is called as `Element(properties?, ...children)`. Properties are o
 | `border` | `{ width, color, dash }`, or `{ top, right, bottom, left }` of those | Lines around the box. `dash: [3, 2]` draws dashes of 3 points with gaps of 2 |
 | `background` | colour | Fill behind the content |
 | `radius` | number | Rounded corners |
-| `width`, `height`, `minWidth`, `maxWidth`, `minHeight` | number or `"50%"`; `width` and `height` also `"auto"` | Size. By default (`"auto"`) an element is as wide as its container and as tall as its content; in a `Row` it is as wide as its content, and shrinks to its narrowest (the longest word of a text) when the row is full |
+| `width`, `height`, `minWidth`, `maxWidth`, `minHeight` | number or `"50%"`; `width` and `height` also `"auto"` | Size. By default (`"auto"`) an element is as wide as its container and as tall as its content; in a `Row` it is as wide as its content, and shrinks to its narrowest (the longest word of a text) when the row is full. A `height` includes the padding and border, as CSS `border-box` does; content taller than a fixed `height` sticks out below it rather than moving to the next page |
 | `opacity` | 0–1 | Transparency of the element and everything in it |
 | `id` | string | A name that `Link({ to })` can point to |
 

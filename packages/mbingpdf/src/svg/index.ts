@@ -294,16 +294,23 @@ function pageText(items: readonly DisplayItem[]): string {
   let baseline: number | undefined;
   const visit = (list: readonly DisplayItem[]): void => {
     for (const item of list) {
-      if (item.type === "group" || item.type === "tagged") visit(item.items);
+      if (item.type === "tagged" && item.tag.role === "Figure" && item.tag.alt !== undefined) {
+        // A picture is read as its description, on the line it sits on if text is beside it.
+        if (out !== "" && !/\s$/.test(out)) out += " ";
+        out += item.tag.alt;
+      } else if (item.type === "group" || item.type === "tagged") visit(item.items);
       else if (item.type === "text") {
-        if (baseline !== undefined) out += Math.abs(item.y - baseline) > 0.5 ? "\n" : " ";
+        if (baseline !== undefined && out !== "") {
+          const separator = Math.abs(item.y - baseline) > 0.5 ? "\n" : " ";
+          out = out.replace(/ +$/, "") + separator;
+        }
         out += item.text;
         baseline = item.y;
       }
     }
   };
   visit(items);
-  return out.replace(/ +/g, " ");
+  return out.replace(/ +/g, " ").replace(/ +$/gm, "");
 }
 
 type Point = readonly [number, number];
@@ -370,7 +377,9 @@ export function previewPages(
   document: LayoutNode | DocumentLayout,
   options: { debug?: boolean } = {},
 ): PreviewPage[] {
-  const layout = "pages" in document ? document : layoutDocument(document, options);
+  // Laid out with its structure noted, so that a page's text can include what pictures show.
+  const layout =
+    "pages" in document ? document : layoutDocument(document, { ...options, tagged: true });
   return layout.pages.map((page) => {
     const links: PreviewLink[] = [];
     const anchors: PreviewAnchor[] = [];

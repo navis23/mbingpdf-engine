@@ -106,7 +106,12 @@ function furniture(
 /** Lays out a document into pages of drawing instructions, without writing a file. */
 export function layoutDocument(
   document: LayoutNode,
-  options: { minImageDpi?: number; debug?: boolean } = {},
+  options: {
+    minImageDpi?: number;
+    debug?: boolean;
+    /** Mark what each part of a page is (paragraph, figure with its description, furniture). */
+    tagged?: boolean;
+  } = {},
 ): DocumentLayout {
   if (document?.type !== "Document") throw new LayoutError("render() needs a Document element");
   // A table of contents shows page numbers that are only known once the document is laid out,
