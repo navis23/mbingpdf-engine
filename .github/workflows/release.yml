@@ -25,7 +25,8 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          registry-url: https://registry.npmjs.org
+          # No registry-url: with one, setup-node writes an .npmrc whose token is a placeholder,
+          # and npm sends that instead of logging in through OIDC (the registry answers 404).
       - name: Install qpdf (structural PDF checks)
         run: sudo apt-get update && sudo apt-get install -y qpdf
       - name: npm 11.5.1 or later (trusted publishing needs it)
@@ -50,3 +51,6 @@ jobs:
             fi
             npm publish "$tarball" --access public
           done
+      - name: Show npm's login attempt
+        if: ${{ failure() && !inputs.dry-run }}
+        run: grep -h -i -E "oidc|trusted|auth" ~/.npm/_logs/*-debug-*.log || true
