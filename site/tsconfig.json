@@ -9,7 +9,11 @@
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "paths": {
+      "mbingpdf": ["../packages/mbingpdf/src/index.ts"],
+      "mbingpdf/svg": ["../packages/mbingpdf/src/svg/index.ts"]
+    }
   },
   "include": ["src", "build", "vite.config.ts"]
 }
