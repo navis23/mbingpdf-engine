@@ -1,6 +1,6 @@
 {
   "name": "@mbingpdf/vue",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vue components and composables for previewing and downloading mbingpdf documents.",
   "license": "MIT",
   "author": "Navis Zarkasy",

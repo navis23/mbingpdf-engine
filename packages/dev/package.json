@@ -1,6 +1,6 @@
 {
   "name": "@mbingpdf/dev",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Preview server and command line for mbingpdf documents: see the pages re-render as you save.",
   "license": "MIT",
   "author": "Navis Zarkasy",

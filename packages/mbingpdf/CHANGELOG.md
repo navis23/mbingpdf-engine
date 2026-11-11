@@ -1,5 +1,16 @@
 # mbingpdf
 
+## 0.2.0
+
+### Minor Changes
+
+- 4b1c252: WebP images are read by the library itself, on servers as well as in browsers: `await loadImage(bytes)` now decodes lossy, lossless and transparent WebP files everywhere, and `decodeWebp` from the new `mbingpdf/webp` entry does it synchronously. The pixels are exactly the ones libwebp produces, on Node, Deno, Bun and in browsers. The decoder (about 18 kB gzip) loads only when a WebP file is read. Animated WebP files are refused.
+
+### Patch Changes
+
+- 0996cba: A hyphen that hyphenation adds at a line break now reads as a soft hyphen (U+00AD) in files with embedded fonts, as tagged PDF requires: screen readers and copied text get the word whole, while the hyphen is drawn as before. Real hyphens are unchanged.
+- 9cc1340: The packages' home page is now the website, https://mbingpdf.enterbiner.com, with a playground and the documentation.
+
 ## 0.1.0
 
 ### Minor Changes
