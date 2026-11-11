@@ -2,11 +2,12 @@
   "mbingpdf": 163840,
   "mbingpdf/core": 47104,
   "mbingpdf/font": 33792,
-  "mbingpdf/image": 10752,
+  "mbingpdf/image": 12288,
   "mbingpdf/qr": 4096,
   "mbingpdf/svg": 124928,
   "mbingpdf/text": 35328,
   "mbingpdf/jsx-runtime": 512,
   "mbingpdf/jsx-dev-runtime": 512,
-  "mbingpdf/barcode": 4096
+  "mbingpdf/barcode": 4096,
+  "mbingpdf/webp": 20480
 }

@@ -89,7 +89,7 @@ Text({ font: [inter, StandardFonts.ZapfDingbats] }, "Paid ✔");    // falls bac
 import { Image, QrCode, Svg, loadImage } from "mbingpdf";
 
 Image({ src: jpegOrPngBytes, width: mm(40) });        // height follows from the proportions
-Image({ src: await loadImage(webpBytes), width: mm(40) });   // WebP and others, in a browser
+Image({ src: await loadImage(webpBytes), width: mm(40) });   // WebP anywhere; AVIF and GIF in a browser
 Svg({ src: svgMarkup, width: 120 });                  // drawn as vectors, sharp at any size
 QrCode({ value: "https://example.com/t/0421", size: mm(25) });
 ```

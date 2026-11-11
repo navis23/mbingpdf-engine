@@ -1,0 +1,106 @@
+{
+  "alpha-compressed": {
+    "size": "50x37",
+    "rgba": "6b5679b6e40dbd5da0f62a5e1fc0440e8015a081fcf54c7f977d992249e4a6c7"
+  },
+  "alpha-gradient": {
+    "size": "64x64",
+    "rgba": "9ce5707fe2732b93e70398d1750a3e98989960f63bc6ddbad3ed2edb38f6496c"
+  },
+  "alpha-horizontal": {
+    "size": "120x80",
+    "rgba": "f6da8398249e6bb01c489e5039c1658e953dc625c73361dfcf8538d7e29622ce"
+  },
+  "alpha-raw": {
+    "size": "50x37",
+    "rgba": "6b5679b6e40dbd5da0f62a5e1fc0440e8015a081fcf54c7f977d992249e4a6c7"
+  },
+  "alpha-vertical": {
+    "size": "120x80",
+    "rgba": "4355c14792e3c964d8ad99505d1cec18a47efed22b8049b298092b38f3234adf"
+  },
+  "lossless-alpha": {
+    "size": "50x37",
+    "rgba": "cb15db8881032b05f9bced7ab61f54f781abd200f6357d12ef63bd08bfb11dd3"
+  },
+  "lossless-best": {
+    "size": "97x61",
+    "rgba": "7e7f2dcee0406dbe218c744687c5c6984d00b481b1f5515babc0e06cb9332a8b"
+  },
+  "lossless-colors16": {
+    "size": "97x61",
+    "rgba": "2e311984d2e3d0e5f60c6e3d47f7f62f1c141b225b9ccfeb9a60935e85dadeb9"
+  },
+  "lossless-colors200": {
+    "size": "97x61",
+    "rgba": "12ac422b9ca151868a2bd9760c0579a7baa8763b7760e1ae1c8c60e565b61540"
+  },
+  "lossless-colors2": {
+    "size": "97x61",
+    "rgba": "37eee450026ba9d54307d1db97f1691da2222a6ed9e258cf9d9aab6edd8afbb6"
+  },
+  "lossless-colors4": {
+    "size": "97x61",
+    "rgba": "77f71f9f628a645f772b3ee4922db796de4717022a55f99f1acfe5ba14dad2e5"
+  },
+  "lossless-dot": {
+    "size": "1x1",
+    "rgba": "5f012c948caddaafc1ed4c7caf67000fc4eb8d7c238ab674167ef75182bebf99"
+  },
+  "lossless-fast": {
+    "size": "97x61",
+    "rgba": "7e7f2dcee0406dbe218c744687c5c6984d00b481b1f5515babc0e06cb9332a8b"
+  },
+  "lossless-near": {
+    "size": "17x33",
+    "rgba": "2e111a53f7377955eb6cc2bcf72ef31afe31c198f8b7ccf7bf190e6c0af7e30c"
+  },
+  "lossless-photo": {
+    "size": "120x80",
+    "rgba": "f666b1e56aa6cd5bb0cc2dc1c4bdd60dd5d8301fee58463c984edfb32b4b8847"
+  },
+  "lossy-dot": {
+    "size": "1x1",
+    "rgba": "e8b4e1f867a3b9a1923c6ea2bf7ac58439b58bab01338b370f5184dde727ca3c"
+  },
+  "lossy-line": {
+    "size": "33x1",
+    "rgba": "e82ed39e6fcca1db6f7e91410703f88e5e69db82f0ee23588c3cf902994dd265"
+  },
+  "lossy-no-filter": {
+    "size": "97x61",
+    "rgba": "ab55d621a44b4a7d03f95afa1c852cea59ed168bdf620f81799183176719cde7"
+  },
+  "lossy-one-segment": {
+    "size": "17x33",
+    "rgba": "42164a9e3f7d509ea44dbda19b17915086d186b681730f1796beb7e2e938521f"
+  },
+  "lossy-partitions": {
+    "size": "120x80",
+    "rgba": "53166fb8c3d30bc2504c26d750f2e3760e460512a6bd6e5dde4fb5fd9f5659ac"
+  },
+  "lossy-photo-q100": {
+    "size": "120x80",
+    "rgba": "7a1e0528500b7dca439882c8d494f3d11fe2c4fe31d8adbe95841abf0dc936a3"
+  },
+  "lossy-photo-q5": {
+    "size": "120x80",
+    "rgba": "54a9157a2b3584984d23d4419f240eeb7947879766c6da1327e2a3f0edcbbb4f"
+  },
+  "lossy-photo": {
+    "size": "120x80",
+    "rgba": "1fd91dfd79a8baa2a2897851bf246c7f227af6fb9b4cc092884a165a609f5f3f"
+  },
+  "lossy-sharp-yuv": {
+    "size": "97x61",
+    "rgba": "79cd62fcac68f87def03681d29b8f0598bb39f9f64ecca57afc907ba5554d641"
+  },
+  "lossy-simple-filter": {
+    "size": "97x61",
+    "rgba": "193c8c7beffada24ede073947a635af220593783e4b940e28738d6f810497078"
+  },
+  "lossy-strong-filter": {
+    "size": "97x61",
+    "rgba": "88130721570adc431f5b5e2037f1adf2a7c72d882c7e1e809d6d0ebd0e689ba0"
+  }
+}

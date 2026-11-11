@@ -25,21 +25,30 @@ export function decodeImage(data: Uint8Array): PdfImage {
   if (isPng(data)) return decodePng(data);
   const format = foreignFormat(data);
   throw new Error(
-    format
-      ? `${format} images cannot be read directly: only JPEG and PNG can. ` +
+    format === "WebP"
+      ? "WebP images are read by `await loadImage(bytes)`, or by `decodeWebp(bytes)` from " +
+          '"mbingpdf/webp"; `Image` takes JPEG and PNG bytes directly'
+      : format
+        ? `${format} images cannot be read directly: only JPEG and PNG can. ` +
           "In a browser, `await loadImage(bytes)` reads them with the browser's own decoder."
-      : "Unsupported image format: only JPEG and PNG can be embedded",
+        : "Unsupported image format: only JPEG and PNG can be embedded",
   );
 }
 
 /**
  * Reads an image file of any kind the runtime can show. JPEG and PNG are read as
- * {@link decodeImage} reads them. Anything else (WebP, AVIF, GIF) is handed to the browser's
- * own decoder, so it works in a browser or a Web Worker but not on a server: there, convert
- * the image to PNG or JPEG first. The result can be used as the `src` of an `Image`.
+ * {@link decodeImage} reads them, and WebP by this library's own decoder (loaded only when
+ * needed), so all three work everywhere and give the same pixels everywhere. Anything else
+ * (AVIF, GIF) is handed to the browser's own decoder, so it works in a browser or a Web Worker
+ * but not on a server: there, convert the image to PNG or JPEG first. The result can be used
+ * as the `src` of an `Image`.
  */
 export async function loadImage(data: Uint8Array): Promise<PdfImage> {
   if (isJpeg(data) || isPng(data)) return decodeImage(data);
+  if (foreignFormat(data) === "WebP") {
+    const { decodeWebp } = await import("../webp/index.ts");
+    return decodeWebp(data);
+  }
   const format = foreignFormat(data) ?? "This kind of";
   const scope = globalThis as {
     createImageBitmap?: (

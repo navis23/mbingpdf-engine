@@ -62,6 +62,7 @@ Node 22 or later, current browsers, Bun, Deno and edge runtimes. There are no ru
 | `mbingpdf/font` | Font parsing, subsetting, shaping, variable-font instancing |
 | `mbingpdf/text` | Line breaking, hyphenation, paragraph layout |
 | `mbingpdf/image` | JPEG and PNG decoding |
+| `mbingpdf/webp` | WebP decoding (lossy, lossless, transparent), without the platform |
 | `mbingpdf/qr` | QR code generation |
 | `mbingpdf/barcode` | One-dimensional barcode patterns |
 

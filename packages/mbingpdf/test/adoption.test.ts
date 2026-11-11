@@ -1,4 +1,5 @@
 /** What the first real app to adopt the library found missing. */
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import {
   Box,
@@ -315,15 +316,21 @@ describe("small things", () => {
   });
 
   test("images the library cannot read say what to do about it", async () => {
-    // The first bytes of a WebP file are enough to know it by.
-    const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0, 0]);
-    expect(() => decodeImage(webp)).toThrow(
-      "WebP images cannot be read directly: only JPEG and PNG can. In a browser, `await loadImage(bytes)`",
+    // The first bytes of a GIF file are enough to know it by.
+    const gif = new TextEncoder().encode("GIF89a\x01\x00\x01\x00");
+    expect(() => decodeImage(gif)).toThrow(
+      "GIF images cannot be read directly: only JPEG and PNG can. In a browser, `await loadImage(bytes)`",
     );
     // Node has no image decoder to hand it to. (In Chromium this is checked by hand: it loads.)
-    await expect(loadImage(webp)).rejects.toThrow(
-      "WebP image cannot be read on this runtime: it has no image decoder of its own. Convert the image to PNG or JPEG first.",
+    await expect(loadImage(gif)).rejects.toThrow(
+      "GIF image cannot be read on this runtime: it has no image decoder of its own. Convert the image to PNG or JPEG first.",
     );
+    // WebP is read by the library itself, on a server too (the app's note D).
+    const webp = new Uint8Array(
+      readFileSync(new URL("./images/webp/lossy-photo.webp", import.meta.url)),
+    );
+    expect(() => decodeImage(webp)).toThrow("WebP images are read by `await loadImage(bytes)`");
+    expect(await loadImage(webp)).toMatchObject({ width: 120, height: 80, encoding: "raw" });
     // JPEG and PNG go the usual way, so loadImage can be used for every upload.
     const photo = await loadImage(env.photo);
     expect(photo).toMatchObject({ encoding: "jpeg" });

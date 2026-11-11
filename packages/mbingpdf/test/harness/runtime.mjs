@@ -9,8 +9,10 @@ import * as core from "../../dist/core/index.js";
 import * as font from "../../dist/font/index.js";
 import * as doc from "../../dist/index.js";
 import * as text from "../../dist/text/index.js";
+import { decodeWebp } from "../../dist/webp/index.js";
 import golden from "../golden/digests.json" with { type: "json" };
-import { compareDigests, digestSamples } from "./digest.ts";
+import webpExpected from "../images/webp/expected.json" with { type: "json" };
+import { compareDigests, digestSamples, digestWebp, expectedWebp } from "./digest.ts";
 import { ALL_FONT_FILES, fontFileName } from "./samples.ts";
 
 const runtime =
@@ -45,3 +47,16 @@ if (different.length > 0) {
   );
 }
 console.log(`${runtime}: ${Object.keys(actual).length} samples match the approved digests`);
+
+// WebP decoding gives libwebp's pixels here too.
+const webp = await digestWebp(
+  decodeWebp,
+  async (name) =>
+    new Uint8Array(await readFile(new URL(`../images/webp/${name}.webp`, import.meta.url))),
+  Object.keys(webpExpected),
+);
+const webpDifferent = compareDigests(webp, expectedWebp(webpExpected));
+if (webpDifferent.length > 0) {
+  throw new Error(`${runtime}: WebP pixels differ from libwebp's for ${webpDifferent.join(", ")}`);
+}
+console.log(`${runtime}: ${Object.keys(webp).length} WebP files decode to libwebp's pixels`);

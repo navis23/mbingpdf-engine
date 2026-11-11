@@ -6,3 +6,7 @@
   colour type and bit depth, interlacing, transparency, filters, odd sizes, and deliberately
   corrupt files (names starting with `x`). See `pngsuite/PngSuite.LICENSE`; from
   <http://www.schaik.com/pngsuite/>.
+- `webp/` — WebP files made by `webp/make.sh` with ImageMagick and libwebp, from synthetic
+  pictures (plasma fractals, gradients) and `photo.jpg`; no third-party material. Each covers one
+  part of the format (both loop filters, segments, partitions, palettes, alpha coding and
+  filters). `expected.json` holds the SHA-256 of the RGBA pixels libwebp decodes each file to.

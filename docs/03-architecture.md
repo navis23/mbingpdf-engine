@@ -100,7 +100,8 @@ Pagination controls: `break: before | after | avoid`, `keepTogether`, `keepWithN
 - SVG converted to native vector paths, not rasterised.
 - QR codes drawn as a single vector path.
 - Effective-resolution check: warn when an image will print below a set DPI.
-- Later: WebP and AVIF through the runtime's decoder where one exists; other barcodes.
+- WebP decoded by the library itself (`mbingpdf/webp`): lossy, lossless and alpha, pixel for pixel as libwebp.
+- Later: AVIF through the runtime's decoder where one exists; other barcodes.
 
 ### 5. Public API (`mbingpdf`)
 

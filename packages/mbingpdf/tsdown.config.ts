@@ -12,6 +12,7 @@ const config: UserConfig = defineConfig({
     "qr/index": "src/qr/index.ts",
     "svg/index": "src/svg/index.ts",
     "text/index": "src/text/index.ts",
+    "webp/index": "src/webp/index.ts",
   },
   format: ["esm", "cjs"],
   platform: "neutral",

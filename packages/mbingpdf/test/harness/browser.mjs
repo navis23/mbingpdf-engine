@@ -12,7 +12,8 @@ import { extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import golden from "../golden/digests.json" with { type: "json" };
-import { compareDigests } from "./digest.ts";
+import webpExpected from "../images/webp/expected.json" with { type: "json" };
+import { compareDigests, expectedWebp } from "./digest.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const TYPES = {
@@ -22,6 +23,7 @@ const TYPES = {
   ".ttf": "font/ttf",
   ".otf": "font/otf",
   ".jpg": "image/jpeg",
+  ".webp": "image/webp",
   ".icc": "application/vnd.iccprofile",
 };
 
@@ -60,18 +62,23 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   await page.goto(`${origin}/`);
-  const actual = await page.evaluate(async () => {
-    const { runSamples } = await import("/test/harness/browser-run.ts");
-    return runSamples();
-  });
+  const webpNames = Object.keys(webpExpected);
+  const { actual, webp } = await page.evaluate(async (names) => {
+    const { runSamples, runWebp } = await import("/test/harness/browser-run.ts");
+    return { actual: await runSamples(), webp: await runWebp(names) };
+  }, webpNames);
   // The same again inside a Web Worker, where there is no DOM.
   const worker = await page.evaluate(
-    () =>
+    (names) =>
       new Promise((resolve, reject) => {
-        const instance = new Worker("/test/harness/browser-worker.ts", { type: "module" });
+        const instance = new Worker("/test/harness/browser-worker.ts", {
+          type: "module",
+          name: names.join(","),
+        });
         instance.onmessage = (event) => resolve(event.data);
         instance.onerror = (event) => reject(new Error(event.message || "worker failed to start"));
       }),
+    webpNames,
   );
   if (worker.error) throw new Error(`Web Worker: ${worker.error}`);
   if (worker.hasDocument) throw new Error("The worker check did not run in a worker");
@@ -94,6 +101,20 @@ try {
   console.log(
     `${name} Web Worker: ${Object.keys(worker.digests).length} samples match the approved digests`,
   );
+  // WebP decoding, in the page and in the worker.
+  const webpGolden = expectedWebp(webpExpected);
+  for (const [where, digests] of [
+    ["", webp],
+    [" Web Worker", worker.webp],
+  ]) {
+    const differentWebp = compareDigests(digests, webpGolden);
+    if (differentWebp.length > 0) {
+      throw new Error(`${name}${where}: WebP pixels differ for ${differentWebp.join(", ")}`);
+    }
+    console.log(
+      `${name}${where}: ${Object.keys(digests).length} WebP files decode to libwebp's pixels`,
+    );
+  }
 } finally {
   await browser.close();
   server.close();

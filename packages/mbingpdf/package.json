@@ -21,7 +21,8 @@
     "svg",
     "qr-code",
     "barcode",
-    "charts"
+    "charts",
+    "webp"
   ],
   "type": "module",
   "sideEffects": false,
@@ -116,6 +117,16 @@
       "require": {
         "types": "./dist/text/index.d.cts",
         "default": "./dist/text/index.cjs"
+      }
+    },
+    "./webp": {
+      "import": {
+        "types": "./dist/webp/index.d.ts",
+        "default": "./dist/webp/index.js"
+      },
+      "require": {
+        "types": "./dist/webp/index.d.cts",
+        "default": "./dist/webp/index.cjs"
       }
     },
     "./jsx-runtime": {

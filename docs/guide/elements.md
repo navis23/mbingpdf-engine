@@ -118,7 +118,7 @@ A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is f
 
 | Element | Notes |
 | --- | --- |
-| `Image({ src })` | JPEG or PNG bytes, or the result of `await loadImage(bytes)`, which in a browser also reads WebP, AVIF and GIF. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
+| `Image({ src })` | JPEG or PNG bytes, or the result of `await loadImage(bytes)`, which also reads WebP (lossy, lossless and transparent) on every runtime, and AVIF and GIF in a browser. `width`, `height`; `fit`: `"contain"` (default), `"cover"`, `"fill"` |
 | `Svg({ src })` | SVG markup or bytes, drawn as vectors. Paths, shapes, groups, transforms, solid fills and strokes, opacity. No gradients, text, clipping or masks. The same artwork used many times (a logo on every page) is stored once in the file. `fit: "cover"` fills a box of other proportions and cuts off what sticks out. Shapes painted `currentColor` take the element's `color`; `monochrome` paints every shape in it |
 | `QrCode({ value })` | `size` (default 72), `level`: `"L"`, `"M"`, `"Q"`, `"H"`; `quiet` (default 4 modules); `color` |
 | `Barcode({ value })` | `type`: `"code128"` (default; any ASCII text), `"ean13"`, `"ean8"`, `"upca"`, `"code39"`, `"itf"`, `"itf14"`. `moduleWidth` (narrowest bar, default 1), `barHeight` (default 36), `showText` (default true), `textSize`, `quiet` (margin in modules, default 10), `color`. Check digits are added when left out and refused when wrong |
