@@ -45,6 +45,8 @@ Node 22 or later, current browsers, Bun, Deno and edge runtimes. There are no ru
 
 ## Documentation
 
+**[mbingpdf.enterbiner.com](https://mbingpdf.enterbiner.com)**: the guides below, and a playground that runs the library in your browser.
+
 - [Quick start](https://github.com/navis23/mbingpdf-engine/blob/main/docs/guide/quick-start.md)
 - [Element reference](https://github.com/navis23/mbingpdf-engine/blob/main/docs/guide/elements.md)
 - [Starter templates](https://github.com/navis23/mbingpdf-engine/tree/main/examples): invoice, report, letter, certificate, label sheet

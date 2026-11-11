@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm -r --filter \"!mbingpdf-site\" build",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -19,7 +19,9 @@
     "release": "pnpm build && changeset publish",
     "test:update": "UPDATE_GOLDEN=1 vitest run",
     "test:runtime": "pnpm -r test:runtime:node && pnpm -r test:runtime:deno && pnpm -r test:runtime:browser",
-    "size": "pnpm -r size"
+    "size": "pnpm -r size",
+    "site": "pnpm --filter mbingpdf-site build",
+    "site:dev": "pnpm --filter mbingpdf-site dev"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",

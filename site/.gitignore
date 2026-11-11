@@ -1,0 +1,10 @@
+# Written by build/generate.ts
+/index.html
+/404.html
+/docs/
+/playground/
+/public/gallery/
+/public/fonts/
+/public/docs/
+/dist/
+/public/og.png

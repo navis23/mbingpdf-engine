@@ -41,3 +41,4 @@ Append-only. One short entry per working session; newest at the bottom.
   preview accessibility. Decisions: rows 78–83. npm organisation and token are in place; release dry run passed.
 - 2026-11-11: version 0.1.0 published to npm by the owner through the Release workflow (the first try failed
   on a token without the bypass-2FA setting; nothing was published by it). Tagged `v0.1.0`.
+- 2026-11-11: built the website (`site/`): home, playground, documentation; GitHub Pages workflow. Decision 85.

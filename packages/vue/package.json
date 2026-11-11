@@ -53,7 +53,7 @@
     "mbingpdf": "workspace:^",
     "vue": "^3.5.45"
   },
-  "homepage": "https://github.com/navis23/mbingpdf-engine#readme",
+  "homepage": "https://mbingpdf.enterbiner.com",
   "bugs": {
     "url": "https://github.com/navis23/mbingpdf-engine/issues"
   },

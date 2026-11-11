@@ -39,6 +39,8 @@ What works today:
 
 [`@mbingpdf/dev`](https://github.com/navis23/mbingpdf-engine/tree/main/packages/dev) adds a preview server that redraws a document on every save.
 
+**[mbingpdf.enterbiner.com](https://mbingpdf.enterbiner.com)** has the documentation and a [playground](https://mbingpdf.enterbiner.com/playground/) that runs the library in your browser.
+
 ## Documentation
 
 - [Quick start](./docs/guide/quick-start.md) — from a first document to themes, tables and print.
@@ -56,6 +58,7 @@ pnpm check          # lint, typecheck, test, build, size
 pnpm test:update    # approve changed output (golden images and digests) after reviewing it
 pnpm test:runtime   # built package gives byte-identical output on Node, Deno and Chromium
 pnpm size           # gzip size of each entry point against its budget
+pnpm site:dev       # the website (site/), with live reload
 ```
 
 The tests use `qpdf` for structural checks when it is installed, and render every sample with pdf.js and PDFium to compare against approved images in `packages/mbingpdf/test/golden/`.

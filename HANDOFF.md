@@ -1,5 +1,5 @@
 # HANDOFF — mbingpdf
-_Updated: 2026-11-11 10:25 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps; M6 started · Branch: main_
+_Updated: 2026-11-11 13:40 WIB · Session 2 · Milestone: M0–M3 done; M4 and M5 done except the owner's steps; M6 started · Branch: main_
 
 ## Where we are
 M0, M1, M2 and M3 are finished. The root `mbingpdf` entry now has
@@ -98,7 +98,14 @@ M1 has just started; see `docs/05-roadmap.md`.
     changeset). Published and tagged `v0.1.0`; an install from npm was checked (ESM, CJS, types, CLI).
     The token must be a granular one with "bypass 2FA" ticked; npm says such tokens will be restricted,
     so move the workflow to trusted publishing (OIDC) before the next release. For the next release: add a changeset (`pnpm changeset`), then version, then Release.
-25. Next after that: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
+25. Website (decision 85): `site/`, built with `pnpm site`, previewed with `pnpm site:dev`, deployed to GitHub
+    Pages by the Site workflow. Showcase documents and playground templates are the same files,
+    `site/templates/*.js`. The owner adds the DNS record for mbingpdf.enterbiner.com (CNAME to
+    `navis23.github.io`, DNS only); until then the address does not resolve.
+26. Trusted publishing for npm (no stored token) is to be set up just before the next release: the owner
+    adds a trusted publisher per package on npmjs.com (repository `navis23/mbingpdf-engine`, workflow
+    `release.yml`), and the workflow changes to `npm publish` with npm 11.5.1 or later.
+27. Next after that: the rest of M6 in `docs/05-roadmap.md`, ordered by demand (forms, signatures, complex scripts,
     reading PDFs, HTML subset). Open follow-ups: long-table speed; a hyphen added
     by hyphenation is read as a real hyphen in tagged files; tagged output and encryption are not in the
     benchmarks.
@@ -160,6 +167,9 @@ things do need them, all part of the M4 exit:
 - Run `vitest` from the repository root. From `packages/mbingpdf` the root config's aliases are not
   applied, the examples load the built package beside the source, and fonts fail with "undefined does not
   permit embedding".
+- In the playground and the site's templates the code is wrapped in a block before it becomes a function, so
+  that it may declare `const spot` or `const rgb` although those are also names of exports.
+- `history` imported from CodeMirror hides `window.history`; the site's typecheck caught it.
 - Toolchain on this machine: Node 26, pnpm 10, Deno 2, system Chromium, qpdf, poppler. No Bun (CI covers it).
 
 ## Resume checklist

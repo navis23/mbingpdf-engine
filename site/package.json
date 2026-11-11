@@ -1,0 +1,33 @@
+{
+  "name": "mbingpdf-site",
+  "private": true,
+  "type": "module",
+  "description": "The mbingpdf website: home, playground and documentation.",
+  "scripts": {
+    "generate": "node build/generate.ts",
+    "dev": "node build/generate.ts && vite",
+    "build": "node build/generate.ts && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.0.0",
+    "@codemirror/lang-javascript": "^6.2.0",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
+    "@fontsource-variable/jetbrains-mono": "^5.0.0",
+    "@fontsource-variable/plus-jakarta-sans": "^5.0.0",
+    "@fontsource/barlow-condensed": "^5.0.0",
+    "@lezer/highlight": "^1.0.0",
+    "codemirror": "^6.0.0",
+    "mbingpdf": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "marked": "^16.0.0",
+    "shiki": "^3.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.7"
+  }
+}
