@@ -1,6 +1,6 @@
 {
   "name": "@mbingpdf/react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "React components and hooks for previewing and downloading mbingpdf documents.",
   "license": "MIT",
   "author": "Navis Zarkasy",
