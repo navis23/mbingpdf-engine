@@ -42,6 +42,14 @@ class FakeObserver {
   }
 }
 
+let renders = 0;
+/** Builds its document anew on every render, as a careless caller would. */
+function Unstable(): null {
+  renders++;
+  result = usePdf(sample(), { lazy: true });
+  return null;
+}
+
 let host: HTMLElement;
 let root: Root;
 const original = globalThis.IntersectionObserver;
@@ -62,6 +70,18 @@ afterEach(() => {
 });
 
 describe("PdfPreview", () => {
+  it("shows the fallback until the first layout, and never after", async () => {
+    const { renderToString } = await import("react-dom/server");
+    const document = sample();
+    const fallback = createElement("p", { className: "wait" }, "Menyiapkan…");
+    expect(renderToString(createElement(PdfPreview, { document, fallback }))).toContain(
+      "Menyiapkan…",
+    );
+    await act(async () => root.render(createElement(PdfPreview, { document, fallback })));
+    expect(host.querySelector(".wait")).toBeNull();
+    expect(host.querySelectorAll("[data-page]").length).toBe(2);
+  });
+
   it("shows each page as a picture at the page's proportions", () => {
     act(() => root.render(createElement(PdfPreview, { document: sample() })));
     const pages = [...host.querySelectorAll<HTMLElement>("[data-page]")];
@@ -174,6 +194,14 @@ describe("usePdf", () => {
     // A new document makes the old file stale.
     await act(async () => root.render(createElement(Probe, { document: sample(), options })));
     await vi.waitFor(() => expect(result?.bytes).toBeUndefined());
+  });
+
+  it("in lazy mode a document that is new on every render does not loop", async () => {
+    renders = 0;
+    await act(async () => root.render(createElement(Unstable)));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(renders).toBeLessThan(5);
+    expect(result?.loading).toBe(false);
   });
 
   it("reports a document that cannot be made", async () => {

@@ -75,6 +75,11 @@ export interface TextProps {
   color?: ColorInput;
   /** Distance between baselines as a multiple of the font size. */
   lineHeight?: number;
+  /**
+   * Distance between baselines in points, as typographers give it: `size: 10, leading: 13`.
+   * An alternative to `lineHeight`, which wins when both are given.
+   */
+  leading?: number;
   /** Extra space after each character, in points. */
   letterSpacing?: number;
   /** Extra space after each word space, in points. */

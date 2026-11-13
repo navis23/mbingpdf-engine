@@ -26,10 +26,15 @@ export interface ThemeFontFamily {
   readonly fallback?: readonly TextFont[];
 }
 
-/** A named text style: any text properties, plus a line height given in points. */
-export interface ThemeTextStyle extends Omit<TextProps, "style"> {
-  /** Distance between baselines in points. An alternative to `lineHeight`, which is a ratio. */
-  leading?: number;
+/**
+ * A named text style: any text properties. A colour or font given by name is any string here,
+ * not one of the registered theme's names: the theme is what the names come from, so its own
+ * type must not depend on them (a theme made in a function could not be registered otherwise).
+ * A wrong name is reported when the document is laid out.
+ */
+export interface ThemeTextStyle extends Omit<TextProps, "style" | "color" | "font"> {
+  color?: Color | string;
+  font?: TextFont | readonly TextFont[] | string;
 }
 
 export interface Theme {
@@ -53,6 +58,9 @@ export interface Theme {
  *   interface Register { theme: typeof theme }
  * }
  * ```
+ *
+ * A theme whose fonts are loaded at run time is made in a function; register its return type:
+ * `interface Register { theme: ReturnType<typeof makeTheme> }`.
  */
 export function defineTheme<const T extends Theme>(theme: T): T {
   return theme;

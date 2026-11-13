@@ -44,7 +44,7 @@ The document is laid out again whenever the `document` prop changes. Build it in
 | `layout` | `{ pages }`, after each layout |
 | `error` | The error, when the document cannot be laid out |
 
-The `error` slot replaces the message shown in place: `<template #error="{ error }">…</template>`.
+The `error` slot replaces the message shown in place: `<template #error="{ error }">…</template>`. The `fallback` slot is shown until the first layout is done (and in server rendering): a skeleton or spinner.
 
 ## The file
 

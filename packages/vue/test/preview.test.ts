@@ -64,6 +64,22 @@ afterEach(() => {
 });
 
 describe("PdfPreview", () => {
+  it("shows the fallback slot until the first layout, and never after", async () => {
+    const document = sample();
+    const fallback = () => [h("p", { class: "wait" }, "Menyiapkan…")];
+    // On a server nothing is laid out, so the fallback is what is sent.
+    const { renderToString } = await import("vue/server-renderer");
+    const { createSSRApp } = await import("vue");
+    const html = await renderToString(
+      createSSRApp({ render: () => h(PdfPreview, { document }, { fallback }) }),
+    );
+    expect(html).toContain("Menyiapkan…");
+    mount(() => h(PdfPreview, { document }, { fallback }));
+    await nextTick();
+    expect(host.querySelector(".wait")).toBeNull();
+    expect(host.querySelectorAll("[data-page]").length).toBe(2);
+  });
+
   it("shows each page as a picture at the page's proportions", async () => {
     const document = sample();
     mount(() => h(PdfPreview, { document }));

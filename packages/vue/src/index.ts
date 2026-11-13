@@ -54,6 +54,11 @@ export type PdfPreviewEmits = {
 export type PdfPreviewSlots = SlotsType<{
   /** Shown in place of the pages when the document cannot be laid out. */
   error?: (props: { error: unknown }) => VNode[];
+  /**
+   * Shown until the document has been laid out for the first time (and on a server, where it
+   * never is): a skeleton, a spinner.
+   */
+  fallback?: () => VNode[];
 }>;
 
 const percent = (part: number, whole: number): string => `${(part / whole) * 100}%`;
@@ -194,6 +199,7 @@ export const PdfPreview: DefineSetupFnComponent<PdfPreviewProps, PdfPreviewEmits
       const prefix = `${useId()}-`;
       const pages = shallowRef<PreviewPage[]>([]);
       const failure = shallowRef<{ error: unknown }>();
+      const ready = shallowRef(false);
       let version = 0;
 
       // Laid out in the browser only: a server has no screen to preview on.
@@ -202,6 +208,7 @@ export const PdfPreview: DefineSetupFnComponent<PdfPreviewProps, PdfPreviewEmits
           () => [props.document, props.debug] as const,
           ([document, debug]) => {
             version++;
+            ready.value = true;
             try {
               pages.value = previewPages(document, { debug: debug ?? false });
               failure.value = undefined;
@@ -230,20 +237,22 @@ export const PdfPreview: DefineSetupFnComponent<PdfPreviewProps, PdfPreviewEmits
                     : String(failure.value.error),
                 ),
               ])
-            : pages.value.map((page, index) =>
-                h(PageView, {
-                  // A new layout gives new pages, so each view belongs to one page for life.
-                  key: `${version}-${index}`,
-                  page,
-                  index,
-                  label: props.pageLabel
-                    ? props.pageLabel(index + 1, pages.value.length)
-                    : `Page ${index + 1} of ${pages.value.length}`,
-                  prefix,
-                  pageClass: props.pageClass,
-                  pageStyle: props.pageStyle,
-                }),
-              ),
+            : !ready.value && slots.fallback
+              ? slots.fallback()
+              : pages.value.map((page, index) =>
+                  h(PageView, {
+                    // A new layout gives new pages, so each view belongs to one page for life.
+                    key: `${version}-${index}`,
+                    page,
+                    index,
+                    label: props.pageLabel
+                      ? props.pageLabel(index + 1, pages.value.length)
+                      : `Page ${index + 1} of ${pages.value.length}`,
+                    prefix,
+                    pageClass: props.pageClass,
+                    pageStyle: props.pageStyle,
+                  }),
+                ),
         );
     },
     {

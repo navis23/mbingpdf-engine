@@ -226,14 +226,24 @@ function layoutPass(
     if (!(contentWidth > 0 && contentHeight > 0)) {
       throw new LayoutError("The page margins leave no room for content");
     }
-    // Headers and footers are measured once; their height must not depend on the page number.
-    const sample = { page: 1, pages: 1 };
-    const headerHeight =
-      measureIn(furniture(props.header, sample), context, contentWidth, contentHeight)?.height ?? 0;
-    const footerHeight =
-      measureIn(furniture(props.footer, sample), context, contentWidth, contentHeight)?.height ?? 0;
-    const bodyHeight = contentHeight - headerHeight - footerHeight;
-    if (!(bodyHeight > 0)) throw new LayoutError("The header and footer leave no room for content");
+    // A header or footer may differ from page to page (none on the first, a running head on
+    // the rest), so each page's is measured for that page. The page count is not known yet:
+    // their height may depend on the page number, not on the total.
+    const room = (number: number): { header: number; body: number } => {
+      const sample = { page: number, pages: number };
+      const header =
+        measureIn(furniture(props.header, sample), context, contentWidth, contentHeight)?.height ??
+        0;
+      const footer =
+        measureIn(furniture(props.footer, sample), context, contentWidth, contentHeight)?.height ??
+        0;
+      const body = contentHeight - header - footer;
+      if (!(body > 0)) throw new LayoutError("The header and footer leave no room for content");
+      return { header, body };
+    };
+    const constant = typeof props.header !== "function" && typeof props.footer !== "function";
+    let space = room(planned.length + 1);
+    const bodyHeight = space.body;
 
     // Content that is to be centred, or pushed apart by a spacer, needs a body as tall as
     // the page; otherwise the body is as tall as its content.
@@ -254,16 +264,17 @@ function layoutPass(
     let state: unknown;
     let guard = 0;
     do {
+      if (state !== undefined && !constant) space = room(planned.length + 1);
       const result = layout(
         body,
         context,
-        { width: contentWidth, height: bodyHeight, fresh: true },
+        { width: contentWidth, height: space.body, fresh: true },
         state,
         sink,
       );
       if (result.box) {
         result.box.x = margin.left;
-        result.box.y = margin.top + headerHeight;
+        result.box.y = margin.top + space.header;
       } else if (result.state !== undefined) {
         throw new LayoutError("Content does not fit on an empty page and cannot be split");
       }
@@ -298,6 +309,7 @@ function layoutPass(
     const bleed = Math.max(0, props.bleed ?? 0);
     // The top-left corner of the bleed; plain zero, not negative zero, when there is none.
     const edge = bleed === 0 ? 0 : -bleed;
+    let backdrop: Box | undefined;
     if (props.fill !== undefined) {
       items.push({
         type: "path",
@@ -321,6 +333,7 @@ function layoutPass(
         const painted: DisplayItem[] = [];
         paintBox(box, 0, 0, painted);
         items.push(...furnish(shiftItems(painted, -bleed, -bleed)));
+        backdrop = box;
       }
       sink.page = { width: plan.width, height: plan.height };
     }
@@ -337,6 +350,7 @@ function layoutPass(
     }
     if (plan.body) paintBox(plan.body, 0, 0, items);
     const placed: [Box, number, number][] = [];
+    if (backdrop) placed.push([backdrop, edge, edge]);
     if (header) placed.push([header, margin.left, margin.top]);
     if (plan.body) placed.push([plan.body, 0, 0]);
     const footer = measureIn(

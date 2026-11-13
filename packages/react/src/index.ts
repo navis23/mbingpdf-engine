@@ -10,6 +10,7 @@ import {
   createElement,
   type MouseEvent,
   type ReactElement,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -38,6 +39,11 @@ export interface PdfPreviewProps {
    * Default `"Page 1 of 3"`. The page's text follows it.
    */
   pageLabel?: (page: number, pages: number) => string;
+  /**
+   * Shown until the document has been laid out for the first time (and on a server, where it
+   * never is): a skeleton, a spinner. Without it there is nothing there until then.
+   */
+  fallback?: ReactNode;
   /** Called after each layout with the number of pages. */
   onLayout?: (info: { pages: number }) => void;
   /** Called when the document cannot be laid out. Without it the error is shown in place. */
@@ -168,17 +174,19 @@ function PageView({ page, index, label, prefix, className, style }: PageViewProp
 export function PdfPreview(props: PdfPreviewProps): ReactElement {
   const { document, debug = false, gap = 16 } = props;
   const prefix = `${useId()}-`;
-  const [state, setState] = useState<{ pages: PreviewPage[]; error?: unknown }>({ pages: [] });
+  const [state, setState] = useState<{ pages: PreviewPage[]; error?: unknown; ready?: boolean }>({
+    pages: [],
+  });
   const callbacks = useRef(props);
   callbacks.current = props;
 
   useEffect(() => {
     try {
       const pages = previewPages(document, { debug });
-      setState({ pages });
+      setState({ pages, ready: true });
       callbacks.current.onLayout?.({ pages: pages.length });
     } catch (error) {
-      setState({ pages: [], error });
+      setState({ pages: [], error, ready: true });
       callbacks.current.onError?.(error);
     }
   }, [document, debug]);
@@ -195,19 +203,21 @@ export function PdfPreview(props: PdfPreviewProps): ReactElement {
           { role: "alert", style: { whiteSpace: "pre-wrap", color: "#b00020" } },
           state.error instanceof Error ? state.error.message : String(state.error),
         )
-      : state.pages.map((page, index) =>
-          createElement(PageView, {
-            key: index,
-            page,
-            index,
-            label: props.pageLabel
-              ? props.pageLabel(index + 1, state.pages.length)
-              : `Page ${index + 1} of ${state.pages.length}`,
-            prefix,
-            className: props.pageClassName,
-            style: props.pageStyle,
-          }),
-        ),
+      : !state.ready && props.fallback !== undefined
+        ? props.fallback
+        : state.pages.map((page, index) =>
+            createElement(PageView, {
+              key: index,
+              page,
+              index,
+              label: props.pageLabel
+                ? props.pageLabel(index + 1, state.pages.length)
+                : `Page ${index + 1} of ${state.pages.length}`,
+              prefix,
+              className: props.pageClassName,
+              style: props.pageStyle,
+            }),
+          ),
   );
 }
 
@@ -303,7 +313,13 @@ export function usePdf(document: LayoutNode | undefined, options?: UsePdfOptions
       run.current++;
       if (address.current) URL.revokeObjectURL(address.current);
       address.current = undefined;
-      setState({});
+      // Nothing to forget means nothing to update: a document that is new on every render
+      // must not start another render from here, or the two would chase each other for ever.
+      setState((current) =>
+        current.bytes === undefined && current.url === undefined && current.error === undefined
+          ? current
+          : {},
+      );
       setLoading(false);
     } else void make();
   }, [make, lazy]);

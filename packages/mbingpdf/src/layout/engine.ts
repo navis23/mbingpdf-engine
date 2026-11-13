@@ -43,6 +43,7 @@ import type {
   HeadingProps,
   ImageProps,
   LayoutNode,
+  Length,
   ListProps,
   QrCodeProps,
   RowProps,
@@ -126,6 +127,17 @@ export interface Area {
   fresh: boolean;
   /** Shrink to the content's width instead of filling the area. */
   fit?: boolean;
+  /**
+   * What a percentage height refers to where `height` has no end (inside an `Absolute`): the
+   * height of the box the element sits in.
+   */
+  base?: number;
+}
+
+/** A height in points; a percentage is of the room here, and of nothing when there is no end to it. */
+function heightIn(length: Length | "auto" | undefined, area: Area): number | undefined {
+  const height = toPoints(length, Number.isFinite(area.height) ? area.height : (area.base ?? NaN));
+  return height !== undefined && Number.isFinite(height) ? height : undefined;
 }
 
 export interface LayoutResult {
@@ -556,7 +568,7 @@ function layoutStack(
   const children = normalize(node.children);
 
   // A fixed height that cannot fit here waits for the next page; on a fresh page it is cut.
-  const fixedHeight = first ? toPoints(props.height, area.height) : undefined;
+  const fixedHeight = first ? heightIn(props.height, area) : undefined;
   if (fixedHeight !== undefined && fixedHeight > area.height + 1e-6 && !area.fresh) {
     return { state: RETRY };
   }
@@ -566,6 +578,13 @@ function layoutStack(
   // sticks out below, as in CSS. Only the end of the page makes them break, so a box that
   // fits on the page is never split because its content is a little too tall for it.
   const available = (fixedHeight !== undefined ? area.height : limit) - decoration.inset.bottom;
+
+  // Where the page has no say (inside an `Absolute`), a child's percentage is of this box.
+  const outer = fixedHeight ?? area.base;
+  const percentBase =
+    outer === undefined
+      ? undefined
+      : Math.max(0, outer - decoration.inset.top - decoration.inset.bottom);
 
   const box: Box = { x: 0, y: 0, width, height: 0, children: [] };
   const placed: { index: number; box: Box; y: number; whole: boolean }[] = [];
@@ -613,6 +632,7 @@ function layoutStack(
         height: remaining,
         fresh,
         fit: childAlign !== "stretch",
+        ...(Number.isFinite(remaining) || percentBase === undefined ? {} : { base: percentBase }),
       },
       childState,
       sink,
@@ -629,8 +649,9 @@ function layoutStack(
         );
       }
       next = { index, child: result.state ?? RETRY, broke: true };
-      // A heading must not be left behind at the bottom of the page.
-      while (placed.length > 1) {
+      // A heading must not be left behind at the bottom of the page. When it is all this box
+      // has here, the whole box moves on with it, unless this is the top of a page already.
+      while (placed.length > (area.fresh ? 1 : 0)) {
         const last = placed.at(-1) as (typeof placed)[number];
         if (!last.whole || !keepsWithNext(children[last.index] as LayoutNode)) break;
         placed.pop();
@@ -638,6 +659,8 @@ function layoutStack(
         y = last.y;
         next = { index: last.index, child: undefined, broke: true };
       }
+      // A box that has put nothing here starts over on the next page, padding and all.
+      if (first && placed.length === 0 && absolutes.length === 0) return { state: RETRY };
       break;
     }
 
@@ -674,7 +697,7 @@ function layoutStack(
   let height = y + (finished ? decoration.inset.bottom : 0);
   if (fixedHeight !== undefined) height = limit;
   else {
-    const floor = first ? toPoints(props.minHeight, area.height) : undefined;
+    const floor = first ? heightIn(props.minHeight, area) : undefined;
     if (floor !== undefined) height = Math.max(height, Math.min(floor, area.height));
     // An unfinished box with a background or border runs to the bottom of the page.
     if (!finished && (props.background !== undefined || props.border !== undefined))
@@ -740,10 +763,31 @@ function layoutAbsolute(
     right !== undefined &&
     (props.width === undefined || props.width === "auto");
   const room = container.width - (left ?? 0) - (right ?? 0);
+  // Held at the top and at the bottom, it is as tall as the space between them.
+  const tall = Math.max(0, container.height - (props.top ?? 0) - (props.bottom ?? 0));
+  const held =
+    props.top !== undefined &&
+    props.bottom !== undefined &&
+    (props.height === undefined || props.height === "auto");
   const result = layoutStack(
-    stretched ? { ...node, props: { ...props, width: room } } : node,
+    stretched || held
+      ? {
+          ...node,
+          props: {
+            ...props,
+            ...(stretched ? { width: room } : {}),
+            ...(held ? { height: tall } : {}),
+          },
+        }
+      : node,
     context,
-    { width: Math.max(0, room), height: Number.POSITIVE_INFINITY, fresh: true, fit: !stretched },
+    {
+      width: Math.max(0, room),
+      height: Number.POSITIVE_INFINITY,
+      fresh: true,
+      fit: !stretched,
+      base: tall,
+    },
     undefined,
     sink,
   );
@@ -837,7 +881,7 @@ function layoutRow(
   const children = all.filter((child) => child.type !== "Absolute");
   const widths = state?.widths ?? flexWidths(children, own, innerWidth, gap);
 
-  const fixedHeight = first ? toPoints(props.height, area.height) : undefined;
+  const fixedHeight = first ? heightIn(props.height, area) : undefined;
   if (fixedHeight !== undefined && fixedHeight > area.height + 1e-6 && !area.fresh)
     return { state: RETRY };
   const limit = fixedHeight !== undefined ? Math.min(fixedHeight, area.height) : area.height;

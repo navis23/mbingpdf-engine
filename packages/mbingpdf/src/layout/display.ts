@@ -42,6 +42,12 @@ export type DisplayItem =
       readonly glyphs: readonly PositionedGlyph[];
       /** What the glyphs stand for. */
       readonly text: string;
+      /**
+       * Extra space after each glyph, in points, already part of the glyphs' advances. A
+       * reader that guesses words from the gaps would split spaced-out words, so a backend
+       * that can says what the spacing and the text are.
+       */
+      readonly letterSpacing?: number;
     }
   | {
       readonly type: "image";

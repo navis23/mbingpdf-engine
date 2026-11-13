@@ -54,7 +54,8 @@ Set on any element; inherited by everything inside it.
 | `size` | font size |
 | `color` | `"#RRGGBB"`, `rgb()`, `cmyk()`, `gray()`, `spot()`, or a theme colour name |
 | `lineHeight` | distance between baselines as a multiple of the size |
-| `letterSpacing`, `wordSpacing` | extra space in points |
+| `leading` | the same distance in points (`size: 10, leading: 13`); `lineHeight` wins when both are given |
+| `letterSpacing`, `wordSpacing` | extra space in points. Letter-spaced words are still copied and read as words |
 | `textAlign` | `"left"`, `"center"`, `"right"`, `"justify"` |
 | `transform` | `"uppercase"`, `"lowercase"`, `"capitalize"` |
 | `features` | OpenType features: `{ tnum: true, liga: false }` |
@@ -71,7 +72,7 @@ Set on any element; inherited by everything inside it.
 | `Page(props, ...children)` | `size` (`"A4"`, `"A5"`, `"Letter"`, … or `[width, height]`), `orientation`, `margin` (default 20 mm), `gap`, `justify` (where content that does not fill the page sits: `"center"` for a certificate), `header`, `footer`, `background`, `fill`, `bleed`, `marks`, `fontSize` |
 | `PageBreak()` | Ends the page |
 
-`header`, `footer` and `background` take content, or a function of `{ page, pages }`. The background is laid out across the whole sheet, behind everything.
+`header`, `footer` and `background` take content, or a function of `{ page, pages }`. The background is laid out across the whole sheet, behind everything. A header or footer may differ from page to page (none on the first page, a running head on the rest): each page's content starts below that page's own header. Its height may depend on the page number, not on the total.
 
 ## Layout
 
@@ -83,7 +84,7 @@ Set on any element; inherited by everything inside it.
 | `Spacer(size?)` | A fixed gap. Without a size: all the spare width in a row, or all the spare height in a stack that has a height, or on a page |
 | `Columns(props, ...children)` | Newspaper columns. `count` (default 2), `gap`, `rowGap`, `rule`, `balance` |
 | `Grid(props, ...children)` | Cells of a fixed size. `columns` **required**, `cell: { width?, height }` **required**, `gap`, `rows` |
-| `Absolute(props, ...children)` | Out of the flow. `top`, `right`, `bottom`, `left`, `rotate` (degrees), `anchor`: `"parent"` or `"page"` |
+| `Absolute(props, ...children)` | Out of the flow. `top`, `right`, `bottom`, `left`, `rotate` (degrees), `anchor`: `"parent"` or `"page"`. Given both `left` and `right` it is as wide as the space between them, and given both `top` and `bottom` as tall; a percentage height inside it is a share of that box |
 
 ## Text
 
@@ -112,7 +113,7 @@ Set on any element; inherited by everything inside it.
 | `zebra` | Background of every second row |
 | `headerStyle`, `footerStyle` | Text properties and `background` |
 
-A cell is any child. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is for cells that need properties, `TableRow({ background, height, keepWithNext, ...text }, ...cells)` for rows that do.
+A cell is any child. An empty value (`false`, `null`, `undefined`, as in `paid && "Lunas"`) is an empty cell: the columns after it stay where they are. `Cell({ colSpan, align, verticalAlign, ...box }, ...)` is for cells that need properties, `TableRow({ background, height, keepWithNext, ...text }, ...cells)` for rows that do.
 
 ## Media
 

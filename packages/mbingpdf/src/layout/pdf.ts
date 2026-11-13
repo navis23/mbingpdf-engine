@@ -4,9 +4,11 @@ import {
   type ContentStream,
   cmyk,
   type LinkOptions,
+  PdfDict,
   type PdfDocument,
   type PdfForm,
   type PdfPage,
+  PdfString,
   type PdfStructElement,
 } from "../core/index.ts";
 import type { DisplayItem, DisplayPage, PathCommand, SharedItem, StructureTag } from "./display.ts";
@@ -157,18 +159,44 @@ function drawItems(
         if (stroke) content.restore();
         break;
       }
-      case "text":
+      case "text": {
         if (marks) tagging?.marker.enter(marks);
         // The page is drawn with y pointing down; flipping the text matrix stands the glyphs
         // back upright.
+        // Letter-spaced text would be copied with a space inside every word: the gaps are
+        // as wide as some readers take a word space to be. So the spacing is written as
+        // character spacing (`Tc`), which readers know is not a gap, and ActualText gives the
+        // words to those that go by the gaps all the same. Glyphs that share a cluster keep
+        // their own advances: `Tc` would push a mark off its letter.
+        const tracking = item.letterSpacing;
+        const single =
+          tracking !== undefined &&
+          item.glyphs.every((glyph, i) => glyph.cluster !== item.glyphs[i + 1]?.cluster);
+        if (tracking !== undefined) {
+          content.beginMarkedContent(
+            "Span",
+            new PdfDict({ ActualText: PdfString.text(item.text) }),
+          );
+        }
         content
           .fillColor(item.color)
           .font(item.font as AnyFont, item.size)
           .beginText()
-          .textMatrix(1, 0, 0, -1, item.x, item.y)
-          .showGlyphs(item.glyphs, item.text)
-          .endText();
+          .textMatrix(1, 0, 0, -1, item.x, item.y);
+        if (single) {
+          const units = (tracking * item.font.unitsPerEm) / item.size;
+          content
+            .characterSpacing(tracking)
+            .showGlyphs(
+              item.glyphs.map((glyph) => ({ ...glyph, xAdvance: glyph.xAdvance - units })),
+              item.text,
+            )
+            .characterSpacing(0);
+        } else content.showGlyphs(item.glyphs, item.text);
+        content.endText();
+        if (tracking !== undefined) content.endMarkedContent();
         break;
+      }
       case "image":
         if (marks) tagging?.marker.enter(marks);
         if (item.clip) {

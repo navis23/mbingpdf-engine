@@ -232,6 +232,9 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             color,
             glyphs: spaced ? [...run.glyphs, { ...spaced, cluster: run.text.length }] : run.glyphs,
             text: spaced ? `${text} ` : text,
+            ...((run.style.letterSpacing ?? 0) > 0
+              ? { letterSpacing: run.style.letterSpacing as number }
+              : {}),
           });
         }
         // Underline and strike-through follow the font's own metrics where it has them.

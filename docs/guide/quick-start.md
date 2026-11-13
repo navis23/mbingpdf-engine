@@ -194,6 +194,8 @@ declare module "mbingpdf" {
 }
 ```
 
+When the fonts are fetched at run time, make the theme in a function (`const makeTheme = (fonts) => defineTheme({ … })`) and register `theme: ReturnType<typeof makeTheme>`.
+
 ## Preview on screen
 
 `renderSvg` gives one SVG per page from the same layout, for showing a document without a PDF viewer.

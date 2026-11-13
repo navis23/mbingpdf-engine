@@ -34,6 +34,7 @@ The document is laid out again whenever the `document` prop changes. Build it wi
 | `pageLabel` | What a screen reader calls each page: `(page, pages) => string`; default `Page 1 of 3`. The page's text follows it |
 | `className`, `style` | For the element around all pages |
 | `pageClassName`, `pageStyle` | For each page; the default is a white sheet with a light shadow |
+| `fallback` | Shown until the first layout is done (and in server rendering): a skeleton or spinner |
 | `onLayout` | Called with `{ pages }` after each layout |
 | `onError` | Called when the document cannot be laid out; without it the message is shown in place |
 
