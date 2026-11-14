@@ -223,6 +223,7 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             line.hyphenated && run === line.runs.at(-1) && run.text.endsWith("-")
               ? `${run.text.slice(0, -1)}\u00ad`
               : run.text;
+          const tracked = (run.style.letterSpacing ?? 0) > 0;
           target.push({
             type: "text",
             x: runX,
@@ -230,12 +231,27 @@ export function paintBox(box: Box, originX: number, originY: number, items: Disp
             font: run.font,
             size: run.size,
             color,
-            glyphs: spaced ? [...run.glyphs, { ...spaced, cluster: run.text.length }] : run.glyphs,
-            text: spaced ? `${text} ` : text,
-            ...((run.style.letterSpacing ?? 0) > 0
-              ? { letterSpacing: run.style.letterSpacing as number }
-              : {}),
+            glyphs:
+              spaced && !tracked
+                ? [...run.glyphs, { ...spaced, cluster: run.text.length }]
+                : run.glyphs,
+            text: spaced && !tracked ? `${text} ` : text,
+            ...(tracked ? { letterSpacing: run.style.letterSpacing as number } : {}),
           });
+          // Letter-spaced text is written with its words spelled out for readers; the space
+          // of the line break is no part of those words, so it follows on its own.
+          if (spaced && tracked) {
+            target.push({
+              type: "text",
+              x: runX + run.width,
+              y: baseline,
+              font: run.font,
+              size: run.size,
+              color,
+              glyphs: [{ ...spaced, cluster: 0 }],
+              text: " ",
+            });
+          }
         }
         // Underline and strike-through follow the font's own metrics where it has them.
         const metrics = run.font as TextFont & {

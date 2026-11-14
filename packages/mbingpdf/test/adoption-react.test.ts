@@ -190,6 +190,8 @@ describe("text properties", () => {
       const file = join(mkdtempSync(join(tmpdir(), "mbingpdf-")), "spaced.pdf");
       writeFileSync(file, pdf);
       const text = spawnSync("pdftotext", [file, "-"], { encoding: "utf8" }).stdout;
+      // No space after a label: the space of a line break is not part of the spelled-out words.
+      expect(text).not.toMatch(/[A-Z] \n/);
       expect(text.split(/\s*\n\s*/).filter(Boolean)).toEqual([
         "TANGGAL SURAT PERJANJIAN",
         "INVOICE",
