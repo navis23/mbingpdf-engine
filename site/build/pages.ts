@@ -98,7 +98,7 @@ function footer(version: string): string {
     <nav aria-label="Project">
       <h2>Project</h2>
       <a href="${REPO_URL}" rel="noopener">GitHub</a>
-      <a href="${REPO_URL}/blob/main/packages/mbingpdf/CHANGELOG.md" rel="noopener">Changelog</a>
+      <a href="${REPO_URL}/blob/main/CHANGELOG.md" rel="noopener">Changelog</a>
       <a href="/docs/benchmarks/">Benchmarks</a>
       <a href="${REPO_URL}/issues" rel="noopener">Report a problem</a>
     </nav>

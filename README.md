@@ -2,7 +2,7 @@
 
 A TypeScript library for generating production-grade PDF documents in any JavaScript runtime: browsers, Node, Bun, Deno and edge functions.
 
-**Status: 0.1, early.** On npm as [`mbingpdf`](https://www.npmjs.com/package/mbingpdf). The API may still change before 1.0; changes are listed in each package's `CHANGELOG.md`.
+**Status: 0.2, early.** On npm as [`mbingpdf`](https://www.npmjs.com/package/mbingpdf). The API may still change before 1.0; every release is recorded in [CHANGELOG.md](CHANGELOG.md), and [docs/09-versioning.md](docs/09-versioning.md) says how versions are numbered.
 
 ```sh
 npm install mbingpdf
