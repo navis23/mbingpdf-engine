@@ -1,6 +1,6 @@
 {
   "name": "mbingpdf",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Generate production-grade PDF documents in any JavaScript runtime.",
   "license": "MIT",
   "author": "Navis Zarkasy",

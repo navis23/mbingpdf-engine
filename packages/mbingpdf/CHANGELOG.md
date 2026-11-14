@@ -1,5 +1,11 @@
 # mbingpdf
 
+## 0.2.3
+
+### Patch Changes
+
+- ab121e6: In a tagged file, a letter-spaced label is no longer copied with a space after it (`TANGGAL `): the space that stands for the line break is written after the spelled-out words, not as part of them.
+
 ## 0.2.2
 
 ### Patch Changes
